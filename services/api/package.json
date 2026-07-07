@@ -1,0 +1,18 @@
+{
+  "name": "@harbor/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "pnpm build && pnpm typecheck",
+    "dev": "pnpm build && node dist/index.js",
+    "health": "pnpm build && node dist/health.js",
+    "lint": "pnpm typecheck",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@harbor/protocol": "workspace:*",
+    "@harbor/shared": "workspace:*"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "harbor",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "build": "pnpm -r --sort --if-present build",
+    "check": "pnpm check:format && pnpm check:packages && pnpm check:contracts",
+    "check:contracts": "forge build --root contracts",
+    "check:format": "prettier --check \"README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.base.json\" \"apps/**/*.{json,md,ts,tsx}\" \"services/**/*.{json,md,ts}\" \"packages/**/*.{json,md,ts}\"",
+    "check:packages": "pnpm -r --sort --if-present check",
+    "format": "prettier --write \"README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.base.json\" \"apps/**/*.{json,md,ts,tsx}\" \"services/**/*.{json,md,ts}\" \"packages/**/*.{json,md,ts}\"",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --sort --if-present typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}
