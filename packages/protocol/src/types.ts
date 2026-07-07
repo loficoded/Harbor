@@ -24,5 +24,27 @@ export type AbiEventFragment = {
   readonly inputs: readonly AbiParameter[];
 };
 
-export type AbiFragment = AbiFunctionFragment | AbiEventFragment;
+export type AbiConstructorFragment = {
+  readonly type: "constructor";
+  readonly inputs: readonly AbiParameter[];
+  readonly stateMutability: "nonpayable" | "payable";
+};
+
+export type AbiReceiveFragment = {
+  readonly type: "receive";
+  readonly stateMutability: "payable";
+};
+
+export type AbiErrorFragment = {
+  readonly type: "error";
+  readonly name: string;
+  readonly inputs: readonly AbiParameter[];
+};
+
+export type AbiFragment =
+  | AbiFunctionFragment
+  | AbiEventFragment
+  | AbiConstructorFragment
+  | AbiReceiveFragment
+  | AbiErrorFragment;
 export type Abi = readonly AbiFragment[];

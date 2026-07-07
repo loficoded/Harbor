@@ -36,7 +36,10 @@ import {
   type EvmAddress,
 } from "./index.js";
 
-type NamedFragment = AbiFragment & {
+type NamedFragment = Extract<
+  AbiFragment,
+  { readonly type: "function" | "event" }
+> & {
   readonly inputs: readonly unknown[];
   readonly name: string;
   readonly type: "function" | "event";
@@ -47,7 +50,10 @@ const findFragment = (
   type: "function" | "event",
   name: string,
 ): NamedFragment => {
-  const fragment = abi.find((item) => item.type === type && item.name === name);
+  const fragment = abi.find(
+    (item): item is NamedFragment =>
+      item.type === type && "name" in item && item.name === name,
+  );
   assert.ok(fragment, `${type} ${name} is exported`);
   return fragment;
 };
@@ -227,7 +233,39 @@ describe("ABI exports", () => {
       "getAllContracts",
       0,
     );
-    assert.equal(harborRedeemerAbi.length, 0);
+    expectInputCount(harborRedeemerAbi, "function", "assetManagerAddress", 0);
+    expectInputCount(harborRedeemerAbi, "function", "fAssetTokenAddress", 0);
+    expectInputCount(harborRedeemerAbi, "function", "lotSizeUBA", 0);
+    expectInputCount(harborRedeemerAbi, "function", "assetDecimals", 0);
+    expectInputCount(harborRedeemerAbi, "function", "defaultKeeperExecutor", 0);
+    expectInputCount(harborRedeemerAbi, "function", "executeDefault", 2);
+    expectInputCount(
+      harborRedeemerAbi,
+      "function",
+      "setDefaultKeeperExecutor",
+      1,
+    );
+    expectInputCount(
+      harborRedeemerAbi,
+      "event",
+      "DefaultKeeperExecutorUpdated",
+      1,
+    );
+    expectInputCount(
+      harborRedeemerAbi,
+      "event",
+      "RedemptionDefaultForwarded",
+      3,
+    );
+    assert.equal(
+      harborRedeemerAbi.some(
+        (item) =>
+          item.type === "function" &&
+          "name" in item &&
+          (item.name as string) === "redeemViaHarbor",
+      ),
+      false,
+    );
     assert.equal(harborContractPlaceholders.redeemer.address, undefined);
     assert.equal(harborContractPlaceholders.redeemer.abi, harborRedeemerAbi);
   });

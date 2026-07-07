@@ -33,3 +33,16 @@ The Harbor contract must not assume wrapper redemption is non-custodial until Co
 4. The FDC non-payment request for plain XRPL redemption must use `checkSourceAddresses=false`.
 
 These semantics decide whether Harbor can safely wrap `redeem` or should only provide permissionless default execution helpers for the MVP.
+
+## Prompt #04 Redemption Contract Decision
+
+Verified from the pinned Coston2 FAssets interfaces:
+
+- `IAssetManager.redeem` burns FAssets belonging to the redeemer/caller and emits `RedemptionRequested(redeemer, ...)`.
+- `RedemptionRequestInfo.Data.redeemer` is the native address that receives collateral in case of default.
+- `redemptionPaymentDefault` may only be called by the recorded redeemer, the recorded executor, or the agent owner.
+- `redemptionPaymentDefault` pays default collateral to the recorded redeemer.
+
+MVP contract behavior therefore avoids `redeemViaHarbor`. A single wrapper contract would be recorded as redeemer and would receive default collateral, while `redeem` returns only the redeemed amount and not the emitted request ids needed for a reliable on-chain user-claim map.
+
+Frontend redemption flow must call `AssetManager.redeem(lots, xrplAddress, executor)` directly from the user's wallet after the user approves the AssetManager for the exact FXRP lot amount. To keep default execution permissionless through Harbor, set `executor` to the deployed `HarborRedeemer` address. Anyone can then call `HarborRedeemer.executeDefault(proof, redemptionRequestId)`, which forwards the proof to `AssetManager.redemptionPaymentDefault` and forwards any native executor fee received by Harbor to the caller.

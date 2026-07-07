@@ -12,6 +12,12 @@ const uint = (name: string, internalType = "uint256"): AbiParameter => ({
   type: internalType,
 });
 
+const bool = (name: string): AbiParameter => ({
+  name,
+  internalType: "bool",
+  type: "bool",
+});
+
 const bytes32 = (name: string): AbiParameter => ({
   name,
   internalType: "bytes32",
@@ -365,6 +371,11 @@ const referencedPaymentNonexistenceProof = {
       ],
     },
   ],
+} as const satisfies AbiParameter;
+
+const harborReferencedPaymentNonexistenceProof = {
+  ...referencedPaymentNonexistenceProof,
+  name: "proof",
 } as const satisfies AbiParameter;
 
 export const assetManagerEventsAbi = [
@@ -911,7 +922,162 @@ export const flareContractRegistryAbi = [
   },
 ] as const satisfies Abi;
 
-export const harborRedeemerAbi = [] as const satisfies Abi;
+export const harborRedeemerAbi = [
+  {
+    type: "constructor",
+    inputs: [
+      address("assetManagerOrRegistry"),
+      bool("resolveAssetManagerFromRegistry"),
+      address("initialDefaultKeeperExecutor"),
+      address("initialOwner"),
+    ],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "receive",
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "FXRP_ASSET_MANAGER_REGISTRY_NAME",
+    inputs: [],
+    outputs: [{ name: "", internalType: "string", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "assetDecimals",
+    inputs: [],
+    outputs: [{ name: "", internalType: "uint8", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "assetManagerAddress",
+    inputs: [],
+    outputs: [address("")],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "defaultKeeperExecutor",
+    inputs: [],
+    outputs: [address("")],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "executeDefault",
+    inputs: [
+      harborReferencedPaymentNonexistenceProof,
+      uint("redemptionRequestId"),
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "fAssetTokenAddress",
+    inputs: [],
+    outputs: [address("")],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "lotSizeUBA",
+    inputs: [],
+    outputs: [uint("")],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "owner",
+    inputs: [],
+    outputs: [address("")],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "renounceOwnership",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setDefaultKeeperExecutor",
+    inputs: [address("executor")],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "transferOwnership",
+    inputs: [address("newOwner")],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    anonymous: false,
+    name: "DefaultKeeperExecutorUpdated",
+    inputs: [{ ...address("executor"), indexed: true }],
+  },
+  {
+    type: "event",
+    anonymous: false,
+    name: "OwnershipTransferred",
+    inputs: [
+      { ...address("previousOwner"), indexed: true },
+      { ...address("newOwner"), indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    anonymous: false,
+    name: "RedemptionDefaultForwarded",
+    inputs: [
+      { ...address("caller"), indexed: true },
+      { ...uint("redemptionRequestId"), indexed: true },
+      { ...uint("forwardedExecutorFeeNatWei"), indexed: false },
+    ],
+  },
+  {
+    type: "error",
+    name: "AssetManagerResolutionFailed",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "DirectNativeTransferRejected",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "NativeForwardFailed",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "OwnableInvalidOwner",
+    inputs: [address("owner")],
+  },
+  {
+    type: "error",
+    name: "OwnableUnauthorizedAccount",
+    inputs: [address("account")],
+  },
+  {
+    type: "error",
+    name: "ReentrancyGuardReentrantCall",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "ZeroAddress",
+    inputs: [],
+  },
+] as const satisfies Abi;
 
 export const iAssetManagerAbi = assetManagerAbi;
 export const iAssetManagerEventsAbi = assetManagerEventsAbi;
