@@ -8,5 +8,8 @@
     "check": "pnpm build && pnpm typecheck",
     "lint": "pnpm typecheck",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@harbor/protocol": "workspace:*"
   }
 }

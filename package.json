@@ -7,11 +7,15 @@
   "scripts": {
     "build": "pnpm -r --sort --if-present build",
     "check": "pnpm check:format && pnpm check:packages && pnpm check:contracts",
-    "check:contracts": "forge build --root contracts",
+    "check:contracts": "forge test --root contracts",
     "check:format": "prettier --check \"README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.base.json\" \"apps/**/*.{json,md,ts,tsx}\" \"services/**/*.{json,md,ts}\" \"packages/**/*.{json,md,ts}\"",
     "check:packages": "pnpm -r --sort --if-present check",
+    "deploy:harbor:coston2": "forge script --root contracts contracts/script/DeployHarborRedeemer.s.sol:DeployHarborRedeemer --rpc-url \"$RPC_URL_COSTON2\" --broadcast",
+    "deploy:harbor:coston2:dry-run": "forge script --root contracts contracts/script/DeployHarborRedeemer.s.sol:DeployHarborRedeemer --rpc-url \"$RPC_URL_COSTON2\"",
     "format": "prettier --write \"README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.base.json\" \"apps/**/*.{json,md,ts,tsx}\" \"services/**/*.{json,md,ts}\" \"packages/**/*.{json,md,ts}\"",
     "lint": "pnpm -r --if-present lint",
+    "protocol:generate-harbor-abi": "forge build --root contracts && pnpm --filter @harbor/protocol generate:harbor-abi",
+    "smoke:protocol-imports": "pnpm --filter @harbor/shared build && pnpm --filter @harbor/protocol build && pnpm --filter @harbor/api typecheck && pnpm --filter @harbor/web typecheck",
     "typecheck": "pnpm -r --sort --if-present typecheck"
   },
   "devDependencies": {

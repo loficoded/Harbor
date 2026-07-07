@@ -46,4 +46,5 @@ export const coston2VerifiedAddressSnapshot = {
   registryAddress: coston2ProtocolAddresses.flareContractRegistry,
 } as const;
 
-export const harborRedeemerAddress: EvmAddress | undefined = undefined;
+export const HARBOR_REDEEMER_ADDRESS: EvmAddress | undefined = undefined;
+export const harborRedeemerAddress = HARBOR_REDEEMER_ADDRESS;
