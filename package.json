@@ -15,6 +15,7 @@
     "typecheck": "pnpm -r --sort --if-present typecheck"
   },
   "devDependencies": {
+    "@flarenetwork/flare-periphery-contracts": "0.1.52",
     "@types/node": "^22.10.1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"

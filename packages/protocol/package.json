@@ -13,8 +13,9 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "pnpm build && pnpm typecheck",
+    "check": "pnpm typecheck && pnpm test",
     "lint": "pnpm typecheck",
+    "test": "pnpm build && node --test \"dist/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }
