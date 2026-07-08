@@ -78,7 +78,16 @@ export function runMigrations(
       continue;
     }
 
-    applyMigration(migration);
+    if (migration.useTransaction === false) {
+      database.exec(migration.sql);
+      insertMigration.run({
+        id: migration.id,
+        appliedAt: new Date().toISOString(),
+      });
+    } else {
+      applyMigration(migration);
+    }
+
     results.push({ id: migration.id, applied: true });
   }
 

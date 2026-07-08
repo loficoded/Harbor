@@ -17,6 +17,7 @@ import {
   coston2VerifiedAddressSnapshot,
   fAssetAbi,
   fdcHubAbi,
+  fdcRequestFeeConfigurationsAbi,
   flareContractRegistryAbi,
   ftsoV2Abi,
   ftsoV2InterfaceAbi,
@@ -213,6 +214,12 @@ describe("ABI exports", () => {
   test("exports FDC, FTSO, Relay, registry, and Harbor placeholder ABIs", () => {
     expectInputCount(fdcHubAbi, "function", "requestAttestation", 1);
     expectInputCount(fdcHubAbi, "function", "requestsOffsetSeconds", 0);
+    expectInputCount(
+      fdcRequestFeeConfigurationsAbi,
+      "function",
+      "getRequestFee",
+      1,
+    );
     expectInputCount(fdcHubAbi, "event", "AttestationRequest", 2);
 
     expectInputCount(ftsoV2Abi, "function", "getFeedById", 1);

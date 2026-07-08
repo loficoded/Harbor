@@ -109,10 +109,16 @@ export function upsertFdcRequest(
       status: input.status ?? existing.status,
       votingRoundId: input.votingRoundId ?? existing.votingRoundId,
       submissionTransactionHash:
-        input.submissionTransactionHash ?? existing.submissionTransactionHash,
-      lastError: input.lastError ?? existing.lastError,
+        input.submissionTransactionHash === undefined
+          ? existing.submissionTransactionHash
+          : input.submissionTransactionHash,
+      lastError:
+        input.lastError === undefined ? existing.lastError : input.lastError,
       retryCount: input.retryCount ?? existing.retryCount,
-      nextRetryAt: input.nextRetryAt ?? existing.nextRetryAt,
+      nextRetryAt:
+        input.nextRetryAt === undefined
+          ? existing.nextRetryAt
+          : input.nextRetryAt,
     };
 
     if (input.updatedAt !== undefined) {
@@ -230,10 +236,16 @@ WHERE fdc_request_id = @fdcRequestId
             : serializeBigint(current.votingRoundId)
           : serializeBigint(input.votingRoundId),
       submissionTransactionHash:
-        input.submissionTransactionHash ?? current.submissionTransactionHash,
-      lastError: input.lastError ?? current.lastError,
+        input.submissionTransactionHash === undefined
+          ? current.submissionTransactionHash
+          : input.submissionTransactionHash,
+      lastError:
+        input.lastError === undefined ? current.lastError : input.lastError,
       retryCount: input.retryCount ?? current.retryCount,
-      nextRetryAt: input.nextRetryAt ?? current.nextRetryAt,
+      nextRetryAt:
+        input.nextRetryAt === undefined
+          ? current.nextRetryAt
+          : input.nextRetryAt,
       updatedAt: input.updatedAt ?? nowIso(),
     });
 

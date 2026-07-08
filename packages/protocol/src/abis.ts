@@ -324,56 +324,62 @@ export const referencedPaymentNonexistenceRequestBodyAbi = [
   bytes32("sourceAddressesRoot"),
 ] as const satisfies readonly AbiParameter[];
 
+export const referencedPaymentNonexistenceResponseBodyAbi = [
+  {
+    name: "minimalBlockTimestamp",
+    internalType: "uint64",
+    type: "uint64",
+  },
+  {
+    name: "firstOverflowBlockNumber",
+    internalType: "uint64",
+    type: "uint64",
+  },
+  {
+    name: "firstOverflowBlockTimestamp",
+    internalType: "uint64",
+    type: "uint64",
+  },
+] as const satisfies readonly AbiParameter[];
+
+export const referencedPaymentNonexistenceResponseAbi = [
+  bytes32("attestationType"),
+  bytes32("sourceId"),
+  { name: "votingRound", internalType: "uint64", type: "uint64" },
+  {
+    name: "lowestUsedTimestamp",
+    internalType: "uint64",
+    type: "uint64",
+  },
+  {
+    name: "requestBody",
+    internalType: "struct IReferencedPaymentNonexistence.RequestBody",
+    type: "tuple",
+    components: referencedPaymentNonexistenceRequestBodyAbi,
+  },
+  {
+    name: "responseBody",
+    internalType: "struct IReferencedPaymentNonexistence.ResponseBody",
+    type: "tuple",
+    components: referencedPaymentNonexistenceResponseBodyAbi,
+  },
+] as const satisfies readonly AbiParameter[];
+
+export const referencedPaymentNonexistenceProofAbi = [
+  { name: "merkleProof", internalType: "bytes32[]", type: "bytes32[]" },
+  {
+    name: "data",
+    internalType: "struct IReferencedPaymentNonexistence.Response",
+    type: "tuple",
+    components: referencedPaymentNonexistenceResponseAbi,
+  },
+] as const satisfies readonly AbiParameter[];
+
 const referencedPaymentNonexistenceProof = {
   name: "_proof",
   internalType: "struct IReferencedPaymentNonexistence.Proof",
   type: "tuple",
-  components: [
-    { name: "merkleProof", internalType: "bytes32[]", type: "bytes32[]" },
-    {
-      name: "data",
-      internalType: "struct IReferencedPaymentNonexistence.Response",
-      type: "tuple",
-      components: [
-        bytes32("attestationType"),
-        bytes32("sourceId"),
-        { name: "votingRound", internalType: "uint64", type: "uint64" },
-        {
-          name: "lowestUsedTimestamp",
-          internalType: "uint64",
-          type: "uint64",
-        },
-        {
-          name: "requestBody",
-          internalType: "struct IReferencedPaymentNonexistence.RequestBody",
-          type: "tuple",
-          components: referencedPaymentNonexistenceRequestBodyAbi,
-        },
-        {
-          name: "responseBody",
-          internalType: "struct IReferencedPaymentNonexistence.ResponseBody",
-          type: "tuple",
-          components: [
-            {
-              name: "minimalBlockTimestamp",
-              internalType: "uint64",
-              type: "uint64",
-            },
-            {
-              name: "firstOverflowBlockNumber",
-              internalType: "uint64",
-              type: "uint64",
-            },
-            {
-              name: "firstOverflowBlockTimestamp",
-              internalType: "uint64",
-              type: "uint64",
-            },
-          ],
-        },
-      ],
-    },
-  ],
+  components: referencedPaymentNonexistenceProofAbi,
 } as const satisfies AbiParameter;
 
 export const assetManagerEventsAbi = [
@@ -798,6 +804,16 @@ export const fdcHubAbi = [
         type: "address",
       },
     ],
+    stateMutability: "view",
+  },
+] as const satisfies Abi;
+
+export const fdcRequestFeeConfigurationsAbi = [
+  {
+    type: "function",
+    name: "getRequestFee",
+    inputs: [{ name: "_data", internalType: "bytes", type: "bytes" }],
+    outputs: [{ name: "", internalType: "uint256", type: "uint256" }],
     stateMutability: "view",
   },
 ] as const satisfies Abi;

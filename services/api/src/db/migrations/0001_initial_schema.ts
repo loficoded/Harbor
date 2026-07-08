@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS fdc_requests (
   source_chain_id TEXT,
   request_body TEXT NOT NULL,
   request_hash TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('PENDING', 'SUBMITTED', 'FINALIZED', 'FAILED')),
+  status TEXT NOT NULL CHECK (status IN ('PENDING', 'SUBMITTED', 'FINALIZED', 'PROOF_READY', 'FAILED')),
   voting_round_id TEXT,
   submission_transaction_hash TEXT,
   last_error TEXT,

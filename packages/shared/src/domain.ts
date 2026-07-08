@@ -116,7 +116,8 @@ export type XrplPaymentObservation = Readonly<{
   createdAt: IsoTimestamp;
 }>;
 
-export type FdcRequestStatus = "PENDING" | "SUBMITTED" | "FINALIZED" | "FAILED";
+export type FdcRequestStatus =
+  "PENDING" | "SUBMITTED" | "FINALIZED" | "PROOF_READY" | "FAILED";
 
 export type FdcRequestRecord = Readonly<{
   fdcRequestId: string;

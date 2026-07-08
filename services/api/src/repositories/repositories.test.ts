@@ -110,6 +110,7 @@ describe("SQLite migrations", () => {
       { id: "0002_agent_inventory_fields", applied: true },
       { id: "0003_agent_reliability_scores", applied: true },
       { id: "0004_xrpl_observation_receipts", applied: true },
+      { id: "0005_fdc_request_proof_ready_status", applied: true },
     ]);
 
     const tableNames = database
@@ -153,12 +154,17 @@ ORDER BY name
         id: "0004_xrpl_observation_receipts",
         appliedAt: listAppliedMigrations(database)[3]?.appliedAt,
       },
+      {
+        id: "0005_fdc_request_proof_ready_status",
+        appliedAt: listAppliedMigrations(database)[4]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
       { id: "0002_agent_inventory_fields", applied: false },
       { id: "0003_agent_reliability_scores", applied: false },
       { id: "0004_xrpl_observation_receipts", applied: false },
+      { id: "0005_fdc_request_proof_ready_status", applied: false },
     ]);
   });
 });
@@ -351,6 +357,20 @@ describe("XRPL and FDC repositories", () => {
     assert.equal(failed.status, "FAILED");
     assert.equal(failed.lastError, "rate limited");
     assert.equal(failed.retryCount, 2);
+
+    const proofReady = updateFdcRequestStatus(database, {
+      fdcRequestId: "fdc-request-1",
+      status: "PROOF_READY",
+      lastError: null,
+      retryCount: 0,
+      nextRetryAt: null,
+      updatedAt: "2026-07-08T03:19:00.000Z",
+    });
+
+    assert.equal(proofReady.status, "PROOF_READY");
+    assert.equal(proofReady.lastError, null);
+    assert.equal(proofReady.retryCount, 0);
+    assert.equal(proofReady.nextRetryAt, null);
 
     const firstProof = insertFdcProof(database, {
       fdcProofId: "fdc-proof-1",
