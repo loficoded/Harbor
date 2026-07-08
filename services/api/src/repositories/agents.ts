@@ -20,6 +20,8 @@ type AgentRow = Readonly<{
   failed_redemptions: number;
   average_payment_seconds: number | null;
   score_updated_at: string;
+  fee_fields_json: string | null;
+  collateral_metadata_json: string | null;
   raw_inventory_json: string | null;
   last_inventory_refresh_at: string | null;
   created_at: string;
@@ -42,6 +44,8 @@ function mapAgentRow(row: AgentRow): StoredAgentRecord {
       averagePaymentSeconds: row.average_payment_seconds,
       updatedAt: row.score_updated_at,
     },
+    feeFieldsJson: row.fee_fields_json,
+    collateralMetadataJson: row.collateral_metadata_json,
     rawInventoryJson: row.raw_inventory_json,
     lastInventoryRefreshAt: row.last_inventory_refresh_at,
     createdAt: row.created_at,
@@ -56,6 +60,9 @@ export function upsertAgent(
   const createdAt = input.createdAt ?? nowIso();
   const updatedAt = input.updatedAt ?? createdAt;
   const scoreUpdatedAt = input.score?.updatedAt ?? updatedAt;
+  const hasAvailability = input.availability === undefined ? 0 : 1;
+  const hasAvailableLots = input.availableLots === undefined ? 0 : 1;
+  const hasScore = input.score === undefined ? 0 : 1;
 
   database
     .prepare(
@@ -72,6 +79,8 @@ INSERT INTO agents (
   failed_redemptions,
   average_payment_seconds,
   score_updated_at,
+  fee_fields_json,
+  collateral_metadata_json,
   raw_inventory_json,
   last_inventory_refresh_at,
   created_at,
@@ -88,6 +97,8 @@ INSERT INTO agents (
   @failedRedemptions,
   @averagePaymentSeconds,
   @scoreUpdatedAt,
+  @feeFieldsJson,
+  @collateralMetadataJson,
   @rawInventoryJson,
   @lastInventoryRefreshAt,
   @createdAt,
@@ -96,14 +107,16 @@ INSERT INTO agents (
 ON CONFLICT(agent_vault) DO UPDATE SET
   owner = COALESCE(excluded.owner, agents.owner),
   payment_address = COALESCE(excluded.payment_address, agents.payment_address),
-  availability = excluded.availability,
+  availability = CASE WHEN @hasAvailability = 1 THEN excluded.availability ELSE agents.availability END,
   redemption_fee_bips = COALESCE(excluded.redemption_fee_bips, agents.redemption_fee_bips),
-  available_lots = excluded.available_lots,
-  score = excluded.score,
-  successful_redemptions = excluded.successful_redemptions,
-  failed_redemptions = excluded.failed_redemptions,
-  average_payment_seconds = excluded.average_payment_seconds,
-  score_updated_at = excluded.score_updated_at,
+  available_lots = CASE WHEN @hasAvailableLots = 1 THEN excluded.available_lots ELSE agents.available_lots END,
+  score = CASE WHEN @hasScore = 1 THEN excluded.score ELSE agents.score END,
+  successful_redemptions = CASE WHEN @hasScore = 1 THEN excluded.successful_redemptions ELSE agents.successful_redemptions END,
+  failed_redemptions = CASE WHEN @hasScore = 1 THEN excluded.failed_redemptions ELSE agents.failed_redemptions END,
+  average_payment_seconds = CASE WHEN @hasScore = 1 THEN excluded.average_payment_seconds ELSE agents.average_payment_seconds END,
+  score_updated_at = CASE WHEN @hasScore = 1 THEN excluded.score_updated_at ELSE agents.score_updated_at END,
+  fee_fields_json = COALESCE(excluded.fee_fields_json, agents.fee_fields_json),
+  collateral_metadata_json = COALESCE(excluded.collateral_metadata_json, agents.collateral_metadata_json),
   raw_inventory_json = COALESCE(excluded.raw_inventory_json, agents.raw_inventory_json),
   last_inventory_refresh_at = COALESCE(excluded.last_inventory_refresh_at, agents.last_inventory_refresh_at),
   updated_at = excluded.updated_at
@@ -121,10 +134,15 @@ ON CONFLICT(agent_vault) DO UPDATE SET
       failedRedemptions: input.score?.failedRedemptions ?? 0,
       averagePaymentSeconds: input.score?.averagePaymentSeconds ?? null,
       scoreUpdatedAt,
+      feeFieldsJson: input.feeFieldsJson ?? null,
+      collateralMetadataJson: input.collateralMetadataJson ?? null,
       rawInventoryJson: input.rawInventoryJson ?? null,
       lastInventoryRefreshAt: input.lastInventoryRefreshAt ?? null,
       createdAt,
       updatedAt,
+      hasAvailability,
+      hasAvailableLots,
+      hasScore,
     });
 
   return requireRow(

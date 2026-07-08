@@ -105,7 +105,10 @@ describe("SQLite migrations", () => {
     });
 
     const results = runMigrations(database);
-    assert.deepEqual(results, [{ id: "0001_initial_schema", applied: true }]);
+    assert.deepEqual(results, [
+      { id: "0001_initial_schema", applied: true },
+      { id: "0002_agent_inventory_fields", applied: true },
+    ]);
 
     const tableNames = database
       .prepare<[], { name: string }>(
@@ -135,9 +138,14 @@ ORDER BY name
         id: "0001_initial_schema",
         appliedAt: listAppliedMigrations(database)[0]?.appliedAt,
       },
+      {
+        id: "0002_agent_inventory_fields",
+        appliedAt: listAppliedMigrations(database)[1]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
+      { id: "0002_agent_inventory_fields", applied: false },
     ]);
   });
 });

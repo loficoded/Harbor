@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "pnpm typecheck && pnpm test",
+    "agents:refresh": "pnpm build && node dist/indexer/agentInventoryCli.js refresh",
     "db:create": "pnpm build && node dist/db/cli.js create",
     "db:migrate": "pnpm build && node dist/db/cli.js migrate",
     "db:reset": "pnpm build && node dist/db/cli.js reset",

@@ -94,6 +94,8 @@ export type InsertRedemptionEventInput = Omit<
 
 export type StoredAgentRecord = AgentRecord &
   Readonly<{
+    feeFieldsJson: string | null;
+    collateralMetadataJson: string | null;
     rawInventoryJson: string | null;
     lastInventoryRefreshAt: IsoTimestamp | null;
   }>;
@@ -106,6 +108,8 @@ export type UpsertAgentInput = Readonly<{
   redemptionFeeBips?: number | null;
   availableLots?: bigint;
   score?: Partial<AgentScore>;
+  feeFieldsJson?: string | null;
+  collateralMetadataJson?: string | null;
   rawInventoryJson?: string | null;
   lastInventoryRefreshAt?: IsoTimestamp | null;
   createdAt?: IsoTimestamp;
