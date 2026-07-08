@@ -297,6 +297,33 @@ const availableAgentComponents = [
   { name: "status", internalType: "enum AgentInfo.Status", type: "uint8" },
 ] as const satisfies readonly AbiParameter[];
 
+export const referencedPaymentNonexistenceRequestBodyAbi = [
+  {
+    name: "minimalBlockNumber",
+    internalType: "uint64",
+    type: "uint64",
+  },
+  {
+    name: "deadlineBlockNumber",
+    internalType: "uint64",
+    type: "uint64",
+  },
+  {
+    name: "deadlineTimestamp",
+    internalType: "uint64",
+    type: "uint64",
+  },
+  bytes32("destinationAddressHash"),
+  uint("amount"),
+  bytes32("standardPaymentReference"),
+  {
+    name: "checkSourceAddresses",
+    internalType: "bool",
+    type: "bool",
+  },
+  bytes32("sourceAddressesRoot"),
+] as const satisfies readonly AbiParameter[];
+
 const referencedPaymentNonexistenceProof = {
   name: "_proof",
   internalType: "struct IReferencedPaymentNonexistence.Proof",
@@ -320,32 +347,7 @@ const referencedPaymentNonexistenceProof = {
           name: "requestBody",
           internalType: "struct IReferencedPaymentNonexistence.RequestBody",
           type: "tuple",
-          components: [
-            {
-              name: "minimalBlockNumber",
-              internalType: "uint64",
-              type: "uint64",
-            },
-            {
-              name: "deadlineBlockNumber",
-              internalType: "uint64",
-              type: "uint64",
-            },
-            {
-              name: "deadlineTimestamp",
-              internalType: "uint64",
-              type: "uint64",
-            },
-            bytes32("destinationAddressHash"),
-            uint("amount"),
-            bytes32("standardPaymentReference"),
-            {
-              name: "checkSourceAddresses",
-              internalType: "bool",
-              type: "bool",
-            },
-            bytes32("sourceAddressesRoot"),
-          ],
+          components: referencedPaymentNonexistenceRequestBodyAbi,
         },
         {
           name: "responseBody",
