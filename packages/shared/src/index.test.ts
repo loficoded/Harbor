@@ -148,6 +148,19 @@ describe("environment validation", () => {
     assert.equal(env.harborRedeemerAddress, normalizedValidAddress);
   });
 
+  test("accepts a local SQLite backend database path", () => {
+    const env = validateBackendEnv({
+      RPC_URL_COSTON2: "https://coston2-api.flare.network/ext/C/rpc",
+      INDEXER_DB_URL: "./data/harbor.sqlite",
+      XRPL_ENDPOINT: "wss://s.altnet.rippletest.net:51233",
+      FDC_DA_LAYER_URL: "https://fdc-da-layer.example",
+      KEEPER_PRIVATE_KEY: validPrivateKey,
+      HARBOR_REDEEMER_ADDRESS: validAddress,
+    });
+
+    assert.equal(env.indexerDbUrl, "./data/harbor.sqlite");
+  });
+
   test("reports backend env failures together", () => {
     const error = captureEnvError(() =>
       validateBackendEnv({

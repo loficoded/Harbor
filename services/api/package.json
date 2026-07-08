@@ -5,14 +5,22 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "pnpm build && pnpm typecheck",
+    "check": "pnpm typecheck && pnpm test",
+    "db:create": "pnpm build && node dist/db/cli.js create",
+    "db:migrate": "pnpm build && node dist/db/cli.js migrate",
+    "db:reset": "pnpm build && node dist/db/cli.js reset",
     "dev": "pnpm build && node dist/index.js",
     "health": "pnpm build && node dist/health.js",
     "lint": "pnpm typecheck",
+    "test": "pnpm build && node --test \"dist/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@harbor/protocol": "workspace:*",
-    "@harbor/shared": "workspace:*"
+    "@harbor/shared": "workspace:*",
+    "better-sqlite3": "^12.11.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
   }
 }

@@ -120,6 +120,61 @@ function validateUrl(
   }
 }
 
+function isLocalSqlitePath(value: string): boolean {
+  if (value === ":memory:") {
+    return true;
+  }
+
+  return (
+    value.startsWith("./") ||
+    value.startsWith("../") ||
+    value.startsWith("/") ||
+    value.includes("\\") ||
+    value.includes("/") ||
+    /\.(db|sqlite|sqlite3)$/i.test(value)
+  );
+}
+
+function validateDatabaseLocation(
+  env: EnvInput,
+  name: string,
+  issues: EnvValidationIssue[],
+): string | undefined {
+  const value = requiredString(env, name, issues);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (isLocalSqlitePath(value)) {
+    return value;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (
+      !["file:", "sqlite:", "postgres:", "postgresql:"].includes(url.protocol)
+    ) {
+      issues.push({
+        name,
+        message:
+          "must be a local SQLite path or use one of these protocols: file:, sqlite:, postgres:, postgresql:",
+      });
+      return undefined;
+    }
+
+    return value;
+  } catch {
+    issues.push({
+      name,
+      message:
+        "must be a local SQLite path or a valid file:, sqlite:, postgres:, or postgresql: URL",
+    });
+    return undefined;
+  }
+}
+
 function validatePrivateKey(
   env: EnvInput,
   name: string,
@@ -172,12 +227,7 @@ export function validateBackendEnv(env: EnvInput): BackendEnv {
     ["http:", "https:"],
     issues,
   );
-  const indexerDbUrl = validateUrl(
-    env,
-    "INDEXER_DB_URL",
-    ["postgres:", "postgresql:"],
-    issues,
-  );
+  const indexerDbUrl = validateDatabaseLocation(env, "INDEXER_DB_URL", issues);
   const xrplEndpoint = validateUrl(
     env,
     "XRPL_ENDPOINT",
