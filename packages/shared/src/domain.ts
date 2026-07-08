@@ -111,6 +111,7 @@ export type XrplPaymentObservation = Readonly<{
   feeDrops: bigint;
   paymentReference: Bytes32;
   ledgerIndex: bigint;
+  closeTimestamp: IsoTimestamp;
   validatedAt: IsoTimestamp;
   createdAt: IsoTimestamp;
 }>;

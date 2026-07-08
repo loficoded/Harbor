@@ -176,6 +176,7 @@ export type UpsertXrplObservationInput = Readonly<{
   feeDrops: bigint;
   paymentReference: Bytes32;
   ledgerIndex: bigint;
+  closeTimestamp?: IsoTimestamp;
   validatedAt: IsoTimestamp;
   rawJson?: string | null;
   createdAt?: IsoTimestamp;

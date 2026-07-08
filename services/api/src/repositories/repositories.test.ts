@@ -109,6 +109,7 @@ describe("SQLite migrations", () => {
       { id: "0001_initial_schema", applied: true },
       { id: "0002_agent_inventory_fields", applied: true },
       { id: "0003_agent_reliability_scores", applied: true },
+      { id: "0004_xrpl_observation_receipts", applied: true },
     ]);
 
     const tableNames = database
@@ -148,11 +149,16 @@ ORDER BY name
         id: "0003_agent_reliability_scores",
         appliedAt: listAppliedMigrations(database)[2]?.appliedAt,
       },
+      {
+        id: "0004_xrpl_observation_receipts",
+        appliedAt: listAppliedMigrations(database)[3]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
       { id: "0002_agent_inventory_fields", applied: false },
       { id: "0003_agent_reliability_scores", applied: false },
+      { id: "0004_xrpl_observation_receipts", applied: false },
     ]);
   });
 });
@@ -255,6 +261,7 @@ describe("XRPL and FDC repositories", () => {
       feeDrops: 12n,
       paymentReference,
       ledgerIndex: 9876543210123456789n,
+      closeTimestamp: "2026-07-08T02:00:00.000Z",
       validatedAt: "2026-07-08T02:00:00.000Z",
       rawJson: '{"validated":true}',
       createdAt: "2026-07-08T02:00:01.000Z",
@@ -277,6 +284,7 @@ describe("XRPL and FDC repositories", () => {
     assert.equal(countRows(database, "xrpl_observations"), 1);
     assert.equal(first.observationId, "observation-1");
     assert.equal(second.observationId, "observation-1");
+    assert.equal(second.closeTimestamp, "2026-07-08T02:00:00.000Z");
     assert.equal(second.deliveredAmountUBA, 12345678901234567890n);
     assert.deepEqual(
       listXrplObservationsForRedemption(database, "42").map(
