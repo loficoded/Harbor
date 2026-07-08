@@ -108,6 +108,7 @@ describe("SQLite migrations", () => {
     assert.deepEqual(results, [
       { id: "0001_initial_schema", applied: true },
       { id: "0002_agent_inventory_fields", applied: true },
+      { id: "0003_agent_reliability_scores", applied: true },
     ]);
 
     const tableNames = database
@@ -123,6 +124,7 @@ ORDER BY name
       .map((row) => row.name);
 
     assert.deepEqual(tableNames, [
+      "agent_reliability_scores",
       "agents",
       "fdc_proofs",
       "fdc_requests",
@@ -142,10 +144,15 @@ ORDER BY name
         id: "0002_agent_inventory_fields",
         appliedAt: listAppliedMigrations(database)[1]?.appliedAt,
       },
+      {
+        id: "0003_agent_reliability_scores",
+        appliedAt: listAppliedMigrations(database)[2]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
       { id: "0002_agent_inventory_fields", applied: false },
+      { id: "0003_agent_reliability_scores", applied: false },
     ]);
   });
 });

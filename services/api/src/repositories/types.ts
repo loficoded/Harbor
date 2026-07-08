@@ -116,6 +116,49 @@ export type UpsertAgentInput = Readonly<{
   updatedAt?: IsoTimestamp;
 }>;
 
+export type AgentReliabilityFtsoStatus =
+  "AVAILABLE" | "UNAVAILABLE" | "STALE" | "FAILED";
+
+export type AgentCollateralRatioSource =
+  "INVENTORY" | "FTSO_DERIVED" | "UNAVAILABLE";
+
+export type StoredAgentReliabilityScoreRecord = Readonly<{
+  agentVault: EvmAddress;
+  score: number;
+  formulaVersion: string;
+  fulfillmentRate: number | null;
+  fulfillmentScore: number;
+  settlementTimeScore: number;
+  defaultPenalty: number;
+  availabilityScore: number;
+  collateralScore: number;
+  successfulRedemptions: number;
+  defaultedRedemptions: number;
+  totalTerminalRedemptions: number;
+  averageSettlementSeconds: number | null;
+  availability: AgentAvailability;
+  availableLots: bigint;
+  collateralRatioBips: bigint | null;
+  collateralRatioSource: AgentCollateralRatioSource;
+  ftsoStatus: AgentReliabilityFtsoStatus;
+  ftsoXrpUsdPrice: string | null;
+  ftsoFlrUsdPrice: string | null;
+  ftsoTimestamp: string | null;
+  ftsoError: string | null;
+  componentsJson: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}>;
+
+export type UpsertAgentReliabilityScoreInput = Omit<
+  StoredAgentReliabilityScoreRecord,
+  "createdAt" | "updatedAt"
+> &
+  Readonly<{
+    createdAt?: IsoTimestamp;
+    updatedAt?: IsoTimestamp;
+  }>;
+
 export type StoredXrplPaymentObservation = XrplPaymentObservation &
   Readonly<{
     assetManagerAddress: EvmAddress | null;
