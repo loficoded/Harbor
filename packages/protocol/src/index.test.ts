@@ -152,6 +152,12 @@ describe("ABI exports", () => {
 
   test("exports the AssetManager event fragments used by the indexer", () => {
     expectInputCount(assetManagerEventsAbi, "event", "RedemptionRequested", 12);
+    expectInputCount(
+      assetManagerEventsAbi,
+      "event",
+      "RedemptionWithTagRequested",
+      13,
+    );
     expectInputCount(assetManagerEventsAbi, "event", "RedemptionPerformed", 6);
     expectInputCount(assetManagerEventsAbi, "event", "RedemptionDefault", 6);
     expectInputCount(

@@ -402,6 +402,31 @@ export const assetManagerEventsAbi = [
   {
     type: "event",
     anonymous: false,
+    name: "RedemptionWithTagRequested",
+    inputs: [
+      { ...address("agentVault"), indexed: true },
+      { ...address("redeemer"), indexed: true },
+      { ...uint("requestId"), indexed: true },
+      {
+        name: "paymentAddress",
+        internalType: "string",
+        type: "string",
+        indexed: false,
+      },
+      { ...uint("valueUBA"), indexed: false },
+      { ...uint("feeUBA"), indexed: false },
+      { ...uint("firstUnderlyingBlock"), indexed: false },
+      { ...uint("lastUnderlyingBlock"), indexed: false },
+      { ...uint("lastUnderlyingTimestamp"), indexed: false },
+      { ...bytes32("paymentReference"), indexed: false },
+      { ...address("executor"), indexed: false },
+      { ...uint("executorFeeNatWei"), indexed: false },
+      { ...uint("destinationTag"), indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    anonymous: false,
     name: "RedemptionRejected",
     inputs: [
       { ...address("agentVault"), indexed: true },
