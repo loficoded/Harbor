@@ -2,14 +2,43 @@
   "name": "@harbor/web",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "check": "pnpm build && pnpm typecheck",
-    "lint": "pnpm typecheck",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
-    "@harbor/protocol": "workspace:*"
+    "@harbor/protocol": "workspace:*",
+    "@harbor/shared": "workspace:*",
+    "@tanstack/react-query": "5.101.2",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "viem": "2.55.0",
+    "wagmi": "2.19.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "4.7.0",
+    "autoprefixer": "10.5.2",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.35",
+    "jsdom": "25.0.1",
+    "postcss": "8.5.16",
+    "tailwindcss": "3.4.19",
+    "typescript": "^5.7.2",
+    "vitest": "2.1.9"
   }
 }

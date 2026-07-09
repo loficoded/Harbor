@@ -17,3 +17,10 @@ contracts/cache/
 contracts/broadcast/
 
 .DS_Store
+
+# Next.js / apps/web
+next-env.d.ts
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/
+apps/web/playwright/.cache/

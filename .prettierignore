@@ -5,3 +5,7 @@ coverage
 contracts/out
 contracts/cache
 contracts/broadcast
+next-env.d.ts
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
