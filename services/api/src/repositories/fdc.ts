@@ -10,6 +10,7 @@ import {
 import type { SqliteDatabase } from "../db/index.js";
 import { nowIso, optionalRow, requireRow } from "./common.js";
 import type {
+  FdcRoundSummary,
   InsertFdcProofInput,
   StoredFdcProofRecord,
   StoredFdcRequestRecord,
@@ -452,4 +453,66 @@ ORDER BY voting_round_id ASC
     .all(redemptionRequestId);
 
   return rows.map(mapFdcProofRow);
+}
+
+type FdcRoundRow = Readonly<{
+  voting_round_id: string;
+  observed_at: string;
+}>;
+
+/**
+ * Highest FDC voting round the backend has processed across all redemptions.
+ * A stored proof is the strongest evidence that a round finalized, so proofs
+ * are preferred; otherwise the newest finalized/proof-ready request is used.
+ * Ordering casts the stored round id to an integer, which is safe for the
+ * bounded voting-round range FDC uses.
+ */
+export function getLatestFdcRound(
+  database: SqliteDatabase,
+): FdcRoundSummary | null {
+  const proofRow = optionalRow(
+    database
+      .prepare<[], FdcRoundRow>(
+        `
+SELECT voting_round_id, created_at AS observed_at
+FROM fdc_proofs
+ORDER BY CAST(voting_round_id AS INTEGER) DESC, created_at DESC
+LIMIT 1
+`,
+      )
+      .get(),
+  );
+
+  if (proofRow !== null) {
+    return {
+      votingRoundId: parseSerializedBigint(proofRow.voting_round_id),
+      source: "PROOF",
+      observedAt: proofRow.observed_at,
+    };
+  }
+
+  const requestRow = optionalRow(
+    database
+      .prepare<[], FdcRoundRow>(
+        `
+SELECT voting_round_id, updated_at AS observed_at
+FROM fdc_requests
+WHERE voting_round_id IS NOT NULL
+  AND status IN ('FINALIZED', 'PROOF_READY')
+ORDER BY CAST(voting_round_id AS INTEGER) DESC, updated_at DESC
+LIMIT 1
+`,
+      )
+      .get(),
+  );
+
+  if (requestRow !== null) {
+    return {
+      votingRoundId: parseSerializedBigint(requestRow.voting_round_id),
+      source: "REQUEST",
+      observedAt: requestRow.observed_at,
+    };
+  }
+
+  return null;
 }

@@ -1,20 +1,47 @@
-import { createServer } from "node:http";
+import { defaultComponentStarters } from "./api/components.js";
+import { createJsonApiLogger } from "./api/logging.js";
+import { defaultStartupLogger, startHarborService } from "./api/startup.js";
 
-import { createHealthStatus } from "@harbor/shared";
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
-const port = Number.parseInt(process.env.HARBOR_API_PORT ?? "3001", 10);
+async function main(): Promise<void> {
+  const handle = await startHarborService({
+    componentStarters: defaultComponentStarters,
+    apiLogger: createJsonApiLogger(),
+  });
 
-const server = createServer((request, response) => {
-  if (request.url === "/health") {
-    response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify(createHealthStatus("@harbor/api")));
-    return;
-  }
+  let shuttingDown = false;
 
-  response.statusCode = 404;
-  response.end("Not Found");
-});
+  const shutdown = (signal: string): void => {
+    if (shuttingDown) {
+      return;
+    }
 
-server.listen(port, () => {
-  console.log(`Harbor API placeholder listening on port ${port}`);
+    shuttingDown = true;
+    defaultStartupLogger.info("shutting down", { signal });
+
+    handle
+      .stop()
+      .then(() => {
+        process.exit(0);
+      })
+      .catch((error: unknown) => {
+        defaultStartupLogger.error("shutdown failed", {
+          error: errorMessage(error),
+        });
+        process.exit(1);
+      });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+main().catch((error: unknown) => {
+  defaultStartupLogger.error("failed to start Harbor service", {
+    error: errorMessage(error),
+  });
+  process.exitCode = 1;
 });

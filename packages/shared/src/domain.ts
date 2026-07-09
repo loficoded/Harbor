@@ -101,6 +101,21 @@ export type AgentRecord = Readonly<{
   updatedAt: IsoTimestamp;
 }>;
 
+/**
+ * Freshness of the FTSO price feeds used when deriving an agent's collateral
+ * ratio for reliability scoring. `STALE` means a price was returned but is
+ * older than the accepted window; `FAILED` means the feed could not be read.
+ */
+export type AgentReliabilityFtsoStatus =
+  "AVAILABLE" | "UNAVAILABLE" | "STALE" | "FAILED";
+
+/**
+ * How an agent's collateral ratio was determined: read directly from indexed
+ * inventory, derived from FTSO prices, or unavailable for scoring.
+ */
+export type AgentCollateralRatioSource =
+  "INVENTORY" | "FTSO_DERIVED" | "UNAVAILABLE";
+
 export type XrplPaymentObservation = Readonly<{
   observationId: string;
   redemptionRequestId: RedemptionRequestId;

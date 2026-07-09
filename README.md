@@ -40,6 +40,42 @@ pnpm smoke:protocol-imports
 
 If Foundry is not installed locally, `pnpm check:contracts` is expected to fail until `forge test --root contracts` is available.
 
+## Backend API
+
+The backend API lives in `services/api` and exposes stable read-only REST
+endpoints backed by the SQLite persistence layer. It uses the Node.js built-in
+`http` server (no extra framework) and is injectable for testing.
+
+### Endpoints
+
+- `GET /health` - process status plus database health, the indexer sync cursor,
+  keeper queue status, the last processed FDC round, and build metadata. Returns
+  `200` when healthy and `503` when the database is unavailable.
+- `GET /agents?asset=FXRP` - ranked agent reliability score records (highest
+  score first). Amounts are JSON-safe strings and every record carries
+  `scoreIsHeuristic: true`. `asset` defaults to `FXRP`.
+- `GET /redemptions/:id` - a redemption row with its derived status timeline,
+  XRPL receipts, FDC request/proof status, and default transaction hash.
+
+All non-2xx responses share the shape
+`{ "error": { "code", "message", "requestId", "details" } }`. CORS is enabled
+for local Next.js development.
+
+### Running
+
+```sh
+pnpm --filter @harbor/api dev      # build then start (migrations + API server)
+pnpm --filter @harbor/api start    # start from an existing build
+pnpm --filter @harbor/api test     # typecheck + API integration tests
+```
+
+Components are selected with environment flags (see `.env.example`):
+`HARBOR_RUN_MIGRATIONS` and `HARBOR_RUN_API` default on, while
+`HARBOR_RUN_INDEXER`, `HARBOR_RUN_AGENT_REFRESH`, and `HARBOR_RUN_KEEPER` are
+opt-in so each can run as a separate process. `HARBOR_API_PORT` (default `3001`)
+sets the port and `HARBOR_API_CORS_ORIGINS` configures allowed browser origins
+(default `http://localhost:3000`).
+
 ## HarborRedeemer Deployment
 
 The deployment script is `contracts/script/DeployHarborRedeemer.s.sol:DeployHarborRedeemer`.

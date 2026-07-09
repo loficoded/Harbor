@@ -1,6 +1,8 @@
 import type {
   AgentAvailability,
+  AgentCollateralRatioSource,
   AgentRecord,
+  AgentReliabilityFtsoStatus,
   AgentScore,
   Bytes32,
   EvmAddress,
@@ -116,11 +118,10 @@ export type UpsertAgentInput = Readonly<{
   updatedAt?: IsoTimestamp;
 }>;
 
-export type AgentReliabilityFtsoStatus =
-  "AVAILABLE" | "UNAVAILABLE" | "STALE" | "FAILED";
-
-export type AgentCollateralRatioSource =
-  "INVENTORY" | "FTSO_DERIVED" | "UNAVAILABLE";
+// Re-exported so consumers that historically imported these enumerations from
+// the repository layer keep working while the shared domain owns the canonical
+// definition (see @harbor/shared).
+export type { AgentReliabilityFtsoStatus, AgentCollateralRatioSource };
 
 export type StoredAgentReliabilityScoreRecord = Readonly<{
   agentVault: EvmAddress;
@@ -284,6 +285,23 @@ export type SyncCursorRecord = Readonly<{
   logIndex: string | null;
   payloadJson: string | null;
   updatedAt: IsoTimestamp;
+}>;
+
+export type KeeperJobsSummary = Readonly<{
+  total: number;
+  pending: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  ready: number;
+  lastError: string | null;
+  lastUpdatedAt: IsoTimestamp | null;
+}>;
+
+export type FdcRoundSummary = Readonly<{
+  votingRoundId: bigint;
+  source: "PROOF" | "REQUEST";
+  observedAt: IsoTimestamp;
 }>;
 
 export type UpsertSyncCursorInput = Readonly<{

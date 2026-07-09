@@ -1,8 +1,12 @@
-import type { EvmAddress } from "@harbor/shared";
+import type { EvmAddress, IsoTimestamp } from "@harbor/shared";
 
 import type { SqliteDatabase } from "../db/index.js";
 import { nowIso, optionalRow, requireRow } from "./common.js";
-import type { KeeperJobRecord, UpsertKeeperJobInput } from "./types.js";
+import type {
+  KeeperJobRecord,
+  KeeperJobsSummary,
+  UpsertKeeperJobInput,
+} from "./types.js";
 
 type KeeperJobRow = Readonly<{
   job_id: string;
@@ -188,4 +192,72 @@ LIMIT ?
     .all(now, limit);
 
   return rows.map(mapKeeperJobRow);
+}
+
+type KeeperJobCountsRow = Readonly<{
+  total: number;
+  pending: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  last_updated_at: string | null;
+}>;
+
+/**
+ * Aggregate keeper queue health in a single pass: totals by status, how many
+ * PENDING jobs are due to run at `now`, and the most recent recorded error.
+ * Used by the health endpoint to surface keeper status without loading rows.
+ */
+export function summarizeKeeperJobs(
+  database: SqliteDatabase,
+  now: IsoTimestamp = nowIso(),
+): KeeperJobsSummary {
+  const counts = database
+    .prepare<[], KeeperJobCountsRow>(
+      `
+SELECT
+  COUNT(*) AS total,
+  COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending,
+  COALESCE(SUM(CASE WHEN status = 'RUNNING' THEN 1 ELSE 0 END), 0) AS running,
+  COALESCE(SUM(CASE WHEN status = 'SUCCEEDED' THEN 1 ELSE 0 END), 0) AS succeeded,
+  COALESCE(SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END), 0) AS failed,
+  MAX(updated_at) AS last_updated_at
+FROM keeper_jobs
+`,
+    )
+    .get();
+
+  const readyRow = database
+    .prepare<[IsoTimestamp], { ready: number }>(
+      `
+SELECT COUNT(*) AS ready
+FROM keeper_jobs
+WHERE status = 'PENDING'
+  AND run_after <= ?
+`,
+    )
+    .get(now);
+
+  const lastErrorRow = database
+    .prepare<[], { last_error: string | null }>(
+      `
+SELECT last_error
+FROM keeper_jobs
+WHERE last_error IS NOT NULL
+ORDER BY updated_at DESC, job_id ASC
+LIMIT 1
+`,
+    )
+    .get();
+
+  return {
+    total: counts?.total ?? 0,
+    pending: counts?.pending ?? 0,
+    running: counts?.running ?? 0,
+    succeeded: counts?.succeeded ?? 0,
+    failed: counts?.failed ?? 0,
+    ready: readyRow?.ready ?? 0,
+    lastError: lastErrorRow?.last_error ?? null,
+    lastUpdatedAt: counts?.last_updated_at ?? null,
+  };
 }

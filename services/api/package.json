@@ -15,6 +15,7 @@
     "health": "pnpm build && node dist/health.js",
     "keeper:once": "pnpm build && node dist/keeper/cli.js once",
     "keeper:run": "pnpm build && node dist/keeper/cli.js run",
+    "start": "node dist/index.js",
     "lint": "pnpm typecheck",
     "test": "pnpm build && node --test \"dist/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
