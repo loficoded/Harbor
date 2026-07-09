@@ -13,6 +13,8 @@
     "db:reset": "pnpm build && node dist/db/cli.js reset",
     "dev": "pnpm build && node dist/index.js",
     "health": "pnpm build && node dist/health.js",
+    "keeper:once": "pnpm build && node dist/keeper/cli.js once",
+    "keeper:run": "pnpm build && node dist/keeper/cli.js run",
     "lint": "pnpm typecheck",
     "test": "pnpm build && node --test \"dist/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"

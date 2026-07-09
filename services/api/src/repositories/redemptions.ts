@@ -414,3 +414,25 @@ WHERE chain_id = @chainId
   const foundRow = optionalRow(row);
   return foundRow === null ? null : mapRedemptionEventRow(foundRow);
 }
+
+export function findRedemptionDefaultEvent(
+  database: SqliteDatabase,
+  key: RedemptionKey,
+): RedemptionEventRecord | null {
+  const row = database
+    .prepare<RedemptionKey, RedemptionEventRow>(
+      `
+SELECT *
+FROM redemption_events
+WHERE asset_manager_address = @assetManagerAddress
+  AND request_id = @requestId
+  AND event_name IN ('RedemptionDefault', 'RedemptionDefaulted')
+ORDER BY observed_at DESC, created_at DESC
+LIMIT 1
+`,
+    )
+    .get(key);
+
+  const foundRow = optionalRow(row);
+  return foundRow === null ? null : mapRedemptionEventRow(foundRow);
+}
