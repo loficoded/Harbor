@@ -55,13 +55,35 @@ configuration ("mock mode"):
 - `/` — the redemption console (usable app surface, not a marketing page): look
   up a redemption by id and jump to agent comparison.
 - `/agents` — placeholder for the agent reliability leaderboard.
-- `/status/[id]` — placeholder for the redemption status view.
+- `/status/[id]` — the live redemption status view. It reads
+  `GET /redemptions/:id`, polls until the redemption reaches a terminal state
+  (settled, recovered, or failed), and renders the lifecycle timeline, the XRPL
+  settlement receipt, and default-recovery detail (FDC request/proof status,
+  default transaction, recovered state). Additional request ids from a single
+  redemption are shown as a compact related-requests list (from the `more` query
+  param). The self-recovery transaction is reserved for a later prompt; the view
+  shows a clearly-labeled, disabled placeholder for it.
+
+### Status polling and SSE
+
+The status view polls by default (TanStack Query `refetchInterval`, 5s) and
+stops once the status is terminal. It does **not** use SSE: the backend exposes
+no event-stream endpoint, and this frontend does not add one. If the backend
+later gains an `/events` stream, the container is the single place to layer it
+in on top of the existing polling fallback.
 
 ## Testing
 
 - **Unit/component:** Vitest + Testing Library (`src/**/*.test.{ts,tsx}`),
   covering layout rendering, network-guard states, API client base-URL handling,
-  and the missing-WalletConnect fallback.
+  the missing-WalletConnect fallback, the status view-model derivation
+  (`redemption-status.test.ts`, one case per lifecycle status plus settlement,
+  recovery, related-request, and malformed-response handling), and the status
+  view component (`redemption-status-view.test.tsx`, every major status plus the
+  loading, empty, not-found, API-error, and stale-data states).
 - **End-to-end:** Playwright (`tests/e2e`) smoke-loads `/`, `/agents`, and
-  `/status/test` under desktop and mobile viewport projects. Browsers are
-  installed with `pnpm --filter @harbor/web exec playwright install chromium`.
+  `/status/test`, drives the redeem happy path, and exercises the status view
+  against mocked `GET /redemptions/:id` responses (`status.spec.ts`: settled
+  receipt, default recovery in progress, recovered default, not found). All
+  specs run under desktop and mobile viewport projects. Browsers are installed
+  with `pnpm --filter @harbor/web exec playwright install chromium`.

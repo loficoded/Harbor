@@ -82,9 +82,11 @@ The web app in `apps/web` is a Next.js 14 App Router application (TypeScript,
 Tailwind CSS) with `wagmi`/`viem` wallet support for Coston2, an optional
 WalletConnect connector, and a wrong-network guard. It runs with no
 configuration ("mock mode") and targets the backend API base URL from
-`NEXT_PUBLIC_HARBOR_API_URL` (default `http://localhost:3001`). Routes `/`,
-`/agents`, and `/status/[id]` are in place; redeem transactions, the agent
-leaderboard, and self-recovery are deferred to later prompts. See
+`NEXT_PUBLIC_HARBOR_API_URL` (default `http://localhost:3001`). The redemption
+console (`/`), the redeem transaction flow, and the live redemption status view
+(`/status/[id]`, with a polling status timeline, settlement receipt, and
+default-recovery detail) are in place; the agent leaderboard (`/agents`) and the
+self-recovery transaction are deferred to later prompts. See
 `apps/web/README.md` for commands, configuration, and testing.
 
 ## HarborRedeemer Deployment
