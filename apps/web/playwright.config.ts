@@ -32,5 +32,13 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !isCi,
     timeout: 120_000,
+    // A HarborRedeemer address is required for the self-recovery panel to submit
+    // `executeDefault`. Provide a deterministic test address so the Prompt #20
+    // E2E flow is actionable; the redeem flow tolerates it (it becomes the
+    // redeem executor). All-lowercase so it passes viem's `isAddress`.
+    env: {
+      NEXT_PUBLIC_HARBOR_CONTRACT_ADDRESS:
+        "0x00000000000000000000000000000000000000cc",
+    },
   },
 });

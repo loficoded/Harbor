@@ -1,3 +1,4 @@
+import { referencedPaymentNonexistenceResponseAbi } from "@harbor/protocol";
 import type {
   FdcRequestStatus,
   GetRedemptionResponse,
@@ -8,6 +9,7 @@ import type {
   SerializedRedemptionDetail,
   SerializedXrplPaymentObservation,
 } from "@harbor/shared";
+import { encodeAbiParameters } from "viem";
 
 /**
  * Builders for the serialized `GET /redemptions/:id` payload used across the
@@ -51,6 +53,12 @@ export type RedemptionScenarioOptions = Readonly<{
   settlementCount?: number;
   fdcRequestStatus?: FdcRequestStatus | null;
   withProof?: boolean;
+  /**
+   * When `true`, the FDC proof's `responseBody` is a real ABI-encoded Response
+   * tuple (decodable into `executeDefault` calldata) instead of the inert
+   * `0xfeed` placeholder. Used by the self-recovery panel and E2E tests.
+   */
+  validProof?: boolean;
   withDefaultTransaction?: boolean;
   timeline?: readonly RedemptionTimelineEntry[];
   generatedAt?: string;
@@ -94,13 +102,65 @@ function makeFdcRequest(
   };
 }
 
-function makeFdcProof(requestId: string): SerializedFdcProofRecord {
+/** viem descriptor for the encoded `IReferencedPaymentNonexistence.Response`. */
+const RESPONSE_TUPLE_ABI = [
+  { type: "tuple", components: referencedPaymentNonexistenceResponseAbi },
+] as const;
+
+/**
+ * A structurally valid decoded FDC `Response`, matching the shape the backend
+ * keeper assembles for `executeDefault`. The exact field values are arbitrary
+ * (no live chain verifies them in tests); only the ABI shape matters.
+ */
+export function sampleProofResponseData() {
+  return {
+    attestationType: `0x${"11".repeat(32)}`,
+    sourceId: `0x${"22".repeat(32)}`,
+    votingRound: 12345n,
+    lowestUsedTimestamp: 1700000000n,
+    requestBody: {
+      minimalBlockNumber: 100n,
+      deadlineBlockNumber: 200n,
+      deadlineTimestamp: 1700000500n,
+      destinationAddressHash: `0x${"33".repeat(32)}`,
+      amount: 10000000n,
+      standardPaymentReference: DEFAULT_PAYMENT_REFERENCE,
+      checkSourceAddresses: false,
+      sourceAddressesRoot: `0x${"00".repeat(32)}`,
+    },
+    responseBody: {
+      minimalBlockTimestamp: 1699999000n,
+      firstOverflowBlockNumber: 250n,
+      firstOverflowBlockTimestamp: 1700000600n,
+    },
+  } as const;
+}
+
+/**
+ * ABI-encoded Response tuple, mirroring what the backend persists and exposes
+ * as an FDC proof's `responseBody` (see `fdc/daLayer.ts`).
+ */
+export function encodeSampleProofResponseBody(): `0x${string}` {
+  // The protocol ABI is typed with its own loose `AbiParameter`, so viem cannot
+  // infer the named-object value shape and over-narrows the value type. The
+  // object form is correct at runtime (verified by round-trip decode); cast the
+  // value to satisfy the compiler. This mirrors how production code casts these
+  // ABIs for the wagmi/viem hooks.
+  return encodeAbiParameters(RESPONSE_TUPLE_ABI, [
+    sampleProofResponseData(),
+  ] as never) as `0x${string}`;
+}
+
+function makeFdcProof(
+  requestId: string,
+  valid: boolean,
+): SerializedFdcProofRecord {
   return {
     fdcProofId: `fdc-proof-${requestId}`,
     fdcRequestId: `fdc-req-${requestId}`,
     redemptionRequestId: requestId,
     requestHash: `0x${"33".repeat(32)}`,
-    responseBody: "0xfeed",
+    responseBody: valid ? encodeSampleProofResponseBody() : "0xfeed",
     merkleProof: [`0x${"44".repeat(32)}`, `0x${"55".repeat(32)}`],
     votingRoundId: "12345",
     createdAt: fixtureTime(30),
@@ -204,7 +264,7 @@ export function makeRedemptionResponse(
       : [makeFdcRequest(requestId, options.fdcRequestStatus)];
 
   const fdcProofs: SerializedFdcProofRecord[] = options.withProof
-    ? [makeFdcProof(requestId)]
+    ? [makeFdcProof(requestId, options.validProof ?? false)]
     : [];
 
   const detail: SerializedRedemptionDetail = {

@@ -18,7 +18,6 @@ import type {
   DefaultRecoveryInfo,
   RedemptionStatusViewModel,
   RelatedRequest,
-  SelfRecoveryPlaceholder,
   SettlementReceipt,
   TimelineStep,
   TimelineStepState,
@@ -64,6 +63,13 @@ export type RedemptionStatusViewProps = Readonly<{
   errorMessage: string | null;
   errorRequestId: string | null;
   onRetry?: () => void;
+  /**
+   * Live self-recovery transaction control (Prompt #20). Injected by the
+   * container so this view stays pure and free of wallet state — mirroring how
+   * the redemption form injects its agent picker. Rendered in the ready phase
+   * when the redemption is on the recovery track.
+   */
+  selfRecoverySlot?: ReactNode;
 }>;
 
 export function RedemptionStatusView({
@@ -75,6 +81,7 @@ export function RedemptionStatusView({
   errorMessage,
   errorRequestId,
   onRetry,
+  selfRecoverySlot,
 }: RedemptionStatusViewProps) {
   const showFreshness = phase === "ready" && viewModel !== null;
 
@@ -119,6 +126,7 @@ export function RedemptionStatusView({
           viewModel={viewModel}
           submission={submission}
           freshness={freshness}
+          selfRecoverySlot={selfRecoverySlot}
         />
       ) : null}
     </div>
@@ -223,10 +231,12 @@ function ReadyPhase({
   viewModel,
   submission,
   freshness,
+  selfRecoverySlot,
 }: {
   viewModel: RedemptionStatusViewModel;
   submission: StatusSubmission;
   freshness: StatusFreshness;
+  selfRecoverySlot?: ReactNode;
 }) {
   const hasNoActivity =
     viewModel.settlement === null && viewModel.recovery === null;
@@ -254,9 +264,7 @@ function ReadyPhase({
         <DefaultRecoveryCard recovery={viewModel.recovery} />
       ) : null}
 
-      {viewModel.selfRecovery.visible ? (
-        <SelfRecoveryPlaceholderCard placeholder={viewModel.selfRecovery} />
-      ) : null}
+      {selfRecoverySlot ?? null}
 
       {hasNoActivity && !viewModel.needsAttention ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -609,37 +617,6 @@ function DefaultRecoveryCard({ recovery }: { recovery: DefaultRecoveryInfo }) {
         Harbor keeper submits the default permissionlessly; Harbor never
         custodies funds or decides outcomes.
       </p>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Self-recovery placeholder (reserved for Prompt #20)
-// ---------------------------------------------------------------------------
-
-function SelfRecoveryPlaceholderCard({
-  placeholder,
-}: {
-  placeholder: SelfRecoveryPlaceholder;
-}) {
-  return (
-    <Card className="border-dashed">
-      <CardHeader
-        title={placeholder.headline}
-        description={placeholder.body}
-        actions={<Badge tone="neutral">Coming soon</Badge>}
-      />
-      {/*
-        PROMPT #20 INSERTION POINT — self-recovery transaction.
-        Replace this disabled placeholder with the wallet-driven control that
-        calls the AssetManager's default path (redemptionPaymentDefault) with
-        the FDC proof once it is ready. Do NOT wire a transaction here in
-        Prompt #18. `placeholder.actionable` is true exactly when the proof is
-        ready and self-recovery becomes the obvious next action.
-      */}
-      <Button variant="secondary" size="sm" disabled aria-disabled="true">
-        Submit self-recovery (coming soon)
-      </Button>
     </Card>
   );
 }

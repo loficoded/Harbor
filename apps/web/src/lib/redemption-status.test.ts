@@ -2,7 +2,7 @@ import {
   buildRelatedRequests,
   deriveDefaultRecovery,
   deriveRedemptionStatusViewModel,
-  deriveSelfRecoveryPlaceholder,
+  deriveSelfRecovery,
   deriveSettlementReceipt,
   deriveStatusTimeline,
   formatUbaAmount,
@@ -237,42 +237,55 @@ describe("deriveDefaultRecovery", () => {
   });
 });
 
-describe("deriveSelfRecoveryPlaceholder (reserved for Prompt #20)", () => {
+describe("deriveSelfRecovery (Prompt #20)", () => {
   it("is hidden off the recovery track", () => {
-    expect(deriveSelfRecoveryPlaceholder(settledResponse()).visible).toBe(
-      false,
-    );
+    expect(deriveSelfRecovery(settledResponse()).visible).toBe(false);
     expect(
-      deriveSelfRecoveryPlaceholder(
-        makeRedemptionResponse({ status: "WATCHING" }),
-      ).visible,
+      deriveSelfRecovery(makeRedemptionResponse({ status: "WATCHING" }))
+        .visible,
     ).toBe(false);
   });
 
-  it("is visible but not actionable before the proof is ready", () => {
-    const placeholder = deriveSelfRecoveryPlaceholder(
+  it("is visible without an available proof before it is ready", () => {
+    const info = deriveSelfRecovery(
       makeRedemptionResponse({ status: "WINDOW_EXPIRED" }),
     );
-    expect(placeholder.visible).toBe(true);
-    expect(placeholder.actionable).toBe(false);
+    expect(info.visible).toBe(true);
+    expect(info.windowPassed).toBe(true);
+    expect(info.proofAvailable).toBe(false);
+    expect(info.proof).toBeNull();
+    expect(info.recovered).toBe(false);
   });
 
-  it("is actionable once the proof is ready", () => {
-    const placeholder = deriveSelfRecoveryPlaceholder(proofReadyResponse());
-    expect(placeholder.visible).toBe(true);
-    expect(placeholder.actionable).toBe(true);
+  it("exposes the available proof once it is ready", () => {
+    const info = deriveSelfRecovery(proofReadyResponse({ validProof: true }));
+    expect(info.visible).toBe(true);
+    expect(info.proofAvailable).toBe(true);
+    expect(info.proof).not.toBeNull();
+    expect(info.votingRoundId).toBe("12345");
+    expect(info.recovered).toBe(false);
   });
 
-  it("stays visible while a default is submitted but not recovered", () => {
-    expect(
-      deriveSelfRecoveryPlaceholder(defaultSubmittedResponse()).visible,
-    ).toBe(true);
+  it("marks a submitted default and stays visible until recovered", () => {
+    const info = deriveSelfRecovery(defaultSubmittedResponse());
+    expect(info.visible).toBe(true);
+    expect(info.defaultSubmitted).toBe(true);
+    expect(info.defaultTransactionHash).not.toBeNull();
+    expect(info.recovered).toBe(false);
   });
 
-  it("is hidden once recovered", () => {
-    expect(deriveSelfRecoveryPlaceholder(recoveredResponse()).visible).toBe(
-      false,
-    );
+  it("reports recovered (and hides the actionable panel) once recovered", () => {
+    const info = deriveSelfRecovery(recoveredResponse());
+    expect(info.visible).toBe(false);
+    expect(info.recovered).toBe(true);
+    expect(info.windowPassed).toBe(true);
+  });
+
+  it("does not depend on keeper health — only window and proof drive it", () => {
+    // deriveSelfRecovery takes only the redemption response; there is no
+    // keeper/health input, so a proof-ready redemption is always actionable.
+    const info = deriveSelfRecovery(proofReadyResponse({ validProof: true }));
+    expect(info.visible && info.proofAvailable).toBe(true);
   });
 });
 

@@ -432,52 +432,93 @@ export function deriveDefaultRecovery(
 }
 
 // ---------------------------------------------------------------------------
-// Self-recovery placeholder (reserved for Prompt #20)
+// Self-recovery (Prompt #20 — permissionless default execution)
 // ---------------------------------------------------------------------------
 
 /**
- * Whether, and how, to surface the reserved self-recovery placeholder. Prompt
- * #18 must NOT add a working self-recovery transaction button; it only reserves
- * a clearly-labeled slot for Prompt #20. `actionable` marks the state where the
- * proof is ready and a user-submitted default becomes the obvious next action.
+ * Pure model backing the permissionless self-recovery panel. It captures
+ * everything the panel needs to decide its state — whether the window has
+ * passed, whether a submittable FDC proof exists, whether a default is already
+ * on-chain, and whether the AssetManager has recovered — without any wallet or
+ * keeper-health input. `visible` intentionally excludes SETTLED and RECOVERED
+ * so a freshly-loaded terminal redemption shows no actionable control; the
+ * container keeps the panel mounted across an in-session RECOVERED transition
+ * so the user sees the recovered confirmation after submitting.
  */
-export type SelfRecoveryPlaceholder = Readonly<{
+export type SelfRecoveryInfo = Readonly<{
+  /** Whether the actionable self-recovery panel should be shown. */
   visible: boolean;
-  actionable: boolean;
-  headline: string;
-  body: string;
+  /** Redemption status this model was derived from. */
+  status: RedemptionStatus;
+  /** True once the redemption window has passed (recovery track engaged). */
+  windowPassed: boolean;
+  /** Whether a retrievable FDC proof record is available to submit. */
+  proofAvailable: boolean;
+  /** The proof record chosen for submission (latest), or `null`. */
+  proof: SerializedFdcProofRecord | null;
+  /** Latest FDC request status, when known. */
+  fdcRequestStatus: FdcRequestStatus | null;
+  /** FDC voting round behind the proof/request, when known. */
+  votingRoundId: string | null;
+  /** A default transaction already exists (keeper, this user, or a third party). */
+  defaultSubmitted: boolean;
+  /** On-chain default transaction hash, when submitted. */
+  defaultTransactionHash: string | null;
+  /** The AssetManager has paid out the default (terminal success). */
+  recovered: boolean;
 }>;
 
-export function deriveSelfRecoveryPlaceholder(
+/**
+ * Derive the self-recovery model from a redemption response. Availability is a
+ * function of the redemption window and the FDC proof only — deliberately not
+ * of keeper liveness — so self-recovery stays usable even when the Harbor
+ * keeper is unavailable, which is the whole point of this permissionless path.
+ */
+export function deriveSelfRecovery(
   response: GetRedemptionResponse,
-): SelfRecoveryPlaceholder {
+): SelfRecoveryInfo {
   const status = response.redemption.status;
-  const onRecoveryTrack =
+
+  // The window has passed once the redemption leaves the pre-default lifecycle.
+  const windowPassed =
+    status === "WINDOW_EXPIRED" ||
+    status === "REQUEST_PROOF" ||
+    status === "PROOF_READY" ||
+    status === "DEFAULT_SUBMITTED" ||
+    status === "RECOVERED";
+
+  const proofs = response.fdcProofs;
+  const proof = proofs[proofs.length - 1] ?? null;
+  const requests = response.fdcRequests;
+  const latestRequest = requests[requests.length - 1] ?? null;
+
+  const defaultTransactionHash =
+    response.defaultTransactionHash ??
+    response.redemption.defaultTransactionHash ??
+    null;
+
+  const recovered = status === "RECOVERED";
+  const defaultSubmitted =
+    status === "DEFAULT_SUBMITTED" || defaultTransactionHash !== null;
+
+  // Shown while on the recovery track and not yet settled/recovered.
+  const visible =
     status === "WINDOW_EXPIRED" ||
     status === "REQUEST_PROOF" ||
     status === "PROOF_READY" ||
     status === "DEFAULT_SUBMITTED";
 
-  if (!onRecoveryTrack) {
-    return {
-      visible: false,
-      actionable: false,
-      headline: "",
-      body: "",
-    };
-  }
-
-  const actionable = status === "PROOF_READY";
-
   return {
-    visible: true,
-    actionable,
-    headline: actionable
-      ? "Self-recovery will be available here"
-      : "Self-recovery (coming soon)",
-    body: actionable
-      ? "The FDC proof is ready. A later update will let you submit the default recovery yourself instead of waiting for the Harbor keeper. Recovery remains permissionless and enforced by the AssetManager."
-      : "Once the FDC proof is ready, a later update will let you submit the default recovery yourself. Until then the Harbor keeper handles it automatically; no action is required.",
+    visible,
+    status,
+    windowPassed,
+    proofAvailable: proof !== null,
+    proof,
+    fdcRequestStatus: latestRequest?.status ?? null,
+    votingRoundId: proof?.votingRoundId ?? latestRequest?.votingRoundId ?? null,
+    defaultSubmitted,
+    defaultTransactionHash,
+    recovered,
   };
 }
 
@@ -546,7 +587,7 @@ export type RedemptionStatusViewModel = Readonly<{
   timeline: readonly TimelineStep[];
   settlement: SettlementReceipt | null;
   recovery: DefaultRecoveryInfo | null;
-  selfRecovery: SelfRecoveryPlaceholder;
+  selfRecovery: SelfRecoveryInfo;
   agentVault: string;
   redeemer: string;
   paymentReference: string;
@@ -590,7 +631,7 @@ export function deriveRedemptionStatusViewModel(
     timeline: deriveStatusTimeline(response),
     settlement: deriveSettlementReceipt(response),
     recovery: deriveDefaultRecovery(response),
-    selfRecovery: deriveSelfRecoveryPlaceholder(response),
+    selfRecovery: deriveSelfRecovery(response),
     agentVault: response.redemption.agentVault,
     redeemer: response.redemption.redeemer,
     paymentReference: response.redemption.paymentReference,

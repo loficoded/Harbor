@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -8,7 +8,9 @@ import {
   type StatusFreshness,
   type StatusViewPhase,
 } from "@/components/status/redemption-status-view";
+import { SelfRecoveryPanel } from "@/components/status/self-recovery-panel";
 import { createHarborApiClient, HarborApiError } from "@/lib/api-client";
+import { getClientEnv } from "@/lib/env";
 import { formatRelativeTime } from "@/lib/format";
 import {
   buildRelatedRequests,
@@ -146,6 +148,35 @@ export function RedemptionStatus({
   const errorRequestId =
     query.error instanceof HarborApiError ? query.error.requestId : null;
 
+  // Permissionless self-recovery (Prompt #20). The panel is a client component
+  // (wallet/chain state), so it is injected into the pure view as a slot. The
+  // HarborRedeemer address comes from the frontend env; when unset the panel
+  // reports the contract as unconfigured. The panel stays mounted across an
+  // in-session RECOVERED transition (sticky ref) so the recovered confirmation
+  // is shown after a submission, while a freshly-loaded recovered/settled
+  // redemption shows no actionable control.
+  const env = useMemo(() => getClientEnv(), []);
+  const recoveryPanelSeenRef = useRef(false);
+  if (viewModel?.selfRecovery.visible === true) {
+    recoveryPanelSeenRef.current = true;
+  }
+  const showSelfRecovery =
+    viewModel !== null &&
+    (viewModel.selfRecovery.visible ||
+      (recoveryPanelSeenRef.current && viewModel.selfRecovery.recovered));
+
+  const selfRecoverySlot =
+    showSelfRecovery && viewModel !== null ? (
+      <SelfRecoveryPanel
+        requestId={requestId}
+        selfRecovery={viewModel.selfRecovery}
+        harborRedeemerAddress={env.contractAddress}
+        onRecoveryRefresh={() => {
+          void query.refetch();
+        }}
+      />
+    ) : undefined;
+
   return (
     <RedemptionStatusView
       requestId={requestId}
@@ -158,6 +189,7 @@ export function RedemptionStatus({
       onRetry={() => {
         void query.refetch();
       }}
+      selfRecoverySlot={selfRecoverySlot}
     />
   );
 }

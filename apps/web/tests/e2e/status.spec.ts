@@ -56,18 +56,24 @@ test.describe("Status view — happy path settled receipt", () => {
     // Terminal success stops polling.
     await expect(page.getByText("Final")).toBeVisible();
 
-    // No live self-recovery control on the happy path.
+    // No self-recovery control on the happy (settled) path.
     await expect(
-      page.getByRole("button", { name: /self-recovery/i }),
+      page.getByRole("button", { name: /submit default recovery/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Self-recovery" }),
     ).toHaveCount(0);
   });
 });
 
 test.describe("Status view — default recovery in progress", () => {
-  test("renders the recovery detail and reserved self-recovery placeholder", async ({
+  test("renders the recovery detail and the live self-recovery control", async ({
     page,
   }) => {
-    await mockRedemption(page, proofReadyResponse({ requestId: "5150" }));
+    await mockRedemption(
+      page,
+      proofReadyResponse({ requestId: "5150", validProof: true }),
+    );
     await page.goto("/status/5150");
 
     await expect(
@@ -79,10 +85,18 @@ test.describe("Status view — default recovery in progress", () => {
     ).toBeVisible();
     await expect(page.getByText("FDC voting round")).toBeVisible();
 
-    // The self-recovery control is reserved for Prompt #20: present but disabled.
-    const selfRecovery = page.getByRole("button", { name: /self-recovery/i });
-    await expect(selfRecovery).toBeVisible();
-    await expect(selfRecovery).toBeDisabled();
+    // Prompt #20: self-recovery is now a live, permissionless control. With no
+    // wallet connected it is present but disabled and prompts a connection —
+    // it never depends on the keeper being available.
+    await expect(
+      page.getByRole("heading", { name: "Self-recovery" }),
+    ).toBeVisible();
+    const submit = page.getByRole("button", {
+      name: /submit default recovery/i,
+    });
+    await expect(submit).toBeVisible();
+    await expect(submit).toBeDisabled();
+    await expect(page.getByText(/connect a wallet/i)).toBeVisible();
   });
 });
 
@@ -101,10 +115,10 @@ test.describe("Status view — recovered default path", () => {
       page.getByRole("heading", { name: "Default recovery" }),
     ).toBeVisible();
     await expect(page.getByText("Default tx hash")).toBeVisible();
-    // Recovered is terminal, so polling is final and the placeholder is gone.
+    // Recovered is terminal, so polling is final and no action is offered.
     await expect(page.getByText("Final")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /self-recovery/i }),
+      page.getByRole("button", { name: /submit default recovery/i }),
     ).toHaveCount(0);
   });
 });

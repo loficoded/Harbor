@@ -180,14 +180,22 @@ describe("RedemptionStatusView — timeline per major status", () => {
     expect(screen.getByText("SUBMITTED")).toBeInTheDocument();
   });
 
-  it("PROOF_READY shows the ready proof and self-recovery placeholder", () => {
-    renderReady(proofReadyResponse());
+  it("PROOF_READY shows the ready proof and renders the injected self-recovery slot", () => {
+    renderReady(proofReadyResponse(), {
+      selfRecoverySlot: <div>INJECTED_SELF_RECOVERY</div>,
+    });
     expect(screen.getAllByText("Proof ready").length).toBeGreaterThan(0);
     expect(screen.getByText("Default recovery")).toBeInTheDocument();
-    // Reserved for Prompt #20 — placeholder only, never a live button.
+    // The live self-recovery control (Prompt #20) is injected by the container
+    // as a slot so this view stays pure; it renders in the ready phase.
+    expect(screen.getByText("INJECTED_SELF_RECOVERY")).toBeInTheDocument();
+  });
+
+  it("omits the self-recovery slot when none is injected (e.g. settled)", () => {
+    renderReady(settledResponse());
     expect(
-      screen.getByRole("button", { name: /self-recovery/i }),
-    ).toBeDisabled();
+      screen.queryByText("INJECTED_SELF_RECOVERY"),
+    ).not.toBeInTheDocument();
   });
 
   it("DEFAULT_SUBMITTED shows the submitted default and its tx link", () => {
