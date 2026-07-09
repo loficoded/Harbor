@@ -291,9 +291,15 @@ describe("XRPL payment matching", () => {
   test("rejects insufficient delivered amount and unsupported IOU amounts", (t) => {
     const database = createTestDatabase(t);
     const redemption = insertRedemptionFixture(database);
+    // Net delivery (valueUBA - feeUBA = 1_000_000 - 1_000 = 999_000) is exactly
+    // what the agent pays, so it must be accepted; anything below is insufficient.
     const insufficient = matchXrplPaymentToRedemption(
       redemption,
-      xrplPaymentFixture({ deliveredAmount: "999999" }),
+      xrplPaymentFixture({ deliveredAmount: "998999" }),
+    );
+    const netAmount = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ deliveredAmount: "999000" }),
     );
     const issuedCurrency = matchXrplPaymentToRedemption(
       redemption,
@@ -311,6 +317,7 @@ describe("XRPL payment matching", () => {
       insufficient.matched ? null : insufficient.reason,
       "insufficient-delivered-amount",
     );
+    assert.equal(netAmount.matched, true);
     assert.equal(issuedCurrency.matched, false);
     assert.equal(
       issuedCurrency.matched ? null : issuedCurrency.reason,

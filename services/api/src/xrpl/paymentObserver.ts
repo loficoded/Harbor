@@ -396,7 +396,14 @@ export function matchXrplPaymentToRedemption(
 
   const deliveredAmountUBA = payment.deliveredAmountUBA;
 
-  if (deliveredAmountUBA < redemption.valueUBA) {
+  // FAssets agents deliver the redemption value minus the redemption fee they
+  // keep, so the redeemer's underlying address legitimately receives
+  // (valueUBA - feeUBA). Comparing against the gross valueUBA rejected every
+  // valid payment (the on-chain RedemptionPerformed settles on this same net
+  // amount).
+  const requiredDeliveredUBA = redemption.valueUBA - redemption.feeUBA;
+
+  if (deliveredAmountUBA < requiredDeliveredUBA) {
     return {
       matched: false,
       reason: "insufficient-delivered-amount",
