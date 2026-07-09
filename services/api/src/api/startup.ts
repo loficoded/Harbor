@@ -17,17 +17,23 @@ import type { ApiLogger } from "./logging.js";
 
 export const defaultDatabaseLocation = "./data/harbor.sqlite";
 
-export type ServiceComponentName = "indexer" | "agentRefresh" | "keeper";
+export type ServiceComponentName =
+  | "indexer"
+  | "xrplObserver"
+  | "agentRefresh"
+  | "keeper";
 
 /**
  * Feature flags that select which parts of the service run in a given process.
- * Defaults keep local development API-only; the indexer, agent refresh, and
- * keeper are opt-in so they can be run as separate processes.
+ * Defaults keep local development API-only; the indexer, XRPL payment observer,
+ * agent refresh, and keeper are opt-in so they can be run as separate
+ * processes.
  */
 export type StartupFlags = Readonly<{
   runMigrations: boolean;
   runApi: boolean;
   runIndexer: boolean;
+  runXrplObserver: boolean;
   runAgentRefresh: boolean;
   runKeeper: boolean;
 }>;
@@ -62,6 +68,7 @@ export type ComponentStarter = (
 
 export type ServiceComponentStarters = Readonly<{
   indexer?: ComponentStarter;
+  xrplObserver?: ComponentStarter;
   agentRefresh?: ComponentStarter;
   keeper?: ComponentStarter;
 }>;
@@ -120,6 +127,7 @@ export function resolveStartupFlags(env: EnvInput = process.env): StartupFlags {
     runMigrations: parseBoolean(env["HARBOR_RUN_MIGRATIONS"], true),
     runApi: parseBoolean(env["HARBOR_RUN_API"], true),
     runIndexer: parseBoolean(env["HARBOR_RUN_INDEXER"], false),
+    runXrplObserver: parseBoolean(env["HARBOR_RUN_XRPL_OBSERVER"], false),
     runAgentRefresh: parseBoolean(env["HARBOR_RUN_AGENT_REFRESH"], false),
     runKeeper: parseBoolean(env["HARBOR_RUN_KEEPER"], false),
   };
@@ -143,6 +151,10 @@ export function enabledComponents(
 
   if (flags.runIndexer) {
     names.push("indexer");
+  }
+
+  if (flags.runXrplObserver) {
+    names.push("xrplObserver");
   }
 
   if (flags.runAgentRefresh) {

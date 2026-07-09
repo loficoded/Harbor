@@ -50,6 +50,7 @@ function startupConfig(flags: Partial<StartupFlags> = {}): StartupConfig {
       runMigrations: true,
       runApi: true,
       runIndexer: false,
+      runXrplObserver: false,
       runAgentRefresh: false,
       runKeeper: false,
       ...flags,
@@ -80,6 +81,7 @@ describe("resolveStartupFlags", () => {
       runMigrations: true,
       runApi: true,
       runIndexer: false,
+      runXrplObserver: false,
       runAgentRefresh: false,
       runKeeper: false,
     });
@@ -90,12 +92,14 @@ describe("resolveStartupFlags", () => {
       resolveStartupFlags({
         HARBOR_RUN_API: "false",
         HARBOR_RUN_INDEXER: "true",
+        HARBOR_RUN_XRPL_OBSERVER: "true",
         HARBOR_RUN_KEEPER: "1",
       }),
       {
         runMigrations: true,
         runApi: false,
         runIndexer: true,
+        runXrplObserver: true,
         runAgentRefresh: false,
         runKeeper: true,
       },
