@@ -12,6 +12,11 @@ export type HarborFrontendEnv = Readonly<{
   rpcUrl: string;
   walletConnectProjectId: string | null;
   contractAddress: string | null;
+  /**
+   * Configurable default native executor fee (wei) attached to a `redeem` when
+   * the Harbor keeper is the executor. Displayed in the redemption form.
+   */
+  executorFeeWei: bigint;
   /** True only when a WalletConnect project id is configured. */
   walletConnectConfigured: boolean;
 }>;
@@ -24,9 +29,26 @@ export type RawFrontendEnv = Readonly<Record<string, string | undefined>>;
  */
 export const DEFAULT_HARBOR_API_BASE_URL = "http://localhost:3001";
 
+/**
+ * Default native executor fee in wei (0.1 C2FLR) used when no explicit override
+ * is configured. This is the bounty a `redeem` attaches for the Harbor keeper
+ * (or any caller) that later triggers default recovery; it is only sent when a
+ * Harbor executor address is configured.
+ */
+export const DEFAULT_EXECUTOR_FEE_WEI = 100_000_000_000_000_000n;
+
 function clean(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed === undefined || trimmed === "" ? null : trimmed;
+}
+
+/** Parse a wei string into a non-negative bigint, or `null` when invalid. */
+function cleanWei(value: string | undefined): bigint | null {
+  const trimmed = clean(value);
+  if (trimmed === null || !/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  return BigInt(trimmed);
 }
 
 /**
@@ -41,6 +63,8 @@ const defaultSource: RawFrontendEnv = {
     process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
   NEXT_PUBLIC_HARBOR_CONTRACT_ADDRESS:
     process.env.NEXT_PUBLIC_HARBOR_CONTRACT_ADDRESS,
+  NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI:
+    process.env.NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI,
 };
 
 /**
@@ -62,6 +86,9 @@ export function readFrontendEnv(
       clean(source["NEXT_PUBLIC_RPC_URL_COSTON2"]) ?? coston2DefaultRpcUrl,
     walletConnectProjectId,
     contractAddress: clean(source["NEXT_PUBLIC_HARBOR_CONTRACT_ADDRESS"]),
+    executorFeeWei:
+      cleanWei(source["NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI"]) ??
+      DEFAULT_EXECUTOR_FEE_WEI,
     walletConnectConfigured: walletConnectProjectId !== null,
   };
 }

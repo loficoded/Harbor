@@ -1,5 +1,9 @@
 import { coston2DefaultRpcUrl } from "@/lib/chain";
-import { DEFAULT_HARBOR_API_BASE_URL, readFrontendEnv } from "@/lib/env";
+import {
+  DEFAULT_EXECUTOR_FEE_WEI,
+  DEFAULT_HARBOR_API_BASE_URL,
+  readFrontendEnv,
+} from "@/lib/env";
 import { describe, expect, it } from "vitest";
 
 describe("readFrontendEnv", () => {
@@ -11,6 +15,24 @@ describe("readFrontendEnv", () => {
     expect(env.walletConnectProjectId).toBeNull();
     expect(env.walletConnectConfigured).toBe(false);
     expect(env.contractAddress).toBeNull();
+    expect(env.executorFeeWei).toBe(DEFAULT_EXECUTOR_FEE_WEI);
+  });
+
+  it("reads a configured executor fee and ignores invalid values", () => {
+    expect(
+      readFrontendEnv({ NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI: "250000000000000000" })
+        .executorFeeWei,
+    ).toBe(250_000_000_000_000_000n);
+
+    // Non-numeric values fall back to the default rather than throwing.
+    expect(
+      readFrontendEnv({ NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI: "0.1 FLR" })
+        .executorFeeWei,
+    ).toBe(DEFAULT_EXECUTOR_FEE_WEI);
+    expect(
+      readFrontendEnv({ NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI: "   " })
+        .executorFeeWei,
+    ).toBe(DEFAULT_EXECUTOR_FEE_WEI);
   });
 
   it("treats a blank WalletConnect id as not configured", () => {
