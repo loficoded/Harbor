@@ -2,14 +2,12 @@
 
 import {
   AgentPickerView,
-  type AgentOption,
   type AgentPickerStatus,
 } from "@/components/redemption/agent-picker-view";
-import {
-  createHarborApiClient,
-  type HarborApiClient,
-} from "@/lib/api-client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toAgentOption } from "@/lib/agents";
+import type { HarborApiClient } from "@/lib/api-client";
+import { useRankedAgents } from "@/lib/use-ranked-agents";
+import { useMemo } from "react";
 
 export type AgentPickerProps = {
   /** Selected agent vault, or `null` for no preference. */
@@ -20,24 +18,13 @@ export type AgentPickerProps = {
   asset?: string;
 };
 
-type PickerState = Readonly<{
-  status: AgentPickerStatus;
-  agents: readonly AgentOption[];
-  error: string | null;
-}>;
-
-const INITIAL_STATE: PickerState = {
-  status: "loading",
-  agents: [],
-  error: null,
-};
-
 /**
- * Loads ranked agents from the Harbor backend (`GET /agents`) and renders the
- * compact picker. Handles the loading, empty, error, and ready states
- * explicitly; the API client is injectable so those states are unit testable
- * without a live backend. Selection is controlled by the parent form so it can
- * be preserved into the status route after submission.
+ * Compact preferred-agent picker for the redemption form (Prompt #17). It reads
+ * ranked agents from the shared {@link useRankedAgents} hook — the same source
+ * the `/agents` leaderboard uses — and projects each onto the picker's compact
+ * option shape. Selection is controlled by the parent form so it can be
+ * preserved into the status route after submission. Every load state (loading,
+ * error, empty, ready) is rendered by the pure {@link AgentPickerView}.
  */
 export function AgentPicker({
   selectedAgent,
@@ -45,62 +32,19 @@ export function AgentPicker({
   client,
   asset = "FXRP",
 }: AgentPickerProps) {
-  const apiClient = useMemo(
-    () => client ?? createHarborApiClient(),
-    [client],
+  const { status, agents, error, reload } = useRankedAgents(
+    client === undefined ? { asset } : { asset, client },
   );
-  const [state, setState] = useState<PickerState>(INITIAL_STATE);
-  const activeController = useRef<AbortController | null>(null);
-
-  const load = useCallback(() => {
-    activeController.current?.abort();
-    const controller = new AbortController();
-    activeController.current = controller;
-    setState(INITIAL_STATE);
-
-    apiClient
-      .getAgents(asset, controller.signal)
-      .then((response) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        const agents: AgentOption[] = response.agents.map((agent) => ({
-          agentVault: agent.agentVault,
-          score: agent.score,
-          availableLots: agent.availableLots,
-          availability: agent.availability,
-        }));
-        setState({
-          status: agents.length === 0 ? "empty" : "ready",
-          agents,
-          error: null,
-        });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setState({
-          status: "error",
-          agents: [],
-          error: error instanceof Error ? error.message : "Failed to load agents",
-        });
-      });
-  }, [apiClient, asset]);
-
-  useEffect(() => {
-    load();
-    return () => activeController.current?.abort();
-  }, [load]);
+  const options = useMemo(() => agents.map(toAgentOption), [agents]);
 
   return (
     <AgentPickerView
-      status={state.status}
-      agents={state.agents}
+      status={status satisfies AgentPickerStatus}
+      agents={options}
       selectedAgent={selectedAgent}
       onSelect={onSelect}
-      onRetry={load}
-      errorMessage={state.error}
+      onRetry={reload}
+      errorMessage={error}
     />
   );
 }

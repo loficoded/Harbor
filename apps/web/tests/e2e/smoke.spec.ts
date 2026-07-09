@@ -20,15 +20,14 @@ test.describe("Harbor shell smoke", () => {
     ).toBeVisible();
   });
 
-  test("loads the agents placeholder route", async ({ page }) => {
+  test("loads the agents leaderboard route", async ({ page }) => {
     await page.goto("/agents");
 
     await expect(
       page.getByRole("heading", { name: "Agents", exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByText("Agent comparison is coming soon"),
-    ).toBeVisible();
+    // The heuristic framing is always present, independent of backend data.
+    await expect(page.getByText("Scores are a heuristic")).toBeVisible();
   });
 
   test("loads a placeholder status route", async ({ page }) => {

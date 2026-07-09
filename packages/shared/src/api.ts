@@ -1,6 +1,7 @@
 import type {
   AgentAvailability,
   AgentCollateralRatioSource,
+  AgentReliabilityFtsoStatus,
   FdcProofRecord,
   FdcRequestRecord,
   IsoTimestamp,
@@ -61,6 +62,13 @@ export type AgentScoreView = Readonly<{
   availableLots: bigint;
   collateralRatioBips: bigint | null;
   collateralRatioSource: AgentCollateralRatioSource;
+  /**
+   * Freshness of the FTSO price feeds behind the scoring snapshot. Surfaced so
+   * clients can flag an FTSO-derived collateral ratio as `STALE`/`FAILED`
+   * rather than presenting a possibly-outdated value as current. This projects
+   * the already-persisted scoring field; it introduces no new scoring logic.
+   */
+  ftsoStatus: AgentReliabilityFtsoStatus;
   updatedAt: IsoTimestamp;
 }>;
 

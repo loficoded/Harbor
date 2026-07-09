@@ -1,20 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Spinner } from "@/components/ui/spinner";
+import type { AgentOption } from "@/lib/agents";
 import { formatAddress } from "@/lib/format";
 import type { ReactElement } from "react";
 
 /** Load state of the compact agent picker. */
 export type AgentPickerStatus = "loading" | "error" | "empty" | "ready";
 
-/** Minimal agent projection the picker renders (from `GET /agents`). */
-export type AgentOption = Readonly<{
-  agentVault: string;
-  score: number;
-  /** Available lots as a JSON-safe string (serialized bigint on the wire). */
-  availableLots: string;
-  availability: string;
-}>;
+// The picker renders the shared compact projection so its option data is the
+// same ranking data the `/agents` leaderboard uses (see `@/lib/agents`).
+export type { AgentOption };
 
 /** Sentinel select value meaning "let the network assign an agent". */
 export const NO_AGENT_PREFERENCE = "";
@@ -107,7 +103,9 @@ export function AgentPickerView({
         }
         className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
       >
-        <option value={NO_AGENT_PREFERENCE}>No preference (network-assigned)</option>
+        <option value={NO_AGENT_PREFERENCE}>
+          No preference (network-assigned)
+        </option>
         {agents.map((agent) => (
           <option key={agent.agentVault} value={agent.agentVault}>
             {optionLabel(agent)}
@@ -122,8 +120,9 @@ export function AgentPickerView({
         </p>
       ) : (
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Scores are heuristic. The AssetManager fills redemptions from its agent
-          queue, so a preference is advisory and preserved for status tracking.
+          Scores are heuristic. The AssetManager fills redemptions from its
+          agent queue, so a preference is advisory and preserved for status
+          tracking.
         </p>
       )}
 

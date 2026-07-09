@@ -368,6 +368,8 @@ describe("GET /agents", () => {
         score: 65,
         availableLots: 333n,
         collateralRatioBips: 30000n,
+        collateralRatioSource: "FTSO_DERIVED",
+        ftsoStatus: "STALE",
       }),
     );
 
@@ -399,6 +401,13 @@ describe("GET /agents", () => {
     assert.equal(top.averageSettlementSeconds, null);
     assert.equal(middle.availableLots, "333");
     assert.equal(middle.collateralRatioBips, "30000");
+
+    // FTSO freshness is projected so clients can flag stale collateral fields.
+    // The top agent's collateral is from inventory with fresh feeds; the middle
+    // agent's ratio is FTSO-derived from a stale snapshot.
+    assert.equal(top.ftsoStatus, "AVAILABLE");
+    assert.equal(middle.collateralRatioSource, "FTSO_DERIVED");
+    assert.equal(middle.ftsoStatus, "STALE");
   });
 
   test("defaults to FXRP when no asset query is provided", async (t) => {

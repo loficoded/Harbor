@@ -74,6 +74,7 @@ export function toAgentScoreView(
     availableLots: record.availableLots,
     collateralRatioBips: record.collateralRatioBips,
     collateralRatioSource: record.collateralRatioSource,
+    ftsoStatus: record.ftsoStatus,
     updatedAt: record.updatedAt,
   };
 }
