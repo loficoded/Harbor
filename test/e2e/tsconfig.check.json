@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["/mnt/archil/gummie/_runtime/node/node_modules/@types"],
+    "baseUrl": ".",
+    "paths": {
+      "ethers": ["/mnt/archil/gummie/_runtime/node/node_modules/ethers"]
+    }
+  }
+}

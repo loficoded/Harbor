@@ -1,0 +1,7 @@
+node_modules/
+dist.cjs
+*.js
+!run.mjs
+!scripts/*.mjs
+proof-req.json
+proof-payload.json

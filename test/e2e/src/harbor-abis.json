@@ -1,0 +1,2972 @@
+{
+  "referencedPaymentNonexistenceRequestBodyAbi": [
+    {
+      "name": "minimalBlockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "deadlineBlockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "deadlineTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "destinationAddressHash",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "amount",
+      "internalType": "uint256",
+      "type": "uint256"
+    },
+    {
+      "name": "standardPaymentReference",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "checkSourceAddresses",
+      "internalType": "bool",
+      "type": "bool"
+    },
+    {
+      "name": "sourceAddressesRoot",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    }
+  ],
+  "referencedPaymentNonexistenceResponseBodyAbi": [
+    {
+      "name": "minimalBlockTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "firstOverflowBlockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "firstOverflowBlockTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    }
+  ],
+  "referencedPaymentNonexistenceResponseAbi": [
+    {
+      "name": "attestationType",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "sourceId",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "votingRound",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "lowestUsedTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "requestBody",
+      "internalType": "struct IReferencedPaymentNonexistence.RequestBody",
+      "type": "tuple",
+      "components": [
+        {
+          "name": "minimalBlockNumber",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "deadlineBlockNumber",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "deadlineTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "destinationAddressHash",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "amount",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "standardPaymentReference",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "checkSourceAddresses",
+          "internalType": "bool",
+          "type": "bool"
+        },
+        {
+          "name": "sourceAddressesRoot",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        }
+      ]
+    },
+    {
+      "name": "responseBody",
+      "internalType": "struct IReferencedPaymentNonexistence.ResponseBody",
+      "type": "tuple",
+      "components": [
+        {
+          "name": "minimalBlockTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "firstOverflowBlockNumber",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "firstOverflowBlockTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        }
+      ]
+    }
+  ],
+  "referencedPaymentNonexistenceProofAbi": [
+    {
+      "name": "merkleProof",
+      "internalType": "bytes32[]",
+      "type": "bytes32[]"
+    },
+    {
+      "name": "data",
+      "internalType": "struct IReferencedPaymentNonexistence.Response",
+      "type": "tuple",
+      "components": [
+        {
+          "name": "attestationType",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "sourceId",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "votingRound",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "lowestUsedTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "requestBody",
+          "internalType": "struct IReferencedPaymentNonexistence.RequestBody",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "minimalBlockNumber",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "deadlineBlockNumber",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "deadlineTimestamp",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "destinationAddressHash",
+              "internalType": "bytes32",
+              "type": "bytes32"
+            },
+            {
+              "name": "amount",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "standardPaymentReference",
+              "internalType": "bytes32",
+              "type": "bytes32"
+            },
+            {
+              "name": "checkSourceAddresses",
+              "internalType": "bool",
+              "type": "bool"
+            },
+            {
+              "name": "sourceAddressesRoot",
+              "internalType": "bytes32",
+              "type": "bytes32"
+            }
+          ]
+        },
+        {
+          "name": "responseBody",
+          "internalType": "struct IReferencedPaymentNonexistence.ResponseBody",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "minimalBlockTimestamp",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "firstOverflowBlockNumber",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "firstOverflowBlockTimestamp",
+              "internalType": "uint64",
+              "type": "uint64"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assetManagerEventsAbi": [
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionRequested",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "paymentAddress",
+          "internalType": "string",
+          "type": "string",
+          "indexed": false
+        },
+        {
+          "name": "valueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "feeUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "firstUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingTimestamp",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "paymentReference",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "executor",
+          "internalType": "address",
+          "type": "address",
+          "indexed": false
+        },
+        {
+          "name": "executorFeeNatWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionWithTagRequested",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "paymentAddress",
+          "internalType": "string",
+          "type": "string",
+          "indexed": false
+        },
+        {
+          "name": "valueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "feeUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "firstUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingTimestamp",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "paymentReference",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "executor",
+          "internalType": "address",
+          "type": "address",
+          "indexed": false
+        },
+        {
+          "name": "executorFeeNatWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "destinationTag",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionRejected",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionRequestIncomplete",
+      "inputs": [
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "remainingLots",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionPerformed",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "transactionHash",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "spentUnderlyingUBA",
+          "internalType": "int256",
+          "type": "int256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionDefault",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "redeemedVaultCollateralWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "redeemedPoolCollateralWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionPaymentBlocked",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "transactionHash",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "spentUnderlyingUBA",
+          "internalType": "int256",
+          "type": "int256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionPaymentFailed",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "transactionHash",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "spentUnderlyingUBA",
+          "internalType": "int256",
+          "type": "int256",
+          "indexed": false
+        },
+        {
+          "name": "failureReason",
+          "internalType": "string",
+          "type": "string",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionTicketCreated",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redemptionTicketId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "ticketValueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionTicketUpdated",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redemptionTicketId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "ticketValueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionTicketDeleted",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redemptionTicketId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        }
+      ]
+    }
+  ],
+  "assetManagerAbi": [
+    {
+      "type": "function",
+      "name": "fAsset",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "contract IERC20",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getSettings",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "struct AssetManagerSettings.Data",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "assetManagerController",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "fAsset",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "agentVaultFactory",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "collateralPoolFactory",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "collateralPoolTokenFactory",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "poolTokenSuffix",
+              "internalType": "string",
+              "type": "string"
+            },
+            {
+              "name": "__whitelist",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "agentOwnerRegistry",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "fdcVerification",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "burnAddress",
+              "internalType": "address payable",
+              "type": "address"
+            },
+            {
+              "name": "priceReader",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "assetDecimals",
+              "internalType": "uint8",
+              "type": "uint8"
+            },
+            {
+              "name": "assetMintingDecimals",
+              "internalType": "uint8",
+              "type": "uint8"
+            },
+            {
+              "name": "chainId",
+              "internalType": "bytes32",
+              "type": "bytes32"
+            },
+            {
+              "name": "averageBlockTimeMS",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "mintingPoolHoldingsRequiredBIPS",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "collateralReservationFeeBIPS",
+              "internalType": "uint16",
+              "type": "uint16"
+            },
+            {
+              "name": "assetUnitUBA",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "assetMintingGranularityUBA",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "lotSizeAMG",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__minUnderlyingBackingBIPS",
+              "internalType": "uint16",
+              "type": "uint16"
+            },
+            {
+              "name": "__requireEOAAddressProof",
+              "internalType": "bool",
+              "type": "bool"
+            },
+            {
+              "name": "mintingCapAMG",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "underlyingBlocksForPayment",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "underlyingSecondsForPayment",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "redemptionFeeBIPS",
+              "internalType": "uint16",
+              "type": "uint16"
+            },
+            {
+              "name": "redemptionDefaultFactorVaultCollateralBIPS",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "__redemptionDefaultFactorPoolBIPS",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "confirmationByOthersAfterSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "confirmationByOthersRewardUSD5",
+              "internalType": "uint128",
+              "type": "uint128"
+            },
+            {
+              "name": "maxRedeemedTickets",
+              "internalType": "uint16",
+              "type": "uint16"
+            },
+            {
+              "name": "paymentChallengeRewardBIPS",
+              "internalType": "uint16",
+              "type": "uint16"
+            },
+            {
+              "name": "paymentChallengeRewardUSD5",
+              "internalType": "uint128",
+              "type": "uint128"
+            },
+            {
+              "name": "withdrawalWaitMinSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "maxTrustedPriceAgeSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__ccbTimeSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "attestationWindowSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "minUpdateRepeatTimeSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__buybackCollateralFactorBIPS",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__announcedUnderlyingConfirmationMinSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__tokenInvalidationTimeMinSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "vaultCollateralBuyForFlareFactorBIPS",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "agentExitAvailableTimelockSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "agentFeeChangeTimelockSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "agentMintingCRChangeTimelockSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "poolExitCRChangeTimelockSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "agentTimelockedOperationWindowSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "collateralPoolTokenTimelockSeconds",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "liquidationStepSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "liquidationCollateralFactorBIPS",
+              "internalType": "uint256[]",
+              "type": "uint256[]"
+            },
+            {
+              "name": "liquidationFactorVaultCollateralBIPS",
+              "internalType": "uint256[]",
+              "type": "uint256[]"
+            },
+            {
+              "name": "diamondCutMinTimelockSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "maxEmergencyPauseDurationSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "emergencyPauseDurationResetAfterSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__cancelCollateralReservationAfterSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__rejectOrCancelCollateralReservationReturnFactorBIPS",
+              "internalType": "uint16",
+              "type": "uint16"
+            },
+            {
+              "name": "__rejectRedemptionRequestWindowSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__takeOverRedemptionRequestWindowSeconds",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "__rejectedRedemptionDefaultFactorVaultCollateralBIPS",
+              "internalType": "uint32",
+              "type": "uint32"
+            },
+            {
+              "name": "__rejectedRedemptionDefaultFactorPoolBIPS",
+              "internalType": "uint32",
+              "type": "uint32"
+            }
+          ]
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAllAgents",
+      "inputs": [
+        {
+          "name": "_start",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_end",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_agents",
+          "internalType": "address[]",
+          "type": "address[]"
+        },
+        {
+          "name": "_totalLength",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAvailableAgentsList",
+      "inputs": [
+        {
+          "name": "_start",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_end",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_agents",
+          "internalType": "address[]",
+          "type": "address[]"
+        },
+        {
+          "name": "_totalLength",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAvailableAgentsDetailedList",
+      "inputs": [
+        {
+          "name": "_start",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_end",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_agents",
+          "internalType": "struct AvailableAgentInfo.Data[]",
+          "type": "tuple[]",
+          "components": [
+            {
+              "name": "agentVault",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "ownerManagementAddress",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "feeBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "mintingVaultCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "mintingPoolCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "freeCollateralLots",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "status",
+              "internalType": "enum AgentInfo.Status",
+              "type": "uint8"
+            }
+          ]
+        },
+        {
+          "name": "_totalLength",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAgentInfo",
+      "inputs": [
+        {
+          "name": "_agentVault",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "struct AgentInfo.Info",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "status",
+              "internalType": "enum AgentInfo.Status",
+              "type": "uint8"
+            },
+            {
+              "name": "ownerManagementAddress",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "ownerWorkAddress",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "collateralPool",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "collateralPoolToken",
+              "internalType": "address",
+              "type": "address"
+            },
+            {
+              "name": "underlyingAddressString",
+              "internalType": "string",
+              "type": "string"
+            },
+            {
+              "name": "publiclyAvailable",
+              "internalType": "bool",
+              "type": "bool"
+            },
+            {
+              "name": "feeBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "poolFeeShareBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "vaultCollateralToken",
+              "internalType": "contract IERC20",
+              "type": "address"
+            },
+            {
+              "name": "mintingVaultCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "mintingPoolCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "freeCollateralLots",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "totalVaultCollateralWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "freeVaultCollateralWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "vaultCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "poolWNatToken",
+              "internalType": "contract IERC20",
+              "type": "address"
+            },
+            {
+              "name": "totalPoolCollateralNATWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "freePoolCollateralNATWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "poolCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "totalAgentPoolTokensWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "announcedVaultCollateralWithdrawalWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "announcedPoolTokensWithdrawalWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "freeAgentPoolTokensWei",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "mintedUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "reservedUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "redeemingUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "poolRedeemingUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "dustUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "liquidationStartTimestamp",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "maxLiquidationAmountUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "liquidationPaymentFactorVaultBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "liquidationPaymentFactorPoolBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "underlyingBalanceUBA",
+              "internalType": "int256",
+              "type": "int256"
+            },
+            {
+              "name": "requiredUnderlyingBalanceUBA",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "freeUnderlyingBalanceUBA",
+              "internalType": "int256",
+              "type": "int256"
+            },
+            {
+              "name": "announcedUnderlyingWithdrawalId",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "buyFAssetByAgentFactorBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "poolExitCollateralRatioBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "redemptionPoolFeeShareBIPS",
+              "internalType": "uint256",
+              "type": "uint256"
+            }
+          ]
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAgentSetting",
+      "inputs": [
+        {
+          "name": "_agentVault",
+          "internalType": "address",
+          "type": "address"
+        },
+        {
+          "name": "_name",
+          "internalType": "string",
+          "type": "string"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAgentVaultOwner",
+      "inputs": [
+        {
+          "name": "_agentVault",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_ownerManagementAddress",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAgentVaultCollateralToken",
+      "inputs": [
+        {
+          "name": "_agentVault",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "contract IERC20",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAgentFullVaultCollateral",
+      "inputs": [
+        {
+          "name": "_agentVault",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAgentFullPoolCollateral",
+      "inputs": [
+        {
+          "name": "_agentVault",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "redeem",
+      "inputs": [
+        {
+          "name": "_lots",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_redeemerUnderlyingAddressString",
+          "internalType": "string",
+          "type": "string"
+        },
+        {
+          "name": "_executor",
+          "internalType": "address payable",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_redeemedAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "redeemAmount",
+      "inputs": [
+        {
+          "name": "_amountUBA",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_redeemerUnderlyingAddressString",
+          "internalType": "string",
+          "type": "string"
+        },
+        {
+          "name": "_executor",
+          "internalType": "address payable",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_redeemedAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "redemptionPaymentDefault",
+      "inputs": [
+        {
+          "name": "_proof",
+          "internalType": "struct IReferencedPaymentNonexistence.Proof",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "merkleProof",
+              "internalType": "bytes32[]",
+              "type": "bytes32[]"
+            },
+            {
+              "name": "data",
+              "internalType": "struct IReferencedPaymentNonexistence.Response",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "attestationType",
+                  "internalType": "bytes32",
+                  "type": "bytes32"
+                },
+                {
+                  "name": "sourceId",
+                  "internalType": "bytes32",
+                  "type": "bytes32"
+                },
+                {
+                  "name": "votingRound",
+                  "internalType": "uint64",
+                  "type": "uint64"
+                },
+                {
+                  "name": "lowestUsedTimestamp",
+                  "internalType": "uint64",
+                  "type": "uint64"
+                },
+                {
+                  "name": "requestBody",
+                  "internalType": "struct IReferencedPaymentNonexistence.RequestBody",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "minimalBlockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "deadlineBlockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "deadlineTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "destinationAddressHash",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "amount",
+                      "internalType": "uint256",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "standardPaymentReference",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "checkSourceAddresses",
+                      "internalType": "bool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "sourceAddressesRoot",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    }
+                  ]
+                },
+                {
+                  "name": "responseBody",
+                  "internalType": "struct IReferencedPaymentNonexistence.ResponseBody",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "minimalBlockTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "_redemptionRequestId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionRequested",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "paymentAddress",
+          "internalType": "string",
+          "type": "string",
+          "indexed": false
+        },
+        {
+          "name": "valueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "feeUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "firstUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingTimestamp",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "paymentReference",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "executor",
+          "internalType": "address",
+          "type": "address",
+          "indexed": false
+        },
+        {
+          "name": "executorFeeNatWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionWithTagRequested",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "paymentAddress",
+          "internalType": "string",
+          "type": "string",
+          "indexed": false
+        },
+        {
+          "name": "valueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "feeUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "firstUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingBlock",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "lastUnderlyingTimestamp",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "paymentReference",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "executor",
+          "internalType": "address",
+          "type": "address",
+          "indexed": false
+        },
+        {
+          "name": "executorFeeNatWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "destinationTag",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionRejected",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionRequestIncomplete",
+      "inputs": [
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "remainingLots",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionPerformed",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "transactionHash",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "spentUnderlyingUBA",
+          "internalType": "int256",
+          "type": "int256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionDefault",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "redeemedVaultCollateralWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "redeemedPoolCollateralWei",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionPaymentBlocked",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "transactionHash",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "redemptionAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "spentUnderlyingUBA",
+          "internalType": "int256",
+          "type": "int256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionPaymentFailed",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "requestId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "transactionHash",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        },
+        {
+          "name": "spentUnderlyingUBA",
+          "internalType": "int256",
+          "type": "int256",
+          "indexed": false
+        },
+        {
+          "name": "failureReason",
+          "internalType": "string",
+          "type": "string",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionTicketCreated",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redemptionTicketId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "ticketValueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionTicketUpdated",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redemptionTicketId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        },
+        {
+          "name": "ticketValueUBA",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionTicketDeleted",
+      "inputs": [
+        {
+          "name": "agentVault",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "redemptionTicketId",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": true
+        }
+      ]
+    }
+  ],
+  "fAssetAbi": [
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "Approval",
+      "inputs": [
+        {
+          "name": "owner",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "spender",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "value",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "Transfer",
+      "inputs": [
+        {
+          "name": "from",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "to",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "value",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "allowance",
+      "inputs": [
+        {
+          "name": "owner",
+          "internalType": "address",
+          "type": "address"
+        },
+        {
+          "name": "spender",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "approve",
+      "inputs": [
+        {
+          "name": "spender",
+          "internalType": "address",
+          "type": "address"
+        },
+        {
+          "name": "amount",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "bool",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "balanceOf",
+      "inputs": [
+        {
+          "name": "account",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "decimals",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint8",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "name",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "string",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "symbol",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "string",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view"
+    }
+  ],
+  "fdcHubAbi": [
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "AttestationRequest",
+      "inputs": [
+        {
+          "name": "data",
+          "internalType": "bytes",
+          "type": "bytes",
+          "indexed": false
+        },
+        {
+          "name": "fee",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "requestAttestation",
+      "inputs": [
+        {
+          "name": "_data",
+          "internalType": "bytes",
+          "type": "bytes"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "requestsOffsetSeconds",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint8",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "fdcRequestFeeConfigurations",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "contract IFdcRequestFeeConfigurations",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view"
+    }
+  ],
+  "fdcRequestFeeConfigurationsAbi": [
+    {
+      "type": "function",
+      "name": "getRequestFee",
+      "inputs": [
+        {
+          "name": "_data",
+          "internalType": "bytes",
+          "type": "bytes"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    }
+  ],
+  "relayAbi": [
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "ProtocolMessageRelayed",
+      "inputs": [
+        {
+          "name": "protocolId",
+          "internalType": "uint8",
+          "type": "uint8",
+          "indexed": true
+        },
+        {
+          "name": "votingRoundId",
+          "internalType": "uint32",
+          "type": "uint32",
+          "indexed": true
+        },
+        {
+          "name": "isSecureRandom",
+          "internalType": "bool",
+          "type": "bool",
+          "indexed": false
+        },
+        {
+          "name": "merkleRoot",
+          "internalType": "bytes32",
+          "type": "bytes32",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "isFinalized",
+      "inputs": [
+        {
+          "name": "_protocolId",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_votingRoundId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "bool",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "merkleRoots",
+      "inputs": [
+        {
+          "name": "_protocolId",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_votingRoundId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_merkleRoot",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getVotingRoundId",
+      "inputs": [
+        {
+          "name": "_timestamp",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_votingRoundId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "protocolFeeInWei",
+      "inputs": [
+        {
+          "name": "_protocolId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    }
+  ],
+  "flareContractRegistryAbi": [
+    {
+      "type": "function",
+      "name": "getContractAddressByName",
+      "inputs": [
+        {
+          "name": "_name",
+          "internalType": "string",
+          "type": "string"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getContractAddressByHash",
+      "inputs": [
+        {
+          "name": "_nameHash",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "address",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getAllContracts",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "_names",
+          "internalType": "string[]",
+          "type": "string[]"
+        },
+        {
+          "name": "_addresses",
+          "internalType": "address[]",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view"
+    }
+  ],
+  "harborContractAbi": [
+    {
+      "type": "constructor",
+      "inputs": [
+        {
+          "name": "assetManagerOrRegistry",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "resolveAssetManagerFromRegistry",
+          "type": "bool",
+          "internalType": "bool"
+        },
+        {
+          "name": "initialDefaultKeeperExecutor",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "receive",
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "FXRP_ASSET_MANAGER_REGISTRY_NAME",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "string",
+          "internalType": "string"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "assetDecimals",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint8",
+          "internalType": "uint8"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "assetManagerAddress",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "defaultKeeperExecutor",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "executeDefault",
+      "inputs": [
+        {
+          "name": "proof",
+          "type": "tuple",
+          "internalType": "struct IReferencedPaymentNonexistence.Proof",
+          "components": [
+            {
+              "name": "merkleProof",
+              "type": "bytes32[]",
+              "internalType": "bytes32[]"
+            },
+            {
+              "name": "data",
+              "type": "tuple",
+              "internalType": "struct IReferencedPaymentNonexistence.Response",
+              "components": [
+                {
+                  "name": "attestationType",
+                  "type": "bytes32",
+                  "internalType": "bytes32"
+                },
+                {
+                  "name": "sourceId",
+                  "type": "bytes32",
+                  "internalType": "bytes32"
+                },
+                {
+                  "name": "votingRound",
+                  "type": "uint64",
+                  "internalType": "uint64"
+                },
+                {
+                  "name": "lowestUsedTimestamp",
+                  "type": "uint64",
+                  "internalType": "uint64"
+                },
+                {
+                  "name": "requestBody",
+                  "type": "tuple",
+                  "internalType": "struct IReferencedPaymentNonexistence.RequestBody",
+                  "components": [
+                    {
+                      "name": "minimalBlockNumber",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "deadlineBlockNumber",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "deadlineTimestamp",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "destinationAddressHash",
+                      "type": "bytes32",
+                      "internalType": "bytes32"
+                    },
+                    {
+                      "name": "amount",
+                      "type": "uint256",
+                      "internalType": "uint256"
+                    },
+                    {
+                      "name": "standardPaymentReference",
+                      "type": "bytes32",
+                      "internalType": "bytes32"
+                    },
+                    {
+                      "name": "checkSourceAddresses",
+                      "type": "bool",
+                      "internalType": "bool"
+                    },
+                    {
+                      "name": "sourceAddressesRoot",
+                      "type": "bytes32",
+                      "internalType": "bytes32"
+                    }
+                  ]
+                },
+                {
+                  "name": "responseBody",
+                  "type": "tuple",
+                  "internalType": "struct IReferencedPaymentNonexistence.ResponseBody",
+                  "components": [
+                    {
+                      "name": "minimalBlockTimestamp",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockNumber",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockTimestamp",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "redemptionRequestId",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "fAssetTokenAddress",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "lotSizeUBA",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "owner",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "renounceOwnership",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "setDefaultKeeperExecutor",
+      "inputs": [
+        {
+          "name": "executor",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "transferOwnership",
+      "inputs": [
+        {
+          "name": "newOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "event",
+      "name": "DefaultKeeperExecutorUpdated",
+      "inputs": [
+        {
+          "name": "executor",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "OwnershipTransferred",
+      "inputs": [
+        {
+          "name": "previousOwner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "newOwner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "RedemptionDefaultForwarded",
+      "inputs": [
+        {
+          "name": "caller",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "redemptionRequestId",
+          "type": "uint256",
+          "indexed": true,
+          "internalType": "uint256"
+        },
+        {
+          "name": "forwardedExecutorFeeNatWei",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "error",
+      "name": "AssetManagerResolutionFailed",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "DirectNativeTransferRejected",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NativeForwardFailed",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "OwnableInvalidOwner",
+      "inputs": [
+        {
+          "name": "owner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "OwnableUnauthorizedAccount",
+      "inputs": [
+        {
+          "name": "account",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ReentrancyGuardReentrantCall",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroAddress",
+      "inputs": []
+    }
+  ],
+  "coston2ProtocolAddresses": {
+    "flareContractRegistry": "0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019",
+    "fxrpAssetManager": "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA",
+    "fAssetToken": "0x0b6A3645c240605887a5532109323A3E12273dc7",
+    "fdcHub": "0x48aC463d7975828989331F4De43341627b9c5f1D",
+    "fdcVerification": "0x906507E0B64bcD494Db73bd0459d1C667e14B933",
+    "relay": "0xa10B672D1c62e5457b17af63d4302add6A99d7dE",
+    "ftsoV2": "0xC4e9c78EA53db782E28f28Fdf80BaF59336B304d"
+  },
+  "coston2FxrpAsset": {
+    "assetManagerAddress": "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA",
+    "fAssetTokenAddress": "0x0b6A3645c240605887a5532109323A3E12273dc7",
+    "assetManagerRegistryName": "AssetManagerFXRP",
+    "name": "FXRP",
+    "symbol": "FTestXRP",
+    "decimals": 6,
+    "lotSizeUBA": "10000000"
+  },
+  "coston2Chain": {
+    "id": 114,
+    "name": "Flare Testnet Coston2",
+    "network": "coston2",
+    "nativeCurrency": {
+      "name": "Coston2 Flare",
+      "symbol": "C2FLR",
+      "decimals": 18
+    },
+    "rpcUrls": {
+      "default": {
+        "http": [
+          "https://coston2-api.flare.network/ext/C/rpc"
+        ],
+        "webSocket": [
+          "wss://coston2-api.flare.network/ext/C/ws"
+        ]
+      }
+    },
+    "blockExplorers": {
+      "default": {
+        "name": "Coston2 Explorer",
+        "url": "https://coston2-explorer.flare.network"
+      },
+      "systems": {
+        "name": "Coston2 Systems Explorer",
+        "url": "https://coston2-systems-explorer.flare.network"
+      }
+    },
+    "fdc": {
+      "dataAvailabilityApi": "https://ctn2-data-availability.flare.network/api-doc",
+      "xrpVerifierApi": "https://fdc-verifiers-testnet.flare.network/verifier/xrp/api-doc"
+    },
+    "flareContractRegistryAddress": "0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019",
+    "testnet": true
+  }
+}

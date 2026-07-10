@@ -1,0 +1,23 @@
+{
+  "name": "harbor-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Comprehensive live E2E test suite for Harbor (Flare Coston2 FAssets redemption-default executor).",
+  "type": "module",
+  "scripts": {
+    "test": "tsx harbor-e2e.ts",
+    "test:mutations": "RUN_MUTATIONS=true tsx harbor-e2e.ts",
+    "test:sandbox": "node run.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "dump-abis": "node scripts/dump-abis.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  }
+}

@@ -1,0 +1,176 @@
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  HARBOR E2E — Flare Coston2 FAssets redemption-default suite               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+rpc=https://coston2-api.flare.network/ext/C/rpc
+wallet=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
+mutations=ON (will send txs)  lots=1  executorFee=0.1 C2FLR
+defaultedRequestId=(none — T5c will be BLOCKED)
+
+· T0 Environment › RPC reachable + chainId is Coston2 (114) …
+  PASS    T0 Environment › RPC reachable + chainId is Coston2 (114) (1ms)
+          chainId=114
+· T0 Environment › Block height is live …
+  PASS    T0 Environment › Block height is live (262ms)
+          head block=32703008
+· T0 Environment › Signer funded with C2FLR for gas …
+  PASS    T0 Environment › Signer funded with C2FLR for gas (337ms)
+          wallet=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
+          balance=97.311086224999982 C2FLR
+          gasPrice=650000000000
+· T1 Contracts/Proxy › Bytecode present + sizes match brief …
+  PASS    T1 Contracts/Proxy › Bytecode present + sizes match brief (1357ms)
+          impl=12796B, executor=4259B
+· T1 Contracts/Proxy › PROXY answers view calls (Diamond delegates) …
+  PASS    T1 Contracts/Proxy › PROXY answers view calls (Diamond delegates) (189ms)
+          proxy.fAsset()=0x0b6A3645c240605887a5532109323A3E12273dc7
+· T1 Contracts/Proxy › IMPLEMENTATION reverts direct calls (corrects task premise) …
+  PASS    T1 Contracts/Proxy › IMPLEMENTATION reverts direct calls (corrects task premise) (169ms)
+          impl.fAsset() reverted as expected → call the PROXY, not the impl
+          (missing revert data)
+· T1 Contracts/Proxy › Registry resolves AssetManagerFXRP → proxy …
+  PASS    T1 Contracts/Proxy › Registry resolves AssetManagerFXRP → proxy (167ms)
+          0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA
+· T1 Contracts/Proxy › Harbor executor wiring is correct …
+  PASS    T1 Contracts/Proxy › Harbor executor wiring is correct (168ms)
+          assetManager=0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA
+          fAsset=0x0b6A3645c240605887a5532109323A3E12273dc7
+          lotSizeUBA=10000000
+· T1 Contracts/Proxy › FXRP token identity (FTestXRP / 6dp) …
+  PASS    T1 Contracts/Proxy › FXRP token identity (FTestXRP / 6dp) (154ms)
+          symbol=FTestXRP, decimals=6
+· T2 Protocol state › AssetManager settings snapshot …
+  PASS    T2 Protocol state › AssetManager settings snapshot (175ms)
+          lotSizeAMG=10000000  assetUnitUBA=1000000
+          paymentWindow=500 blocks / 900s
+          redemptionFeeBIPS=50  redemptionDefaultFactorVaultBIPS=10500
+          attestationWindowSeconds=86400  underlyingChain=testXRP
+· T2 Protocol state › Agent inventory (status + capacity) …
+  PASS    T2 Protocol state › Agent inventory (status + capacity) (864ms)
+          4 agents; Σ freeLots=1621, Σ redeemingUBA=0
+          0x55c81526… status=0 avail=true freeLots=482 redeeming=0 xrpl=r4uKJRy9mjxGHw1yzS1SrtaKCUwT66MCcP
+          0xd5dEFe2c… status=0 avail=true freeLots=992 redeeming=0 xrpl=rDEXUmuYAe9MCxVfoWArptSZNQPjKpRCXd
+          0x5b89514d… status=0 avail=true freeLots=57 redeeming=0 xrpl=r4GHJwGSaGmJy9BBXS9osFXqRjqdSm7v83
+          0x165c62b4… status=0 avail=true freeLots=90 redeeming=0 xrpl=rDYeqGVc8M3Se9wowvRDbURGYGZ5i5VF6r
+· T2 Protocol state › Harbor executor owner + keeper role …
+  PASS    T2 Protocol state › Harbor executor owner + keeper role (668ms)
+          owner=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
+          defaultKeeperExecutor=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
+          (this wallet=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88, controls-keeper=true)
+· T2 Protocol state › FDC infra reachable (fee config + relay round) …
+  PASS    T2 Protocol state › FDC infra reachable (fee config + relay round) (922ms)
+          feeConfig=0x191a1282Ac700edE65c5B0AaF313BAcC3eA7fC7e
+          currentVotingRound=1391716
+          isFinalized(round-100)=true
+· T3 Setup (FXRP) › Acquire ≥ 1 lot of FXRP …
+  PASS    T3 Setup (FXRP) › Acquire ≥ 1 lot of FXRP (165ms)
+          balance=10.0 FXRP (10000000 UBA) (≥ 1 lot) — ready to redeem
+· T4 Happy path › approve + redeem → RedemptionRequested …
+  PASS    T4 Happy path › approve + redeem → RedemptionRequested (11357ms)
+          requestId=38242590 agent=0x165c62b4531D28E34c68a8b2aCBF4D0421e4E028
+          valueUBA=10.0 FXRP (10000000 UBA) feeUBA=50000
+          payTo=rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G ref=0x464250526641000200000000000000000000000000000000000000000247891e
+          window: blocks 18946649→18947227, tsDeadline=1783685269
+          executor=0xD2180a8A091A1B4652B48F33767A0d0483da5D50 fee=0.1 C2FLR
+          gas: approve≈51609, redeem≈449584, redeemTx=0x2d3bf7e8851287e465f609b80efce3f115bc424bc7529c43a44dff93e946d2bc
+· T4 Happy path › Agent settles → RedemptionPerformed + balance burned …
+  PASS    T4 Happy path › Agent settles → RedemptionPerformed + balance burned (201521ms)
+          RedemptionPerformed: agent=0x165c62b4531D28E34c68a8b2aCBF4D0421e4E028 xrplTx=0xac16b892f1c9a52e0011381e60ebd50f9449661b1fcfc6b8b2c14280e7eebc3f
+          redeemedUBA=10.0 FXRP (10000000 UBA) spentUnderlyingUBA=9950012
+          FXRP burned=10.0 FXRP (10000000 UBA) newBalance=0.0 FXRP (0 UBA)
+· T5 Edge (default) › 5a Build + encode ReferencedPaymentNonexistence request …
+  PASS    T5 Edge (default) › 5a Build + encode ReferencedPaymentNonexistence request (1ms)
+          from live redemption 38242590
+          dest=rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G destHash=0x2e63f8d99779c6abd3cb4437e1543194649651be84b65bc42569765b8b499293
+          blocks 18946649→18947227 amount=10.0 FXRP (10000000 UBA)
+          encodedBody=514 chars
+· T5 Edge (default) › 5b FDC verifier prepareRequest (live) …
+  BLOCKED T5 Edge (default) › 5b FDC verifier prepareRequest (live) (246ms)
+          verifier status=INVALID: BLOCK DOES NOT EXIST (no abiEncodedRequest). expected when the agent DID pay or the window has not fully passed — a genuine default requires an unpaid, expired redemption.
+· T5 Edge (default) › 5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault …
+  BLOCKED T5 Edge (default) › 5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault (0ms)
+          Needs a redemption whose XRPL payment window expired UNPAID (a genuine default).
+          All 4 live agents have 100% fulfillment, so this cannot be forced on demand.
+          To run this live: set HARBOR_DEFAULTED_REQUEST_ID to such a redemption's id
+          (and RUN_MUTATIONS=true). The suite will then: getRequestFee → FdcHub
+          .requestAttestation → wait Relay.isFinalized → DA-layer proof-by-request-round
+          → HarborRedeemer.executeDefault(proof, id) → assert RedemptionDefault +
+          RedemptionDefaultForwarded (executor fee) + collateral received.
+· T5 Edge (default) › 5d executeDefault before window passes reverts (live wiring) …
+  PASS    T5 Edge (default) › 5d executeDefault before window passes reverts (live wiring) (210ms)
+          reverted as expected (invalid/premature proof): execution reverted (unknown custom error) [selector 0xba0514c0]
+· T6 Keeper/executor › executeDefault is wired to AssetManager (reverts on bad input) …
+  PASS    T6 Keeper/executor › executeDefault is wired to AssetManager (reverts on bad input) (672ms)
+          executeDefault(dummy, 999999999) reverted (delegates to redemptionPaymentDefault): execution reverted (unknown custom error) [selector 0xba0514c0]
+· T6 Keeper/executor › setDefaultKeeperExecutor is owner-only …
+  PASS    T6 Keeper/executor › setDefaultKeeperExecutor is owner-only (156ms)
+          rejected non-owner caller: execution reverted (unknown custom error)
+· T6 Keeper/executor › setDefaultKeeperExecutor(0) reverts (ZeroAddress) …
+  PASS    T6 Keeper/executor › setDefaultKeeperExecutor(0) reverts (ZeroAddress) (359ms)
+          owner setting zero address reverted: execution reverted (unknown custom error) [selector 0xd92e233d]
+· T6 Keeper/executor › Keeper can re-set its own executor (owner dry-run) …
+  PASS    T6 Keeper/executor › Keeper can re-set its own executor (owner dry-run) (5895ms)
+          re-set keeper=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88 (idempotent no-op) tx=0xfde823acba827929ac5d74ae1672bf9dc0357943d280816572b1038a39dbd1a8 gas=27382
+· T7 Failure modes › redeem with insufficient FXRP reverts …
+  PASS    T7 Failure modes › redeem with insufficient FXRP reverts (191ms)
+          redeem(1000000 lots) reverted: execution reverted (unknown custom error) [selector 0xdb7b48e3]
+· T7 Failure modes › redeem with zero lots reverts …
+  PASS    T7 Failure modes › redeem with zero lots reverts (610ms)
+          redeem(0 lots) reverted: execution reverted (unknown custom error) [selector 0x882ccad9]
+· T7 Failure modes › XRPL address validation (client-side) …
+  PASS    T7 Failure modes › XRPL address validation (client-side) (1ms)
+          accepted rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G; rejected 5 malformed addresses (incl. bad checksum)
+· T7 Failure modes › redeem with invalid XRPL address reverts on-chain …
+  PASS    T7 Failure modes › redeem with invalid XRPL address reverts on-chain (168ms)
+          redeem(bad XRPL addr) reverted: execution reverted (unknown custom error) [selector 0xdb7b48e3]
+· T7 Failure modes › redemptionPaymentDefault for nonexistent redemption reverts …
+  PASS    T7 Failure modes › redemptionPaymentDefault for nonexistent redemption reverts (171ms)
+          redemptionPaymentDefault(dummy, 987654321) reverted: execution reverted (unknown custom error) [selector 0xba0514c0]
+· T7 Failure modes › Implementation address rejects redeem (must use proxy) …
+  PASS    T7 Failure modes › Implementation address rejects redeem (must use proxy) (170ms)
+          redeem() on impl reverted (confirms proxy-only): missing revert data
+
+────────────────────────── SUMMARY ──────────────────────────
+T0 Environment
+  PASS    RPC reachable + chainId is Coston2 (114) (1ms)
+  PASS    Block height is live (262ms)
+  PASS    Signer funded with C2FLR for gas (337ms)
+T1 Contracts/Proxy
+  PASS    Bytecode present + sizes match brief (1357ms)
+  PASS    PROXY answers view calls (Diamond delegates) (189ms)
+  PASS    IMPLEMENTATION reverts direct calls (corrects task premise) (169ms)
+  PASS    Registry resolves AssetManagerFXRP → proxy (167ms)
+  PASS    Harbor executor wiring is correct (168ms)
+  PASS    FXRP token identity (FTestXRP / 6dp) (154ms)
+T2 Protocol state
+  PASS    AssetManager settings snapshot (175ms)
+  PASS    Agent inventory (status + capacity) (864ms)
+  PASS    Harbor executor owner + keeper role (668ms)
+  PASS    FDC infra reachable (fee config + relay round) (922ms)
+T3 Setup (FXRP)
+  PASS    Acquire ≥ 1 lot of FXRP (165ms)
+T4 Happy path
+  PASS    approve + redeem → RedemptionRequested (11357ms)
+  PASS    Agent settles → RedemptionPerformed + balance burned (201521ms)
+T5 Edge (default)
+  PASS    5a Build + encode ReferencedPaymentNonexistence request (1ms)
+  BLOCKED 5b FDC verifier prepareRequest (live) (246ms)
+  BLOCKED 5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault (0ms)
+  PASS    5d executeDefault before window passes reverts (live wiring) (210ms)
+T6 Keeper/executor
+  PASS    executeDefault is wired to AssetManager (reverts on bad input) (672ms)
+  PASS    setDefaultKeeperExecutor is owner-only (156ms)
+  PASS    setDefaultKeeperExecutor(0) reverts (ZeroAddress) (359ms)
+  PASS    Keeper can re-set its own executor (owner dry-run) (5895ms)
+T7 Failure modes
+  PASS    redeem with insufficient FXRP reverts (191ms)
+  PASS    redeem with zero lots reverts (610ms)
+  PASS    XRPL address validation (client-side) (1ms)
+  PASS    redeem with invalid XRPL address reverts on-chain (168ms)
+  PASS    redemptionPaymentDefault for nonexistent redemption reverts (171ms)
+  PASS    Implementation address rejects redeem (must use proxy) (170ms)
+
+Totals: 28 passed, 0 failed, 2 blocked, 0 skipped  (of 30)
+
+BLOCKED = a real prerequisite is missing (FXRP faucet, or a genuine
+defaulted redemption). See the detail lines above for the exact next step.
