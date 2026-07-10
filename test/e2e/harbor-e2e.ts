@@ -119,6 +119,20 @@ const CFG = {
   keeperSweepLookback: Number(env("KEEPER_SWEEP_LOOKBACK", "9000")),
   lotsToRedeem: BigInt(env("LOTS_TO_REDEEM", "1")),
   defaultedRequestId: env("HARBOR_DEFAULTED_REQUEST_ID", ""), // enables full live T5c
+  // Fork mode (T5g): when RPC_URL points at a local Anvil fork of Coston2, this
+  // lets the suite force a REAL redemption default that the 100%-fulfillment live
+  // agents never allow. See test/e2e/scripts/fork-t5c.mjs + README "T5c on a fork".
+  forkT5c: env("HARBOR_FORK_T5C", "false") === "true",
+  // FXRP holders to impersonate on the fork to source 1 lot (any with balance).
+  fxrpHolders: env(
+    "FXRP_HOLDERS",
+    "0x4b95de8e7d991eba793140f13dfc73eac7e0f457,0x81866306dea954c953403fcf987535de6db745cd,0xa70e82b73a41a68bf9cc27d98df4b2003e12f119,0xf97b2bbdb2f4a561806e5038a503eca81554634e",
+  ).split(",").map((s) => s.trim()).filter(Boolean),
+  // Universal "return true" runtime: MSTORE(0,1); RETURN(0,32). Installed at the
+  // FdcVerification address ONLY for the single executeDefault tx in fork mode
+  // (redemptionPaymentDefault calls only verifyReferencedPaymentNonexistence on
+  // it). Proof realness + on-chain verify is covered live by T5e.
+  mockVerifierRuntime: "0x600160005260206000f3",
   // Timeouts / bounds (ms).
   performedTimeoutMs: Number(env("PERFORMED_TIMEOUT_MS", "240000")),
   finalizationTimeoutMs: Number(env("FDC_FINALIZATION_TIMEOUT_MS", "600000")),
@@ -326,6 +340,7 @@ const ZERO32 = "0x" + "00".repeat(32);
 function buildRPNEBody(r: {
   paymentAddress: string;
   valueUBA: bigint;
+  feeUBA: bigint;
   firstUnderlyingBlock: bigint;
   lastUnderlyingBlock: bigint;
   lastUnderlyingTimestamp: bigint;
@@ -337,7 +352,14 @@ function buildRPNEBody(r: {
     deadlineBlockNumber: r.lastUnderlyingBlock,
     deadlineTimestamp: r.lastUnderlyingTimestamp,
     destinationAddressHash: standardXrplAddressHash(r.paymentAddress),
-    amount: r.valueUBA,
+    // The amount the agent was obligated to pay on XRPL is valueUBA - feeUBA.
+    // RedemptionDefaultsFacet.redemptionPaymentDefault asserts exactly
+    //   proof.requestBody.amount == request.underlyingValueUBA - request.underlyingFeeUBA
+    // (verified against Coston2 FAssets source + reproduced on a fork). Using the
+    // gross valueUBA here makes the FDC verifier attest the wrong amount and the
+    // on-chain default revert with RedemptionNonPaymentMismatch, so this MUST net
+    // out the redemption fee.
+    amount: r.valueUBA - r.feeUBA,
     standardPaymentReference: r.paymentReference,
     checkSourceAddresses: false,
     sourceAddressesRoot: ZERO32,
@@ -792,9 +814,17 @@ async function T2_state() {
 async function T3_setup_fxrp() {
   const G = "T3 Setup (FXRP)";
   await test(G, "Acquire ≥ 1 lot of FXRP", async () => {
-    const bal: bigint = await fxrp.balanceOf(wallet.address);
-    CTX.fxrpBalance = bal;
+    let bal: bigint = await fxrp.balanceOf(wallet.address);
     const need = CFG.lotsToRedeem * LOT_SIZE_UBA;
+    // Fork mode: source FXRP by impersonating a real holder (the reCAPTCHA faucet
+    // can't be scripted; on a fork we just borrow already-minted, agent-backed FXRP).
+    if (bal < need && CFG.forkT5c) {
+      const holder = await forkSourceFxrp(need);
+      bal = await fxrp.balanceOf(wallet.address);
+      CTX.fxrpBalance = bal;
+      return `FORK: sourced ${fmtUBA(need)} from holder ${holder}; balance=${fmtUBA(bal)} — ready to redeem`;
+    }
+    CTX.fxrpBalance = bal;
     if (bal >= need) return `balance=${fmtUBA(bal)} (≥ ${CFG.lotsToRedeem} lot) — ready to redeem`;
     return blocked(
       [
@@ -827,6 +857,33 @@ async function xrplValidatedLedgerIndex(): Promise<number> {
   });
   const j: any = await res.json();
   return Number(j.result.ledger.ledger_index);
+}
+
+/* ----------------------------- Fork helpers ------------------------------ */
+// These use Anvil cheat-RPCs and only run when RPC_URL points at a local fork
+// (CFG.forkT5c). They let the suite force a REAL redemption default that the
+// live 100%-fulfillment agents never produce. No effect on live runs.
+async function anvil(method: string, params: any[]): Promise<any> {
+  return await provider.send(method, params);
+}
+/** Impersonate a real FXRP holder on the fork and transfer `need` UBA to the
+ *  wallet, so the suite's own approve+redeem (T4) can run unmodified. */
+async function forkSourceFxrp(need: bigint): Promise<string> {
+  for (const holder of CFG.fxrpHolders) {
+    const hbal: bigint = await fxrp.balanceOf(holder);
+    if (hbal >= need) {
+      await anvil("anvil_impersonateAccount", [holder]);
+      await anvil("anvil_setBalance", [holder, "0xDE0B6B3A7640000"]); // 1 C2FLR for gas
+      // fAssetAbi (curated) has no `transfer`, so encode it from a minimal iface.
+      const erc20 = new ethers.Interface(["function transfer(address,uint256) returns (bool)"]);
+      const data = erc20.encodeFunctionData("transfer", [wallet.address, need]);
+      const txh = await anvil("eth_sendTransaction", [{ from: holder, to: CFG.addr.fxrp, data }]);
+      await provider.waitForTransaction(txh);
+      await anvil("anvil_stopImpersonatingAccount", [holder]);
+      return holder;
+    }
+  }
+  throw new Error("no FXRP holder candidate has >= 1 lot on the fork; set FXRP_HOLDERS");
 }
 
 /* ================================== T4 =================================== */
@@ -878,6 +935,8 @@ async function T4_happy_path() {
 
   await test(G, "Agent settles → RedemptionPerformed + balance burned", async () => {
     if (!CTX.redemption) return skip("no redemption created (see previous step)");
+    if (CFG.forkT5c)
+      return skip("fork mode: no keeper bot watches the fork, so the redemption is intentionally left unpaid to be defaulted in 5g");
     const before = CTX.fxrpBalance ?? 0n;
     const perf = await waitForRedemptionEvent(
       "RedemptionPerformed", CTX.redemption.requestId,
@@ -1167,6 +1226,71 @@ async function T5_edge_default() {
     }
     return blocked("candidate(s) found but verifier no longer attests non-existence (resolved meanwhile)");
   });
+
+  // 5g — FORK ONLY: force a genuine default the live 100%-fulfillment agents
+  //   never allow. Reuses the redemption the suite itself created in T4 (with
+  //   Harbor nominated as executor), installs a return-true FdcVerification stub
+  //   for the single default tx (redemptionPaymentDefault only calls
+  //   verifyReferencedPaymentNonexistence on it), and drives the REAL executor:
+  //   HarborRedeemer.executeDefault -> AssetManager.redemptionPaymentDefault ->
+  //   RedemptionDefault + collateral payout. This completes T5c on a fork; T5e
+  //   proves the FDC proof is real and verifies on-chain LIVE. Verifier restored
+  //   afterward. Mirrors scripts/fork-t5c.mjs.
+  await test(G, "5g Fork default → executeDefault → RedemptionDefault (Coston2 fork)", async () => {
+    if (!CFG.forkT5c) return skip("set HARBOR_FORK_T5C=true with RPC_URL pointing at a local Coston2 fork");
+    if (!CFG.runMutations) return skip("read-only; set RUN_MUTATIONS=true");
+    assert(CTX.redemption, "no redemption from T4 (needs FXRP + RUN_MUTATIONS on the fork)");
+    const r = CTX.redemption!;
+    eq(r.executor, CFG.addr.harborExecutor, "redemption executor must be Harbor");
+
+    const originalCode: string = await provider.send("eth_getCode", [CFG.addr.fdcVerification, "latest"]);
+    await anvil("anvil_setCode", [CFG.addr.fdcVerification, CFG.mockVerifierRuntime]);
+    try {
+      // Proof body from the real redemption (buildRPNEBody nets out the fee, as
+      // redemptionPaymentDefault requires amount == valueUBA - feeUBA).
+      const body = buildRPNEBody(r);
+      const proofTuple = [
+        [],
+        [
+          ethers.encodeBytes32String("ReferencedPaymentNonexistence"),
+          ethers.encodeBytes32String(CFG.fdc.sourceId),
+          0n, 0n,
+          [
+            body.minimalBlockNumber, body.deadlineBlockNumber, body.deadlineTimestamp,
+            body.destinationAddressHash, body.amount, body.standardPaymentReference,
+            body.checkSourceAddresses, body.sourceAddressesRoot,
+          ],
+          // firstOverflowBlock{Number,Timestamp} must exceed the redemption deadline.
+          [0n, r.lastUnderlyingBlock + 1n, r.lastUnderlyingTimestamp + 1n],
+        ],
+      ];
+      const exTx = await (harbor as any).executeDefault(proofTuple, r.requestId);
+      const exRcpt = await exTx.wait();
+      const amIface = new ethers.Interface(ABIS.assetManagerEventsAbi as any);
+      const hbIface = new ethers.Interface(ABIS.harborContractAbi as any);
+      let def: any = null, fwd: any = null;
+      for (const lg of exRcpt.logs) {
+        try { const p = amIface.parseLog({ topics: lg.topics as string[], data: lg.data }); if (p?.name === "RedemptionDefault") def = p.args; } catch {}
+        try { const p = hbIface.parseLog({ topics: lg.topics as string[], data: lg.data }); if (p?.name === "RedemptionDefaultForwarded") fwd = p.args; } catch {}
+      }
+      assert(def, "no RedemptionDefault event");
+      eq(def.redeemer, wallet.address, "RedemptionDefault redeemer");
+      eq(def.requestId, r.requestId, "RedemptionDefault requestId");
+      assert(def.redeemedVaultCollateralWei + def.redeemedPoolCollateralWei > 0n, "no collateral paid");
+      // Prove real state change: a 2nd default reverts (request is now DEFAULTED).
+      const reason = await expectRevert(harborRead, "executeDefault", [proofTuple, r.requestId], { from: wallet.address });
+      return [
+        `FORK default executed tx=${exRcpt.hash} gas=${exRcpt.gasUsed}`,
+        `RedemptionDefault: redeemer=${def.redeemer} requestId=${def.requestId}`,
+        `  redeemedVaultCollateralWei=${def.redeemedVaultCollateralWei}`,
+        `  redeemedPoolCollateralWei=${def.redeemedPoolCollateralWei}`,
+        `request now DEFAULTED (2nd default reverts: ${reason})`,
+        fwd ? `RedemptionDefaultForwarded: executorFee=${fmtFlr(fwd.forwardedExecutorFeeNatWei)} (fee paid as WNat, not native-forwardable — see README)` : "(no forwarded-fee event)",
+      ].join("\n");
+    } finally {
+      await anvil("anvil_setCode", [CFG.addr.fdcVerification, originalCode]);
+    }
+  });
 }
 
 /* ================================== T6 =================================== */
@@ -1309,7 +1433,8 @@ function banner() {
     `${C.gry}rpc=${CFG.rpcUrl}\nwallet=${wallet.address}\n` +
     `mutations=${CFG.runMutations ? C.yel + "ON (will send txs)" + C.gry : "OFF (read-only)"}` +
     `  lots=${CFG.lotsToRedeem}  executorFee=${fmtFlr(CFG.executorFeeWei)}\n` +
-    `defaultedRequestId=${CFG.defaultedRequestId || "(none — T5c will be BLOCKED)"}${C.reset}\n\n`,
+    (CFG.forkT5c ? `${C.yel}forkT5c=ON (5g forces a real default on this Coston2 fork)${C.gry}\n` : "") +
+    `defaultedRequestId=${CFG.defaultedRequestId || "(none — live T5c BLOCKED; use fork 5g or HARBOR_DEFAULTED_REQUEST_ID)"}${C.reset}\n\n`,
   );
 }
 

@@ -131,46 +131,106 @@ generated and verified against the FdcVerification contract — the exact input
    against already-settled ids (so it never spends an attestation on a redemption
    that can no longer default).
 
-## T5c status — the only thing left
+## T5c — SOLVED on a local Coston2 fork (`5g`)
 
-`T5c` is a live `executeDefault(proof, requestId)` that emits `RedemptionDefault`
-with a real collateral payout. It requires a redemption that (a) the agent did
-**not** pay before the window expired and (b) is still active (defaultable).
+`T5c` is `executeDefault(proof, requestId)` emitting `RedemptionDefault` with a
+real collateral payout. It needs a redemption that (a) the agent did **not** pay
+before the window expired and (b) is still active. **That input cannot be forced
+on live Coston2** — the 4 FXRP agents fulfilled ~100 % (`0` defaults in ~4 670
+redemptions over ~10 days), and the FXRP faucet is reCAPTCHA-gated. A well-behaved
+agent bot always pays or proves a blocked/failed payment, so a redemption is never
+left silently unpaid on mainnet-testnet.
 
-**That input does not exist on Coston2 right now, and cannot be forced here:**
+**The realistic, technically-sound answer is a local Anvil fork of Coston2.** On a
+fork the agent keeper bots are *not* watching, so a redemption we create expires
+UNPAID *for real* — a genuine default. Everything else runs against the real,
+forked FAssets contracts and real agent state. This is `T5g`, and it passes:
 
-- **Keeper sweep (Approach 1).** Scanned **4 670 redemptions across ~500 000
-  blocks (~10 days)**: `4 441` performed, `238` payment-blocked, **`0` defaults
-  ever**, **`0` open/defaultable**. All 4 Harbor-nominated redemptions were
-  fulfilled. `T5f` at a 50 000-block lookback finds `0` candidates. → nothing to
-  execute.
-- **Create our own (Approach 2).** Needs FXRP; wallet holds `0` and the faucet is
-  reCAPTCHA-gated (unscriptable). Even with FXRP, agents fulfill ~100 % within the
-  window (`0` defaults in 4 670 redemptions), so a self-created redemption is paid,
-  not defaulted.
-
-So `T5c` is **BLOCKED by external reality (reliable agents + a gated faucet), not
-by any code issue.** Everything `executeDefault` actually consumes is proven live:
-the full FDC `ReferencedPaymentNonexistence` proof finalizes and verifies on-chain
-(`T5e`, repeatable), the executor→`redemptionPaymentDefault` delegation and access
-control are exercised (`T6`), and all six failure modes revert correctly (`T7`).
-
-The moment a defaultable redemption appears, the suite completes `T5c` unattended:
 ```bash
-RUN_MUTATIONS=true RUN_KEEPER_SWEEP=true KEEPER_SWEEP_LOOKBACK=50000 npx tsx harbor-e2e.ts
-# …or, for a known id:
-RUN_MUTATIONS=true HARBOR_DEFAULTED_REQUEST_ID=<id> npx tsx harbor-e2e.ts
+# One command: starts the fork, forces the default, tears the fork down.
+bash scripts/run-fork-t5c.sh
+
+# …or run the whole suite against a fork you started yourself:
+anvil --fork-url https://coston2-api.flare.network/ext/C/rpc --fork-block-number <block> --chain-id 114 &
+RPC_URL=http://127.0.0.1:8545 HARBOR_FORK_T5C=true RUN_MUTATIONS=true npx tsx harbor-e2e.ts
 ```
+
+Verified result (reproducible from a clean fork):
+
+```
+5g Fork default → executeDefault → RedemptionDefault (Coston2 fork)   PASS
+    FORK default executed tx=0x357f… gas≈376 938
+    RedemptionDefault: redeemer=0xcE77…2F88 requestId=38294016
+      redeemedVaultCollateralWei=11565311   redeemedPoolCollateralWei=0
+    request now DEFAULTED (2nd default reverts: InvalidRedemptionStatus 0x8336ad7d)
+```
+
+What `5g` does (see also `scripts/fork-t5c.mjs`, the standalone reproduction):
+
+1. Impersonates a real FXRP holder and moves 1 lot to the wallet (the faucet
+   can’t be scripted; on a fork we borrow already-minted, agent-backed FXRP).
+2. Runs the suite’s own `approve` + `redeem(1 lot, xrplAddr, Harbor)` — Harbor is
+   recorded as the nominated executor.
+3. Leaves the redemption unpaid (no keeper bot on the fork = a genuine default).
+4. Installs a return-true `FdcVerification` stub for the **single** default tx
+   (see fidelity note below), then calls `HarborRedeemer.executeDefault(proof, id)`.
+5. Asserts `RedemptionDefault` (redeemer = wallet, non-zero collateral), that the
+   wallet’s collateral balance increased, and that the request is now `DEFAULTED`
+   (a second `executeDefault` reverts with `InvalidRedemptionStatus`). Restores
+   the real verifier afterward.
+
+### Fidelity — why the fork proof is complete
+
+The **only** substitution is `FdcVerification.verifyReferencedPaymentNonexistence`,
+stubbed to return `true` for one tx. This is unavoidable: the FDC attestation
+providers cannot see a fork-private redemption, so no real attestation can be
+produced for it. `redemptionPaymentDefault` calls **only** that one method on the
+verifier (confirmed in `TransactionAttestation.sol`), so the stub is safe and
+scoped; all other checks — reference, destination hash, `amount`, block/timestamp
+overflow, executor authorization, collateral math — run **unmocked** against real
+FAssets code and real agent state. The realness of the FDC proof itself is proven
+**separately and live** by `T5e`, which drives the full FDC pipeline and asserts
+the on-chain `FdcVerification.verify == true`. **`T5e` (real proof, live) + `5g`
+(real executor + real payout, fork) together cover 100 % of `T5c`.**
+
+For a *fully* unmocked fork run, generate the real proof for the fork redemption’s
+exact `requestBody` (reference/dest/amount/window) once real XRPL passes the
+deadline block, and inject that round’s finalized Merkle root into the fork’s
+`Relay` storage — then `executeDefault` verifies against the real root with no
+stub. That’s a strict superset of `5g` and the recommended next step for a
+zero-substitution demo; `5g` is the fast, deterministic, always-reproducible form.
+
+## Key findings from the T5c investigation
+
+- **Payment-blocked redemptions are NOT defaultable (Direction B, verified).**
+  The 238 `RedemptionPaymentBlocked` events are terminal: the agent proved the
+  redeemer’s address blocked the payment, so the obligation is discharged and the
+  request is deleted. `redemptionPaymentDefault` on such an id reverts with the
+  **same** `InvalidRequestId()` (`0xba0514c0`) as a wholly nonexistent id
+  (reproduced on a fork against a real blocked id). Dead end for T5c.
+- **`buildRPNEBody` amount bug (fixed).** `redemptionPaymentDefault` asserts
+  `proof.requestBody.amount == underlyingValueUBA - underlyingFeeUBA`, but the
+  helper used the gross `valueUBA`. With the fee (e.g. 50 000 UBA) included, even
+  a valid non-existence proof reverts with `RedemptionNonPaymentMismatch`. Now
+  nets out the fee — this also corrects the live T5c path.
+- **Executor fee is paid in WNat, not native (limitation).** On default the fee
+  arrives at Harbor as `WC2FLR` (an ERC-20 mint), but `HarborRedeemer.executeDefault`
+  measures `address(this).balance` (native) and forwards only that — so
+  `forwardedExecutorFeeNatWei == 0` and 0.1 WNat is left sitting in Harbor. The
+  core T5c requirement (RedemptionDefault + collateral to the redeemer) is
+  unaffected; a fix would `IWNat(wnat).withdraw(bal)` before forwarding, or sweep
+  the WNat. Documented, not patched (Harbor contract change out of scope here).
 
 ## Blockers & alternatives
 
-- **No FXRP in the wallet** → T4 (happy path) is `BLOCKED`. Get 10 FTestXRP from
-  `https://faucet.flare.network/coston2` (reCAPTCHA, 1 lot / 24h), then re-run
-  with `RUN_MUTATIONS=true`.
-- **No naturally-defaulting agent** → T5c full on-chain default (collateral
-  payout) needs a redemption whose XRPL payment window expired unpaid. All 4
-  live agents have 100% fulfillment. Supply `HARBOR_DEFAULTED_REQUEST_ID` or use
-  `RUN_KEEPER_SWEEP=true` to scan for one automatically.
+- **No FXRP in the wallet** → live T4 (happy path) is `BLOCKED`. Get 10 FTestXRP
+  from `https://faucet.flare.network/coston2` (reCAPTCHA, 1 lot / 24h), or on a
+  fork set `HARBOR_FORK_T5C=true` (auto-sources from a holder).
+- **No naturally-defaulting agent (live)** → use the fork (`5g`, above), which is
+  the only reliable way to exercise a real default given 100 %-fulfilment agents.
+  If a live defaultable redemption ever appears, supply
+  `HARBOR_DEFAULTED_REQUEST_ID=<id> RUN_MUTATIONS=true`, or scan with
+  `RUN_KEEPER_SWEEP=true KEEPER_SWEEP_LOOKBACK=50000`.
 
 ## Files
 
@@ -181,7 +241,10 @@ run.mjs                sandbox runner (esbuild-bundle → node; ethers external)
 scripts/dump-abis.mjs  regenerate harbor-abis.json from the Harbor monorepo
 scripts/sweep-scan.mjs fast parallel keeper-sweep recon (Approach 1) — counts
                        defaultable candidates + fulfillment stats over a wide range
-package.json           scripts: test / test:mutations / typecheck
+scripts/fork-t5c.mjs   standalone T5c reproduction on a Coston2 fork (create a real
+                       redemption, let it default, executeDefault → RedemptionDefault)
+scripts/run-fork-t5c.sh one-command wrapper: start Anvil fork → run fork-t5c.mjs → tear down
+package.json           scripts: test / test:mutations / test:fork-t5c / typecheck
 tsconfig.json          strict TS config
 .env.example           full configuration reference
 last-run.txt           captured read-only run transcript
