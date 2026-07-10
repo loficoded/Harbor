@@ -255,7 +255,12 @@ test.describe("Self-recovery — permissionless default execution", () => {
     await submit.click();
 
     // The submission goes through and the panel confirms it — no keeper needed.
-    await expect(page.getByText("Default submitted")).toBeVisible({
+    // Scope to the self-recovery panel's live confirmation callout (role=status):
+    // "Default submitted" also appears as a timeline milestone and the phase
+    // badge, so an unscoped text match is ambiguous under Playwright strict mode.
+    await expect(
+      page.getByRole("status").filter({ hasText: "Default submitted" }),
+    ).toBeVisible({
       timeout: 30_000,
     });
   });

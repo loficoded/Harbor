@@ -34,13 +34,15 @@ The system drives one settlement lifecycle end to end:
 
 > **redeem → watch XRPL → settle · or prove non-payment → execute default → recover collateral**
 
-|             |                                                                                    |
-| ----------- | ---------------------------------------------------------------------------------- |
-| Live demo   | [harbor-web-olive.vercel.app](https://harbor-web-olive.vercel.app)                 |
-| Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app) |
-| Demo video  | [`assets/demo/harbor-demo.mp4`](./assets/demo/harbor-demo.mp4) _(coming soon)_     |
+|             |                                                                                                                         |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Live demo   | [harbor-web-olive.vercel.app](https://harbor-web-olive.vercel.app)                                                      |
+| Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)                                      |
+| Walkthrough | ▶ [Watch on YouTube](https://www.youtube.com/watch?v=97Q2v0fn6VI) (2 min) · [4K capture](./assets/demo/harbor-demo.mp4) |
 
-[![Harbor — FXRP redemption console on Flare Coston2](./assets/screenshots/redemption-console.png)](./assets/demo/harbor-demo.mp4)
+[![Harbor — watch the 2-minute FXRP redemption walkthrough on Flare Coston2](./assets/screenshots/redemption-console.png)](https://www.youtube.com/watch?v=97Q2v0fn6VI)
+
+<p align="center"><em>▶ <a href="https://www.youtube.com/watch?v=97Q2v0fn6VI">Watch the 2-minute walkthrough</a> — redeem → watch XRPL → settle, or prove non-payment → execute default → recover collateral.</em></p>
 
 ---
 
@@ -532,7 +534,7 @@ Approximate size by area, excluding vendored dependencies and build output
 | -------------------------------------------- | ----: | ------: |
 | TypeScript — application & library           |   129 | ~21,800 |
 | TypeScript — tests                           |    38 |  ~9,960 |
-| Smart contracts — Solidity (`src`, `script`) |     3 |     214 |
+| Smart contracts — Solidity (`src`, `script`) |     2 |     206 |
 | Solidity — tests                             |     7 |   1,099 |
 | SQL migrations (embedded in TypeScript)      |     5 |     324 |
 
