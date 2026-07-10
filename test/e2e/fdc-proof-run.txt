@@ -11,59 +11,59 @@ defaultedRequestId=(none — T5c will be BLOCKED)
   PASS    T0 Environment › RPC reachable + chainId is Coston2 (114) (1ms)
           chainId=114
 · T0 Environment › Block height is live …
-  PASS    T0 Environment › Block height is live (700ms)
-          head block=32706126
+  PASS    T0 Environment › Block height is live (273ms)
+          head block=32705968
 · T0 Environment › Signer funded with C2FLR for gas …
-  PASS    T0 Environment › Signer funded with C2FLR for gas (346ms)
+  PASS    T0 Environment › Signer funded with C2FLR for gas (350ms)
           wallet=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
-          balance=96.354117124999973 C2FLR
+          balance=96.410080174999974 C2FLR
           gasPrice=650000000000
 · T1 Contracts/Proxy › Bytecode present + sizes match brief …
-  PASS    T1 Contracts/Proxy › Bytecode present + sizes match brief (542ms)
+  PASS    T1 Contracts/Proxy › Bytecode present + sizes match brief (563ms)
           impl=12796B, executor=4259B
 · T1 Contracts/Proxy › PROXY answers view calls (Diamond delegates) …
-  PASS    T1 Contracts/Proxy › PROXY answers view calls (Diamond delegates) (171ms)
+  PASS    T1 Contracts/Proxy › PROXY answers view calls (Diamond delegates) (186ms)
           proxy.fAsset()=0x0b6A3645c240605887a5532109323A3E12273dc7
 · T1 Contracts/Proxy › IMPLEMENTATION reverts direct calls (corrects task premise) …
-  PASS    T1 Contracts/Proxy › IMPLEMENTATION reverts direct calls (corrects task premise) (181ms)
+  PASS    T1 Contracts/Proxy › IMPLEMENTATION reverts direct calls (corrects task premise) (182ms)
           impl.fAsset() reverted as expected → call the PROXY, not the impl
           (missing revert data)
 · T1 Contracts/Proxy › Registry resolves AssetManagerFXRP → proxy …
-  PASS    T1 Contracts/Proxy › Registry resolves AssetManagerFXRP → proxy (166ms)
+  PASS    T1 Contracts/Proxy › Registry resolves AssetManagerFXRP → proxy (182ms)
           0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA
 · T1 Contracts/Proxy › Harbor executor wiring is correct …
-  PASS    T1 Contracts/Proxy › Harbor executor wiring is correct (616ms)
+  PASS    T1 Contracts/Proxy › Harbor executor wiring is correct (186ms)
           assetManager=0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA
           fAsset=0x0b6A3645c240605887a5532109323A3E12273dc7
           lotSizeUBA=10000000
 · T1 Contracts/Proxy › FXRP token identity (FTestXRP / 6dp) …
-  PASS    T1 Contracts/Proxy › FXRP token identity (FTestXRP / 6dp) (180ms)
+  PASS    T1 Contracts/Proxy › FXRP token identity (FTestXRP / 6dp) (182ms)
           symbol=FTestXRP, decimals=6
 · T2 Protocol state › AssetManager settings snapshot …
-  PASS    T2 Protocol state › AssetManager settings snapshot (186ms)
+  PASS    T2 Protocol state › AssetManager settings snapshot (259ms)
           lotSizeAMG=10000000  assetUnitUBA=1000000
           paymentWindow=500 blocks / 900s
           redemptionFeeBIPS=50  redemptionDefaultFactorVaultBIPS=10500
           attestationWindowSeconds=86400  underlyingChain=testXRP
 · T2 Protocol state › Agent inventory (status + capacity) …
-  PASS    T2 Protocol state › Agent inventory (status + capacity) (1318ms)
-          4 agents; Σ freeLots=1504, Σ redeemingUBA=0
-          0x55c81526… status=0 avail=true freeLots=484 redeeming=0 xrpl=r4uKJRy9mjxGHw1yzS1SrtaKCUwT66MCcP
+  PASS    T2 Protocol state › Agent inventory (status + capacity) (914ms)
+          4 agents; Σ freeLots=1506, Σ redeemingUBA=0
+          0x55c81526… status=0 avail=true freeLots=487 redeeming=0 xrpl=r4uKJRy9mjxGHw1yzS1SrtaKCUwT66MCcP
           0xd5dEFe2c… status=0 avail=true freeLots=916 redeeming=0 xrpl=rDEXUmuYAe9MCxVfoWArptSZNQPjKpRCXd
-          0x5b89514d… status=0 avail=true freeLots=52 redeeming=0 xrpl=r4GHJwGSaGmJy9BBXS9osFXqRjqdSm7v83
+          0x5b89514d… status=0 avail=true freeLots=51 redeeming=0 xrpl=r4GHJwGSaGmJy9BBXS9osFXqRjqdSm7v83
           0x165c62b4… status=0 avail=true freeLots=52 redeeming=0 xrpl=rDYeqGVc8M3Se9wowvRDbURGYGZ5i5VF6r
 · T2 Protocol state › Harbor executor owner + keeper role …
-  PASS    T2 Protocol state › Harbor executor owner + keeper role (166ms)
+  PASS    T2 Protocol state › Harbor executor owner + keeper role (186ms)
           owner=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
           defaultKeeperExecutor=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
           (this wallet=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88, controls-keeper=true)
 · T2 Protocol state › FDC infra reachable (fee config + relay round) …
-  PASS    T2 Protocol state › FDC infra reachable (fee config + relay round) (1018ms)
+  PASS    T2 Protocol state › FDC infra reachable (fee config + relay round) (708ms)
           feeConfig=0x191a1282Ac700edE65c5B0AaF313BAcC3eA7fC7e
-          currentVotingRound=1391797
+          currentVotingRound=1391791
           isFinalized(round-100)=true
 · T3 Setup (FXRP) › Acquire ≥ 1 lot of FXRP …
-  BLOCKED T3 Setup (FXRP) › Acquire ≥ 1 lot of FXRP (170ms)
+  BLOCKED T3 Setup (FXRP) › Acquire ≥ 1 lot of FXRP (166ms)
           FXRP balance=0.0 FXRP (0 UBA) < required 10.0 FXRP (10000000 UBA).
           Wallet 0xcE77eB5b0AFECED65eA70118B96cE3d813112F88 needs FXRP before redemption tests can run.
           
@@ -86,102 +86,107 @@ defaultedRequestId=(none — T5c will be BLOCKED)
   SKIP    T4 Happy path › Agent settles → RedemptionPerformed + balance burned (0ms)
           no redemption created (see previous step)
 · T5 Edge (default) › 5a Build + encode ReferencedPaymentNonexistence request …
-  PASS    T5 Edge (default) › 5a Build + encode ReferencedPaymentNonexistence request (238ms)
+  PASS    T5 Edge (default) › 5a Build + encode ReferencedPaymentNonexistence request (298ms)
           SYNTHETIC (no live redemption; proves pipeline)
           dest=rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G destHash=0x2e63f8d99779c6abd3cb4437e1543194649651be84b65bc42569765b8b499293
-          blocks 18948305→18948705 amount=10.0 FXRP (10000000 UBA)
+          blocks 18948148→18948548 amount=10.0 FXRP (10000000 UBA)
           encodedBody=514 chars
 · T5 Edge (default) › 5b FDC verifier prepareRequest (live) …
-  PASS    T5 Edge (default) › 5b FDC verifier prepareRequest (live) (556ms)
+  PASS    T5 Edge (default) › 5b FDC verifier prepareRequest (live) (570ms)
           status=VALID
           abiEncodedRequest=0x5265666572656e6365645061796d656e744e6f6e6578697374656e636500000074657374… (352 bytes)
           FDC request fee=0.000000000000001 C2FLR
 · T5 Edge (default) › 5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault …
-  SKIP    T5 Edge (default) › 5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault (1ms)
+  SKIP    T5 Edge (default) › 5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault (0ms)
           read-only mode; set RUN_MUTATIONS=true
 · T5 Edge (default) › 5d executeDefault before window passes reverts (live wiring) …
-  SKIP    T5 Edge (default) › 5d executeDefault before window passes reverts (live wiring) (0ms)
+  SKIP    T5 Edge (default) › 5d executeDefault before window passes reverts (live wiring) (1ms)
           needs a fresh redemption from T4 (RUN_MUTATIONS + FXRP)
 · T5 Edge (default) › 5e Full FDC proof → on-chain FdcVerification.verify == true (live) …
-  SKIP    T5 Edge (default) › 5e Full FDC proof → on-chain FdcVerification.verify == true (live) (0ms)
-          slow (~3-6 min, ~1000 wei fee); set RUN_FDC_PROOF=true to run
+          prepareRequest VALID; fee=1000 wei; submitting attestation…
+          submitted tx=0x0564decfdf2e03d2cebd7f4ed7993c98a8c668ff35ec51cc40bb96f10aa8d3a0 round=1391791; waiting for finalization…
+          round 1391791 finalized; retrieving DA-layer proof…
+  PASS    T5 Edge (default) › 5e Full FDC proof → on-chain FdcVerification.verify == true (live) (105344ms)
+          round=1391791 merkleProof=2 node(s)
+          FdcVerification.verifyReferencedPaymentNonexistence => TRUE ✓
+          (a real, finalized, on-chain-valid non-existence proof — the exact input executeDefault consumes)
 · T5 Edge (default) › 5f Keeper sweep → execute a real default if one is available …
-  SKIP    T5 Edge (default) › 5f Keeper sweep → execute a real default if one is available (1ms)
-          set RUN_KEEPER_SWEEP=true to scan for & execute real defaults
+  BLOCKED T5 Edge (default) › 5f Keeper sweep → execute a real default if one is available (286257ms)
+          scanned 473 redemptions (50000 blocks); 0 Harbor-nominated, expired, unpaid candidates. Live agents here pay or prove-blocked, so genuine silent defaults are rare/transient. Re-run when one appears, or use RUN_MUTATIONS with your own un-served redemption.
 · T6 Keeper/executor › executeDefault is wired to AssetManager (reverts on bad input) …
-  PASS    T6 Keeper/executor › executeDefault is wired to AssetManager (reverts on bad input) (174ms)
+  PASS    T6 Keeper/executor › executeDefault is wired to AssetManager (reverts on bad input) (169ms)
           executeDefault(dummy, 999999999) reverted (delegates to redemptionPaymentDefault): execution reverted (unknown custom error) [selector 0xba0514c0]
 · T6 Keeper/executor › setDefaultKeeperExecutor is owner-only …
-  PASS    T6 Keeper/executor › setDefaultKeeperExecutor is owner-only (183ms)
+  PASS    T6 Keeper/executor › setDefaultKeeperExecutor is owner-only (166ms)
           rejected non-owner caller: execution reverted (unknown custom error)
 · T6 Keeper/executor › setDefaultKeeperExecutor(0) reverts (ZeroAddress) …
-  PASS    T6 Keeper/executor › setDefaultKeeperExecutor(0) reverts (ZeroAddress) (333ms)
+  PASS    T6 Keeper/executor › setDefaultKeeperExecutor(0) reverts (ZeroAddress) (357ms)
           owner setting zero address reverted: execution reverted (unknown custom error) [selector 0xd92e233d]
 · T6 Keeper/executor › Keeper can re-set its own executor (owner dry-run) …
-  PASS    T6 Keeper/executor › Keeper can re-set its own executor (owner dry-run) (513ms)
+  PASS    T6 Keeper/executor › Keeper can re-set its own executor (owner dry-run) (493ms)
           dry-run OK (gas≈28420); skipping the state write in read-only mode. keeper=0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
 · T7 Failure modes › redeem with insufficient FXRP reverts …
-  PASS    T7 Failure modes › redeem with insufficient FXRP reverts (175ms)
+  PASS    T7 Failure modes › redeem with insufficient FXRP reverts (189ms)
           redeem(1000000 lots) reverted: execution reverted (unknown custom error) [selector 0xdb7b48e3]
 · T7 Failure modes › redeem with zero lots reverts …
-  PASS    T7 Failure modes › redeem with zero lots reverts (168ms)
+  PASS    T7 Failure modes › redeem with zero lots reverts (180ms)
           redeem(0 lots) reverted: execution reverted (unknown custom error) [selector 0x882ccad9]
 · T7 Failure modes › XRPL address validation (client-side) …
-  PASS    T7 Failure modes › XRPL address validation (client-side) (1ms)
+  PASS    T7 Failure modes › XRPL address validation (client-side) (2ms)
           accepted rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G; rejected 5 malformed addresses (incl. bad checksum)
 · T7 Failure modes › redeem with invalid XRPL address reverts on-chain …
-  PASS    T7 Failure modes › redeem with invalid XRPL address reverts on-chain (177ms)
+  PASS    T7 Failure modes › redeem with invalid XRPL address reverts on-chain (169ms)
           redeem(bad XRPL addr) reverted: execution reverted (unknown custom error) [selector 0xdb7b48e3]
 · T7 Failure modes › redemptionPaymentDefault for nonexistent redemption reverts …
-  PASS    T7 Failure modes › redemptionPaymentDefault for nonexistent redemption reverts (172ms)
+  PASS    T7 Failure modes › redemptionPaymentDefault for nonexistent redemption reverts (183ms)
           redemptionPaymentDefault(dummy, 987654321) reverted: execution reverted (unknown custom error) [selector 0xba0514c0]
 · T7 Failure modes › Implementation address rejects redeem (must use proxy) …
-  PASS    T7 Failure modes › Implementation address rejects redeem (must use proxy) (170ms)
+  PASS    T7 Failure modes › Implementation address rejects redeem (must use proxy) (178ms)
           redeem() on impl reverted (confirms proxy-only): missing revert data
 
 ────────────────────────── SUMMARY ──────────────────────────
 T0 Environment
   PASS    RPC reachable + chainId is Coston2 (114) (1ms)
-  PASS    Block height is live (700ms)
-  PASS    Signer funded with C2FLR for gas (346ms)
+  PASS    Block height is live (273ms)
+  PASS    Signer funded with C2FLR for gas (350ms)
 T1 Contracts/Proxy
-  PASS    Bytecode present + sizes match brief (542ms)
-  PASS    PROXY answers view calls (Diamond delegates) (171ms)
-  PASS    IMPLEMENTATION reverts direct calls (corrects task premise) (181ms)
-  PASS    Registry resolves AssetManagerFXRP → proxy (166ms)
-  PASS    Harbor executor wiring is correct (616ms)
-  PASS    FXRP token identity (FTestXRP / 6dp) (180ms)
+  PASS    Bytecode present + sizes match brief (563ms)
+  PASS    PROXY answers view calls (Diamond delegates) (186ms)
+  PASS    IMPLEMENTATION reverts direct calls (corrects task premise) (182ms)
+  PASS    Registry resolves AssetManagerFXRP → proxy (182ms)
+  PASS    Harbor executor wiring is correct (186ms)
+  PASS    FXRP token identity (FTestXRP / 6dp) (182ms)
 T2 Protocol state
-  PASS    AssetManager settings snapshot (186ms)
-  PASS    Agent inventory (status + capacity) (1318ms)
-  PASS    Harbor executor owner + keeper role (166ms)
-  PASS    FDC infra reachable (fee config + relay round) (1018ms)
+  PASS    AssetManager settings snapshot (259ms)
+  PASS    Agent inventory (status + capacity) (914ms)
+  PASS    Harbor executor owner + keeper role (186ms)
+  PASS    FDC infra reachable (fee config + relay round) (708ms)
 T3 Setup (FXRP)
-  BLOCKED Acquire ≥ 1 lot of FXRP (170ms)
+  BLOCKED Acquire ≥ 1 lot of FXRP (166ms)
 T4 Happy path
   BLOCKED approve + redeem → RedemptionRequested (0ms)
   SKIP    Agent settles → RedemptionPerformed + balance burned (0ms)
 T5 Edge (default)
-  PASS    5a Build + encode ReferencedPaymentNonexistence request (238ms)
-  PASS    5b FDC verifier prepareRequest (live) (556ms)
-  SKIP    5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault (1ms)
-  SKIP    5d executeDefault before window passes reverts (live wiring) (0ms)
-  SKIP    5e Full FDC proof → on-chain FdcVerification.verify == true (live) (0ms)
-  SKIP    5f Keeper sweep → execute a real default if one is available (1ms)
+  PASS    5a Build + encode ReferencedPaymentNonexistence request (298ms)
+  PASS    5b FDC verifier prepareRequest (live) (570ms)
+  SKIP    5c Submit attestation → finalize → proof → executeDefault → RedemptionDefault (0ms)
+  SKIP    5d executeDefault before window passes reverts (live wiring) (1ms)
+  PASS    5e Full FDC proof → on-chain FdcVerification.verify == true (live) (105344ms)
+  BLOCKED 5f Keeper sweep → execute a real default if one is available (286257ms)
 T6 Keeper/executor
-  PASS    executeDefault is wired to AssetManager (reverts on bad input) (174ms)
-  PASS    setDefaultKeeperExecutor is owner-only (183ms)
-  PASS    setDefaultKeeperExecutor(0) reverts (ZeroAddress) (333ms)
-  PASS    Keeper can re-set its own executor (owner dry-run) (513ms)
+  PASS    executeDefault is wired to AssetManager (reverts on bad input) (169ms)
+  PASS    setDefaultKeeperExecutor is owner-only (166ms)
+  PASS    setDefaultKeeperExecutor(0) reverts (ZeroAddress) (357ms)
+  PASS    Keeper can re-set its own executor (owner dry-run) (493ms)
 T7 Failure modes
-  PASS    redeem with insufficient FXRP reverts (175ms)
-  PASS    redeem with zero lots reverts (168ms)
-  PASS    XRPL address validation (client-side) (1ms)
-  PASS    redeem with invalid XRPL address reverts on-chain (177ms)
-  PASS    redemptionPaymentDefault for nonexistent redemption reverts (172ms)
-  PASS    Implementation address rejects redeem (must use proxy) (170ms)
+  PASS    redeem with insufficient FXRP reverts (189ms)
+  PASS    redeem with zero lots reverts (180ms)
+  PASS    XRPL address validation (client-side) (2ms)
+  PASS    redeem with invalid XRPL address reverts on-chain (169ms)
+  PASS    redemptionPaymentDefault for nonexistent redemption reverts (183ms)
+  PASS    Implementation address rejects redeem (must use proxy) (178ms)
 
-Totals: 25 passed, 0 failed, 2 blocked, 5 skipped  (of 32)
+Totals: 26 passed, 0 failed, 3 blocked, 3 skipped  (of 32)
 
 BLOCKED = a real prerequisite is missing (FXRP faucet, or a genuine
 defaulted redemption). See the detail lines above for the exact next step.

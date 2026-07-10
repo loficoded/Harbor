@@ -32,17 +32,32 @@
  *      reCAPTCHA-gated => NOT automatable. If balance < 1 lot, T3 reports a
  *      BLOCKED status with the exact manual step + the code-minting alternative.
  *
- * 3. GENUINE DEFAULT:
- *      All 4 live agents have 100% fulfillment (0 defaults ever). A valid
- *      ReferencedPaymentNonexistence proof only exists when a redemption's
- *      payment window expires UNPAID, which reliable agents don't produce on
- *      demand. So the full live default (T5c) is BLOCKED unless you supply
- *      HARBOR_DEFAULTED_REQUEST_ID. The suite still exercises every other part
- *      of the default machinery live: request encoding, the FDC verifier
- *      prepareRequest, FdcHub fee, and the executeDefault revert wiring.
+ * 3. GENUINE DEFAULT (T5c):
+ *      A wide keeper sweep found 0 defaults across 4670 redemptions / ~500k
+ *      blocks (~10 days): agents fulfill ~100% within the window (4441 performed,
+ *      238 payment-blocked, 0 defaults, 0 open). A valid ReferencedPaymentNon-
+ *      existence proof only exists when a payment window expires UNPAID, which
+ *      reliable agents don't produce on demand -- and the FXRP faucet is
+ *      reCAPTCHA-gated, so we can't even create a redemption to strand. So the
+ *      full live default (T5c) is BLOCKED by external reality, not by code.
+ *      Everything executeDefault consumes is still proven live (see #5 + T5e),
+ *      and supplying HARBOR_DEFAULTED_REQUEST_ID (now looked up on-chain and
+ *      turned into the REAL request body) completes T5c the instant one exists.
  *
  * 4. AUTH: the FDC XRP verifier + DA layer accept the public testnet key
  *      00000000-0000-0000-0000-000000000000 (no real secret required).
+ *
+ * 5. DA-LAYER RACE (fixed here): after a voting round finalizes, the DA layer
+ *      returns 204/404 or a transient 400 ("attestation request not found") for
+ *      ~10-30s before publishing the Merkle proof. Treating that 400 as fatal
+ *      made T5e/T5c/T5f fail on the race; daLayerProof now polls through it.
+ *      Confirmed live: 400 for ~25s, then 200 + proof; on-chain verify == true.
+ *
+ * 6. RPNE amount = GROSS valueUBA (not net). Per the FAssets guide + Harbor's
+ *      keeper, the proof uses amount=valueUBA. Agents pay net (valueUBA-feeUBA),
+ *      so the verifier attests non-existence of the gross amount even after a
+ *      valid payment; the on-chain STATUS check (not the amount) blocks
+ *      defaulting a paid redemption. buildRPNEBody keeps gross (verified live).
  *
  * ----------------------------------------------------------------------------
  * HOW TO RUN
@@ -386,9 +401,22 @@ async function daLayerProof(
     headers: { "content-type": "application/json", "X-API-KEY": CFG.fdc.apiKey },
     body: JSON.stringify({ votingRoundId: Number(votingRoundId), requestBytes: abiEncodedRequest }),
   });
-  if (res.status === 204 || res.status === 404) return { ready: false, payload: null };
+  // A finalized round's proof is not published instantly: for ~10-30s after
+  // finalization the DA layer returns 204/404, a transient 400 (observed:
+  // {"error":"attestation request not found"}), 425, or a 5xx while it builds
+  // the Merkle tree. Treat all of these as "not ready yet" so the caller keeps
+  // polling until daLayerTimeoutMs instead of hard-failing on the race.
+  if (res.status === 204 || res.status === 404 || res.status === 425)
+    return { ready: false, payload: null };
   const text = await res.text();
-  if (!res.ok) throw new Error(`DA layer HTTP ${res.status}: ${text.slice(0, 200)}`);
+  if (!res.ok) {
+    const transient =
+      res.status >= 500 ||
+      (res.status === 400 &&
+        /not found|not available|not yet|pending|processing|no attestation|unavailable/i.test(text));
+    if (transient) return { ready: false, payload: null };
+    throw new Error(`DA layer HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
   const payload = JSON.parse(text);
   const ready = payload && (payload.proof !== undefined) && (payload.response !== undefined || payload.response_hex !== undefined);
   return { ready: !!ready, payload };
@@ -507,6 +535,90 @@ function parseRedemptionRequested(receipt: ethers.TransactionReceipt): Redemptio
   return out;
 }
 
+/** Fetch a specific redemption's RedemptionRequested event by its (indexed)
+ *  requestId. Scans backward from head in 30-block windows (Coston2 caps
+ *  getLogs ranges at 30) up to keeperSweepLookback blocks, batched in parallel,
+ *  stopping at the first hit. Returns the parsed event or null. Used by 5c so a
+ *  supplied HARBOR_DEFAULTED_REQUEST_ID yields the REAL request body. */
+async function findRedemptionRequestedById(requestId: bigint): Promise<RedemptionRequested | null> {
+  const iface = new ethers.Interface(ABIS.assetManagerEventsAbi as any);
+  const topic0 = iface.getEvent("RedemptionRequested")!.topicHash;
+  const idTopic = ethers.zeroPadValue(ethers.toBeHex(requestId), 32);
+  const head = await provider.getBlockNumber();
+  const floor = Math.max(0, head - CFG.keeperSweepLookback);
+  const WIN = 30, BATCH = 12;
+  const getWin = async (lo: number, hi: number): Promise<any[]> => {
+    try {
+      return await provider.getLogs({
+        address: CFG.addr.assetManagerProxy,
+        topics: [topic0, null, null, idTopic] as any,
+        fromBlock: lo, toBlock: hi,
+      });
+    } catch { return []; }
+  };
+  for (let hi = head; hi >= floor; hi -= WIN * BATCH) {
+    const wins: Array<[number, number]> = [];
+    for (let k = 0; k < BATCH; k++) {
+      const whi = hi - k * WIN;
+      if (whi < floor) break;
+      wins.push([Math.max(floor, whi - WIN + 1), whi]);
+    }
+    const results = await Promise.all(wins.map(([lo, h]) => getWin(lo, h)));
+    for (const logs of results) {
+      if (logs.length) {
+        const p = iface.parseLog({ topics: logs[0].topics as string[], data: logs[0].data })!;
+        const a = p.args;
+        return {
+          agentVault: a.agentVault, redeemer: a.redeemer, requestId: a.requestId,
+          paymentAddress: a.paymentAddress, valueUBA: a.valueUBA, feeUBA: a.feeUBA,
+          firstUnderlyingBlock: a.firstUnderlyingBlock, lastUnderlyingBlock: a.lastUnderlyingBlock,
+          lastUnderlyingTimestamp: a.lastUnderlyingTimestamp, paymentReference: a.paymentReference,
+          executor: a.executor, executorFeeNatWei: a.executorFeeNatWei,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/** Whether a redemption already reached a terminal state (performed / defaulted
+ *  / payment-failed / payment-blocked). Scans backward from head by
+ *  keeperSweepLookback, filtering by the (indexed) requestId. Returns the
+ *  terminal event name or null. Used to keep the HARBOR_DEFAULTED_REQUEST_ID
+ *  path from spending an attestation on a redemption that can no longer default
+ *  (executeDefault would revert with InvalidRequestId). */
+async function redemptionTerminalStatus(requestId: bigint): Promise<string | null> {
+  const iface = new ethers.Interface(ABIS.assetManagerEventsAbi as any);
+  const names = ["RedemptionPerformed", "RedemptionDefault", "RedemptionPaymentFailed", "RedemptionPaymentBlocked"];
+  const evTopics = names.map((n) => iface.getEvent(n)!.topicHash);
+  const idTopic = ethers.zeroPadValue(ethers.toBeHex(requestId), 32);
+  const head = await provider.getBlockNumber();
+  const floor = Math.max(0, head - CFG.keeperSweepLookback);
+  const WIN = 30, BATCH = 12;
+  const getWin = async (lo: number, hi: number): Promise<any[]> => {
+    try {
+      return await provider.getLogs({
+        address: CFG.addr.assetManagerProxy,
+        topics: [evTopics, null, null, idTopic] as any,
+        fromBlock: lo, toBlock: hi,
+      });
+    } catch { return []; }
+  };
+  for (let hi = head; hi >= floor; hi -= WIN * BATCH) {
+    const wins: Array<[number, number]> = [];
+    for (let k = 0; k < BATCH; k++) {
+      const whi = hi - k * WIN;
+      if (whi < floor) break;
+      wins.push([Math.max(floor, whi - WIN + 1), whi]);
+    }
+    const results = await Promise.all(wins.map(([lo, h]) => getWin(lo, h)));
+    for (const logs of results)
+      if (logs.length)
+        return iface.parseLog({ topics: logs[0].topics as string[], data: logs[0].data })!.name;
+  }
+  return null;
+}
+
 /** Poll AssetManager logs for a specific redemption terminal event. */
 async function waitForRedemptionEvent(
   eventName: "RedemptionPerformed" | "RedemptionDefault" | "RedemptionPaymentFailed",
@@ -545,6 +657,7 @@ const CTX: {
   fxrpBalance?: bigint;
   redemption?: RedemptionRequested; // a redemption created during this run (T4)
   redemptionBlock?: number;
+  defaultedTerminal?: string | null; // terminal state of a supplied HARBOR_DEFAULTED_REQUEST_ID
 } = {};
 
 /* ================================== T0 =================================== */
@@ -801,6 +914,23 @@ async function T5_edge_default() {
   await test(G, "5a Build + encode ReferencedPaymentNonexistence request", async () => {
     if (CTX.redemption) {
       requestBody = buildRPNEBody(CTX.redemption);
+    } else if (CFG.defaultedRequestId) {
+      // A specific redemption id was supplied (HARBOR_DEFAULTED_REQUEST_ID).
+      // Look up its on-chain RedemptionRequested event (requestId is indexed)
+      // and build the REAL request body, so 5b/5c run the full default on it.
+      // If the agent actually paid, 5b's verifier will (correctly) refuse to
+      // attest non-existence and 5c stays BLOCKED — exactly the right outcome.
+      const r = await findRedemptionRequestedById(BigInt(CFG.defaultedRequestId));
+      assert(
+        r,
+        `RedemptionRequested for id=${CFG.defaultedRequestId} not found within ` +
+          `${CFG.keeperSweepLookback} blocks — increase KEEPER_SWEEP_LOOKBACK to cover its creation block.`,
+      );
+      CTX.redemption = r!;
+      // Detect whether it already settled — a performed/defaulted/failed/blocked
+      // redemption can no longer default, so 5c must not spend an attestation.
+      CTX.defaultedTerminal = await redemptionTerminalStatus(BigInt(CFG.defaultedRequestId));
+      requestBody = buildRPNEBody(r!);
     } else {
       // Synthetic request: real recent XRPL block window + random reference so
       // the verifier legitimately attests NONEXISTENCE. Proves the encoding and
@@ -865,6 +995,16 @@ async function T5_edge_default() {
         `→ HarborRedeemer.executeDefault(proof, id) → assert RedemptionDefault +`,
         `RedemptionDefaultForwarded (executor fee) + collateral received.`,
       ].join("\n"));
+
+    // Guard: never spend an attestation on a redemption that already settled
+    // (only reachable via a mis-supplied HARBOR_DEFAULTED_REQUEST_ID). The
+    // verifier attests non-existence for the GROSS amount even after a valid
+    // NET payment, so 5b VALID alone does not prove the redemption can default.
+    if (CTX.defaultedTerminal)
+      return blocked(
+        `redemption ${reqId} already terminal (${CTX.defaultedTerminal}); executeDefault would revert ` +
+        `with InvalidRequestId. Supply a genuinely-defaulted (unpaid, expired, still-open) redemption id.`,
+      );
 
     // 1) pay FDC request fee + submit attestation
     const fee = await readFdcRequestFee(abiEncodedRequest);
