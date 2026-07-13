@@ -1,4 +1,9 @@
-import { encodeAbiParameters, encodeEventTopics, zeroAddress, type Hex } from "viem";
+import {
+  encodeAbiParameters,
+  encodeEventTopics,
+  zeroAddress,
+  type Hex,
+} from "viem";
 
 /**
  * Local, precisely-typed copy of the `RedemptionRequested` event used only by
@@ -39,7 +44,10 @@ const NON_INDEXED = [
   { name: "executorFeeNatWei", type: "uint256" },
 ] as const;
 
-export type RedemptionLogFixture = Readonly<{ data: Hex; topics: readonly Hex[] }>;
+export type RedemptionLogFixture = Readonly<{
+  data: Hex;
+  topics: readonly Hex[];
+}>;
 
 /** Build a realistic RedemptionRequested log for the given request id. */
 export function redemptionRequestedLog(

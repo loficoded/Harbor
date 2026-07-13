@@ -53,6 +53,19 @@ test.describe("Status view — happy path settled receipt", () => {
     await expect(page.getByText("10 FXRP")).toBeVisible();
     await expect(page.getByText("48213377")).toBeVisible();
 
+    // The indexed agent is shown as protocol-assigned (FIFO), never as a user
+    // choice. The redeemer did not select it.
+    await expect(
+      page.getByRole("heading", { name: "Assigned agent" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        /Selected automatically by the FAssets protocol \(FIFO\)/i,
+      ),
+    ).toBeVisible();
+    await expect(page.getByText(/You did not choose it/i)).toBeVisible();
+    await expect(page.getByText(/preferred agent/i)).toHaveCount(0);
+
     // Terminal success stops polling.
     await expect(page.getByText("Final")).toBeVisible();
 

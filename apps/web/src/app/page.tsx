@@ -33,18 +33,20 @@ export default function HomePage() {
 
           <Card>
             <CardHeader
-              title="Agents"
-              description="Compare agent reliability before deciding where to redeem."
+              title="Agent statistics"
+              description="Observed agent reliability analytics."
             />
             <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              Ranked agent reliability is served from the Harbor backend. Scores
-              are heuristic and intended for operational comparison only.
+              Ranked agent reliability is served from the Harbor backend. It is
+              informational only — the FAssets protocol assigns redemption
+              agents automatically (FIFO), so these stats do not influence which
+              agent fulfills a redemption.
             </p>
             <Link
               href="/agents"
               className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
             >
-              View agents
+              View agent statistics
             </Link>
           </Card>
         </div>

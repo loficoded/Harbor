@@ -3,37 +3,13 @@ import type { SerializedAgentScoreView } from "@harbor/shared";
 import type { StatusTone } from "@/lib/status";
 
 /**
- * Canonical ranked-agent record shared by the `/agents` leaderboard and the
- * home-page redemption agent picker (Prompt #17). It is the JSON-safe view
- * returned by `GET /agents` verbatim — bigint amounts arrive as decimal strings
- * and `ftsoStatus` carries the freshness of any FTSO-derived field. Both
- * surfaces render this one shape so a single fetch/ranking path feeds them and
- * they cannot drift apart.
+ * Canonical ranked-agent record backing the `/agents` statistics page. It is
+ * the JSON-safe view returned by `GET /agents` verbatim — bigint amounts arrive
+ * as decimal strings and `ftsoStatus` carries the freshness of any FTSO-derived
+ * field. This is analytics data only; it is not used to select or influence the
+ * agent that fulfills a redemption (the FAssets protocol assigns agents FIFO).
  */
 export type RankedAgent = SerializedAgentScoreView;
-
-/**
- * Compact projection the redemption form's agent picker renders in its
- * `<select>`. Derived from {@link RankedAgent} so the picker's options always
- * reflect the same ranking data as the leaderboard.
- */
-export type AgentOption = Readonly<{
-  agentVault: string;
-  score: number;
-  /** Available lots as a JSON-safe string (serialized bigint on the wire). */
-  availableLots: string;
-  availability: string;
-}>;
-
-/** Project a ranked agent onto the picker's compact option shape. */
-export function toAgentOption(agent: RankedAgent): AgentOption {
-  return {
-    agentVault: agent.agentVault,
-    score: agent.score,
-    availableLots: agent.availableLots,
-    availability: agent.availability,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Sorting

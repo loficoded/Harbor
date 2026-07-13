@@ -56,11 +56,24 @@ export function AgentLeaderboardView({
 }: AgentLeaderboardViewProps): ReactElement {
   return (
     <div className="flex flex-col gap-4">
+      <Callout
+        tone="info"
+        title="Informational only — the protocol assigns agents (FIFO)"
+      >
+        <p>
+          Agent selection for redemptions is handled automatically by the
+          FAssets protocol using FIFO. This leaderboard is informational only
+          and does not affect assignment — it cannot be used to choose, prefer,
+          or target an agent for a redemption.
+        </p>
+      </Callout>
+
       <Callout tone="info" title="Scores are a heuristic">
         <p>
           Reliability scores rank agents by observed fulfillment, settlement
-          speed, availability, and collateral. They are an operational guide,
-          not a guarantee of settlement.
+          speed, availability, and collateral. They are an analytics signal for
+          understanding network behavior, not a guarantee of settlement and not
+          a selection mechanism.
         </p>
       </Callout>
 

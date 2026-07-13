@@ -79,17 +79,24 @@ function parseOptionalBigint(
   try {
     parsed = BigInt(raw);
   } catch {
-    throw new Error(`${name} must be a non-negative integer, received "${raw}"`);
+    throw new Error(
+      `${name} must be a non-negative integer, received "${raw}"`,
+    );
   }
 
   if (parsed < 0n) {
-    throw new Error(`${name} must be a non-negative integer, received "${raw}"`);
+    throw new Error(
+      `${name} must be a non-negative integer, received "${raw}"`,
+    );
   }
 
   return parsed;
 }
 
-function parseBooleanFlag(value: string | undefined, defaultValue: boolean): boolean {
+function parseBooleanFlag(
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean {
   const raw = trimmed(value)?.toLowerCase();
 
   if (raw === undefined) {
@@ -104,7 +111,9 @@ function parseBooleanFlag(value: string | undefined, defaultValue: boolean): boo
     return false;
   }
 
-  throw new Error(`Expected a boolean value (true/false), received "${value ?? ""}"`);
+  throw new Error(
+    `Expected a boolean value (true/false), received "${value ?? ""}"`,
+  );
 }
 
 function required(value: string | undefined, name: string): string {
@@ -463,7 +472,9 @@ const xrplObservableStatuses = [
  * gives Harbor a fast, XRPL-sourced settlement signal independent of the
  * on-chain RedemptionPerformed event.
  */
-function startXrplObserverComponent(context: ComponentContext): ComponentHandle {
+function startXrplObserverComponent(
+  context: ComponentContext,
+): ComponentHandle {
   const { env } = context;
   const endpoint = trimmed(env["XRPL_ENDPOINT"]) ?? defaultXrplTestnetEndpoint;
   const client = new RetryingXrplClient(endpoint);

@@ -114,9 +114,24 @@ test.describe("Agents leaderboard — ranking, sorting, filtering", () => {
     await page.goto("/agents");
 
     await expect(
-      page.getByRole("heading", { name: "Agents", exact: true }),
+      page.getByRole("heading", { name: "Agent statistics", exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Scores are a heuristic")).toBeVisible();
+
+    // Informational-only: the FIFO notice is present and there is no
+    // agent-selection control or CTA anywhere on the page.
+    await expect(
+      page.getByText(
+        /handled automatically by the FAssets protocol using FIFO/i,
+      ),
+    ).toBeVisible();
+    await expect(page.getByText(/does not affect assignment/i)).toBeVisible();
+    await expect(page.getByText(/preferred agent/i)).toHaveCount(0);
+    await expect(page.getByText(/redeem with this agent/i)).toHaveCount(0);
+    // The only combobox is the analytics sort control, never an agent picker.
+    await expect(
+      page.getByRole("combobox", { name: /preferred agent/i }),
+    ).toHaveCount(0);
 
     // Default ranking is highest-score first.
     await expect(visibleItems(page)).toHaveCount(3);

@@ -18,10 +18,7 @@ import type { ApiLogger } from "./logging.js";
 export const defaultDatabaseLocation = "./data/harbor.sqlite";
 
 export type ServiceComponentName =
-  | "indexer"
-  | "xrplObserver"
-  | "agentRefresh"
-  | "keeper";
+  "indexer" | "xrplObserver" | "agentRefresh" | "keeper";
 
 /**
  * Feature flags that select which parts of the service run in a given process.

@@ -20,8 +20,9 @@ describe("readFrontendEnv", () => {
 
   it("reads a configured executor fee and ignores invalid values", () => {
     expect(
-      readFrontendEnv({ NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI: "250000000000000000" })
-        .executorFeeWei,
+      readFrontendEnv({
+        NEXT_PUBLIC_HARBOR_EXECUTOR_FEE_WEI: "250000000000000000",
+      }).executorFeeWei,
     ).toBe(250_000_000_000_000_000n);
 
     // Non-numeric values fall back to the default rather than throwing.

@@ -1,6 +1,5 @@
 "use client";
 
-import { AgentPicker } from "@/components/redemption/agent-picker";
 import { RedemptionFormView } from "@/components/redemption/redemption-form-view";
 import { coston2 } from "@/lib/chain";
 import { getClientEnv } from "@/lib/env";
@@ -8,6 +7,7 @@ import { formatAddress } from "@/lib/format";
 import {
   buildStatusPath,
   DEFAULT_FXRP_LOT_SIZE_UBA,
+  DEFAULT_REDEEM_MODE,
   formatFxrpAmount,
   FXRP_ASSET_MANAGER_ADDRESS,
   FXRP_TOKEN_ADDRESS,
@@ -15,9 +15,11 @@ import {
   isApprovalRequired,
   lotsToUba,
   parseLotCount,
+  parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
   resolveExecutor,
+  type RedeemMode,
   type RedemptionLogInput,
 } from "@/lib/redemption";
 import { validateXrplDestination } from "@/lib/xrpl";
@@ -55,9 +57,12 @@ function firstErrorMessage(
  * Redemption flow container. Wires live wallet/chain/contract state into the
  * pure {@link RedemptionFormView}.
  *
- * Contract path (Prompt #04): direct `AssetManager.redeem(lots, xrplAddress,
- * executor)` from the user's wallet after approving the AssetManager for the
- * exact lot amount. The executor is the configured Harbor keeper (or the zero
+ * Contract path (Prompt #04): a direct `AssetManager` redeem from the user's
+ * wallet after approving the AssetManager for the exact amount. Arbitrary FXRP
+ * amounts (the primary flow) use `redeemAmount(amountUBA, xrplAddress,
+ * executor)`; the optional whole-lot mode uses `redeem(lots, …)`. In both cases
+ * the FAssets protocol assigns the redemption agent(s) FIFO — Harbor sends no
+ * agent selection. The executor is the configured Harbor keeper (or the zero
  * address when unconfigured), keeping default recovery permissionless via
  * Harbor. On a confirmed receipt the emitted `RedemptionRequested` ids are
  * parsed and the app routes to the status page for the first id.
@@ -69,19 +74,32 @@ export function RedemptionForm() {
   const connected = Boolean(isConnected && address);
   const correctNetwork = chainId === coston2.id;
 
+  const [mode, setMode] = useState<RedeemMode>(DEFAULT_REDEEM_MODE);
+  const [amountInput, setAmountInput] = useState("");
   const [lotInput, setLotInput] = useState("");
   const [addressInput, setAddressInput] = useState("");
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [submittedIds, setSubmittedIds] = useState<readonly string[] | null>(
     null,
   );
 
+  const { amountUba, error: amountError } = parseRedeemAmount(amountInput);
   const { lots, error: lotError } = parseLotCount(lotInput);
   const addressValidation = validateXrplDestination(addressInput);
 
   const lotSizeUba = DEFAULT_FXRP_LOT_SIZE_UBA;
-  const requiredUba = lots !== null ? lotsToUba(lots, lotSizeUba) : 0n;
-  const amountLabel = lots !== null ? formatFxrpAmount(requiredUba) : null;
+
+  // Resolve the amount to redeem (UBA) and the active input's validation state
+  // from the current mode. `requiredUba` is 0n whenever the input is empty or
+  // invalid so approval/balance gating stays inert until a real amount exists.
+  const inputProvided = mode === "amount" ? amountUba !== null : lots !== null;
+  const inputError = mode === "amount" ? amountError : lotError;
+  const requiredUba =
+    mode === "amount"
+      ? (amountUba ?? 0n)
+      : lots !== null
+        ? lotsToUba(lots, lotSizeUba)
+        : 0n;
+  const amountLabel = requiredUba > 0n ? formatFxrpAmount(requiredUba) : null;
 
   const executor = resolveExecutor(env.contractAddress, env.executorFeeWei);
 
@@ -94,8 +112,7 @@ export function RedemptionForm() {
   });
   const balance =
     typeof balanceRead.data === "bigint" ? balanceRead.data : undefined;
-  const balanceLabel =
-    balance !== undefined ? formatFxrpAmount(balance) : null;
+  const balanceLabel = balance !== undefined ? formatFxrpAmount(balance) : null;
 
   const allowanceRead = useReadContract({
     address: FXRP_TOKEN_ADDRESS,
@@ -131,7 +148,9 @@ export function RedemptionForm() {
     }
   }, [approveReceipt.isSuccess, allowanceRead]);
 
-  // On a confirmed redeem, parse request ids and route to the status page.
+  // On a confirmed redeem, parse request ids and route to the status page. No
+  // agent is carried in the route — the protocol assigns agents FIFO and the
+  // status page reads the assigned agent(s) from indexed protocol data.
   const navigatedRef = useRef(false);
   useEffect(() => {
     if (
@@ -151,18 +170,17 @@ export function RedemptionForm() {
     const path = buildStatusPath({
       requestIds: ids,
       transactionHash: redeemReceipt.data.transactionHash,
-      agentVault: selectedAgent,
     });
     if (path !== null) {
       router.push(path);
     }
-  }, [redeemReceipt.isSuccess, redeemReceipt.data, selectedAgent, router]);
+  }, [redeemReceipt.isSuccess, redeemReceipt.data, router]);
 
   const blockedReason = redemptionBlockedReason({
     isConnected: connected,
     correctNetwork,
-    lots,
-    lotError,
+    requiredUba: inputProvided ? requiredUba : null,
+    inputError,
     addressValid: addressValidation.valid,
     balanceKnown: balance !== undefined,
     sufficientBalance,
@@ -179,8 +197,13 @@ export function RedemptionForm() {
     setSubmittedIds(null);
   }
 
+  function handleModeChange(next: RedeemMode) {
+    setMode(next);
+    resetSubmission();
+  }
+
   function handleApprove() {
-    if (blockedReason !== null || lots === null) {
+    if (blockedReason !== null || requiredUba <= 0n) {
       return;
     }
     approveTx.writeContract({
@@ -195,9 +218,28 @@ export function RedemptionForm() {
     if (
       blockedReason !== null ||
       approvalRequired ||
-      lots === null ||
       addressValidation.address === null
     ) {
+      return;
+    }
+
+    // Arbitrary amount (primary): redeemAmount(amountUBA, xrplAddress, executor).
+    if (mode === "amount") {
+      if (amountUba === null) {
+        return;
+      }
+      redeemTx.writeContract({
+        address: FXRP_ASSET_MANAGER_ADDRESS,
+        abi: ASSET_MANAGER_ABI,
+        functionName: "redeemAmount",
+        args: [amountUba, addressValidation.address, executor.executor],
+        value: executor.executorFeeWei,
+      });
+      return;
+    }
+
+    // Whole lots (advanced): redeem(lots, xrplAddress, executor).
+    if (lots === null) {
       return;
     }
     redeemTx.writeContract({
@@ -222,6 +264,14 @@ export function RedemptionForm() {
       correctNetwork={correctNetwork}
       balanceLabel={balanceLabel}
       balanceLoading={balanceRead.isLoading && connected}
+      mode={mode}
+      onModeChange={handleModeChange}
+      amountInput={amountInput}
+      onAmountInputChange={(value) => {
+        setAmountInput(value);
+        resetSubmission();
+      }}
+      amountError={amountError}
       lotInput={lotInput}
       onLotInputChange={(value) => {
         setLotInput(value);
@@ -235,12 +285,6 @@ export function RedemptionForm() {
         resetSubmission();
       }}
       addressError={addressValidation.reason}
-      agentPicker={
-        <AgentPicker
-          selectedAgent={selectedAgent}
-          onSelect={setSelectedAgent}
-        />
-      }
       executorFeeLabel={executorFeeLabel}
       executorLabel={executorLabel}
       harborManaged={executor.harborManaged}

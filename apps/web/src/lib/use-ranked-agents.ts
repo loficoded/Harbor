@@ -33,14 +33,14 @@ const INITIAL_STATE: State = { status: "loading", agents: [], error: null };
 /**
  * Single source of truth for ranked agent reliability data (`GET /agents`).
  *
- * Both the `/agents` leaderboard and the home-page redemption agent picker
- * consume this hook, so they render the exact same ranking from one fetch path
- * and one projection ({@link RankedAgent}). Centralizing it removes the picker's
- * bespoke fetch (Prompt #17) and guarantees the two surfaces cannot diverge.
+ * Consumed by the `/agents` statistics page to render the informational
+ * leaderboard from one fetch path and one projection ({@link RankedAgent}).
+ * This data is analytics only — it never feeds an agent-selection control,
+ * because the FAssets protocol assigns redemption agents automatically (FIFO).
  *
- * The manual `AbortController` fetch — rather than a cache library — mirrors the
- * picker's original approach and keeps the hook injectable and unit-testable
- * with a stand-in client, without requiring extra React providers.
+ * The manual `AbortController` fetch — rather than a cache library — keeps the
+ * hook injectable and unit-testable with a stand-in client, without requiring
+ * extra React providers.
  */
 export function useRankedAgents(
   options: UseRankedAgentsOptions = {},

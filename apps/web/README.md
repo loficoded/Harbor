@@ -1,10 +1,11 @@
 # @harbor/web
 
 The Harbor dApp shell: a Next.js 14 App Router application (TypeScript, Tailwind
-CSS) that provides the operational surface for FXRP redemption status and agent
-comparison on Flare Coston2. This package is the frontend foundation only —
-approval/redeem transactions, the agent leaderboard, and self-recovery are
-intentionally deferred to later prompts.
+CSS) that provides the operational surface for FXRP redemption on Flare Coston2.
+Users redeem an arbitrary amount of FXRP (via `redeemAmount`, with a whole-lot
+`redeem` mode available as an advanced option) and track settlement. The FAssets
+protocol assigns redemption agents automatically (FIFO), so the console has no
+agent-selection control; the `/agents` page is informational analytics only.
 
 ## Commands
 
@@ -52,9 +53,14 @@ configuration ("mock mode"):
 
 ## Routes
 
-- `/` — the redemption console (usable app surface, not a marketing page): look
-  up a redemption by id and jump to agent comparison.
-- `/agents` — placeholder for the agent reliability leaderboard.
+- `/` — the redemption console: submit a redemption (an arbitrary FXRP amount
+  and an XRPL destination; no agent is chosen — the protocol assigns agents
+  FIFO) and look up an existing redemption by id. Explains the FIFO model
+  inline.
+- `/agents` — the agent statistics page: informational analytics only (observed
+  fulfillment, settlement speed, availability, collateral, and a heuristic
+  score). It carries a FIFO notice and does not select or influence which agent
+  fulfills a redemption.
 - `/status/[id]` — the live redemption status view. It reads
   `GET /redemptions/:id`, polls until the redemption reaches a terminal state
   (settled, recovered, or failed), and renders the lifecycle timeline, the XRPL

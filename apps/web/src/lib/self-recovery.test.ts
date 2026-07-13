@@ -74,7 +74,9 @@ describe("validateMerkleProof", () => {
   });
 
   it("flags a non-array", () => {
-    expect(validateMerkleProof("nope")).toContain("merkleProof must be an array");
+    expect(validateMerkleProof("nope")).toContain(
+      "merkleProof must be an array",
+    );
   });
 
   it("flags a non-bytes32 entry with its index", () => {
@@ -113,7 +115,9 @@ describe("decodeProofResponseBody", () => {
     expect(result.data.lowestUsedTimestamp).toBe(1700000000n);
     expect(result.data.requestBody.amount).toBe(10000000n);
     expect(result.data.requestBody.checkSourceAddresses).toBe(false);
-    expect(isBytes32(result.data.requestBody.destinationAddressHash)).toBe(true);
+    expect(isBytes32(result.data.requestBody.destinationAddressHash)).toBe(
+      true,
+    );
     expect(result.data.responseBody.firstOverflowBlockNumber).toBe(250n);
   });
 

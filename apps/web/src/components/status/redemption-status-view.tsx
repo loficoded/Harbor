@@ -50,9 +50,16 @@ export type StatusFreshness = Readonly<{
 /** Details preserved from the redemption submission (Prompt #17 query params). */
 export type StatusSubmission = Readonly<{
   transactionHash: string | null;
-  preferredAgent: string | null;
   relatedRequests: readonly RelatedRequest[];
 }>;
+
+/** The all-zero EVM address, used before an agent has been indexed. */
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+/** Whether a vault address is a real, protocol-assigned agent (not the zero sentinel). */
+function isAssignedAgent(agentVault: string): boolean {
+  return agentVault !== "" && agentVault.toLowerCase() !== ZERO_ADDRESS;
+}
 
 export type RedemptionStatusViewProps = Readonly<{
   requestId: string;
@@ -254,6 +261,8 @@ function ReadyPhase({
         />
       ) : null}
 
+      <AssignedAgentCard agentVault={viewModel.agentVault} />
+
       <TimelineCard steps={viewModel.timeline} />
 
       {viewModel.settlement !== null ? (
@@ -277,10 +286,7 @@ function ReadyPhase({
         <RelatedRequestsCard related={submission.relatedRequests} />
       ) : null}
 
-      <SubmissionDetailsCard
-        transactionHash={submission.transactionHash}
-        preferredAgent={submission.preferredAgent}
-      />
+      <SubmissionDetailsCard transactionHash={submission.transactionHash} />
 
       <HonestCopyFooter />
     </div>
@@ -668,14 +674,45 @@ function RelatedRequestsCard({
   );
 }
 
+/**
+ * Protocol-assigned agent. FAssets assigns redemption agents automatically
+ * (FIFO) — the redeemer never chooses one — so this is shown as a fact read
+ * from indexed protocol data, with copy making clear Harbor only monitors the
+ * assigned agent. Rendered only once a real agent has been indexed (i.e. not
+ * the zero sentinel).
+ */
+function AssignedAgentCard({ agentVault }: { agentVault: string }) {
+  if (!isAssignedAgent(agentVault)) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Assigned agent"
+        description="Selected automatically by the FAssets protocol (FIFO)."
+      />
+      <dl className="flex flex-col gap-3 text-sm">
+        <DetailRow label="Vault address">
+          <AddressLink address={agentVault} />
+        </DetailRow>
+      </dl>
+      <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+        The FAssets protocol assigned this agent from the front of the FIFO
+        redemption queue. You did not choose it — Harbor only monitors the
+        assigned agent&apos;s settlement and, if it fails to pay, its default
+        recovery.
+      </p>
+    </Card>
+  );
+}
+
 function SubmissionDetailsCard({
   transactionHash,
-  preferredAgent,
 }: {
   transactionHash: string | null;
-  preferredAgent: string | null;
 }) {
-  if (transactionHash === null && preferredAgent === null) {
+  if (transactionHash === null) {
     return null;
   }
 
@@ -686,16 +723,9 @@ function SubmissionDetailsCard({
         description="Preserved from the redemption submission."
       />
       <dl className="flex flex-col gap-3 text-sm">
-        {transactionHash !== null ? (
-          <DetailRow label="Redeem transaction">
-            <TxLink hash={transactionHash} />
-          </DetailRow>
-        ) : null}
-        {preferredAgent !== null ? (
-          <DetailRow label="Preferred agent">
-            <AddressLink address={preferredAgent} />
-          </DetailRow>
-        ) : null}
+        <DetailRow label="Redeem transaction">
+          <TxLink hash={transactionHash} />
+        </DetailRow>
       </dl>
     </Card>
   );

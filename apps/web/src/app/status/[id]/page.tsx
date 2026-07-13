@@ -13,10 +13,14 @@ function firstValue(value: string | string[] | undefined): string | undefined {
 /**
  * Live redemption status route (Prompt #18). This server component parses the
  * request id and the query params the redemption flow (Prompt #17) preserves —
- * additional request ids (`more`), the redeem transaction hash (`tx`), and the
- * preferred agent (`agent`) — and hands them to the client container, which
- * fetches `GET /redemptions/:id`, polls until terminal, and renders the status
- * timeline, settlement receipt, and default-recovery detail.
+ * additional request ids (`more`) and the redeem transaction hash (`tx`) — and
+ * hands them to the client container, which fetches `GET /redemptions/:id`,
+ * polls until terminal, and renders the status timeline, settlement receipt,
+ * and default-recovery detail.
+ *
+ * No agent is read from the URL: the FAssets protocol assigns redemption
+ * agents FIFO, so the assigned agent is taken from indexed protocol data in the
+ * redemption response rather than from the submission.
  */
 export default function StatusPage({ params, searchParams }: StatusPageProps) {
   const requestId = decodeURIComponent(params.id).trim();
@@ -24,14 +28,12 @@ export default function StatusPage({ params, searchParams }: StatusPageProps) {
     firstValue(searchParams?.["more"]),
   );
   const transactionHash = firstValue(searchParams?.["tx"]) ?? null;
-  const preferredAgent = firstValue(searchParams?.["agent"]) ?? null;
 
   return (
     <RedemptionStatus
       requestId={requestId}
       additionalRequestIds={additionalRequestIds}
       transactionHash={transactionHash}
-      preferredAgent={preferredAgent}
     />
   );
 }

@@ -102,8 +102,10 @@ custody. Three cooperating parts enforce it:
    watches the payment window, confirms XRPL settlement, and otherwise drives the
    full non-payment proof and default flow to completion.
 3. **A reliability layer** — an indexer, a heuristic agent score, and a read API
-   that let a redeemer compare agents _before_ committing and follow a request's
-   settlement _after_.
+   that surface observed agent reliability as informational network analytics
+   and let a redeemer follow a request's settlement. This is analytics only: the
+   protocol assigns redemption agents FIFO, so nothing here selects or influences
+   which agent fulfills a redemption.
 
 Because Harbor never holds the FAsset or the redeemer role — FAssets pays default
 collateral to the recorded redeemer, so Harbor intentionally never wraps
@@ -195,7 +197,7 @@ Each stage is an isolated module with a narrow contract:
 | FDC           | [`services/api/src/fdc`](./services/api/src/fdc)                         | Builds, submits, finalizes, and retrieves `ReferencedPaymentNonexistence` proofs.           |
 | Scoring       | [`services/api/src/scoring`](./services/api/src/scoring)                 | Heuristic agent reliability from redemption history and FTSOv2 collateral.                  |
 | API           | [`services/api/src/api`](./services/api/src/api)                         | Read-only HTTP surface over the SQLite store.                                               |
-| Web           | [`apps/web`](./apps/web)                                                 | Next.js console: redeem, status timeline, agent leaderboard, self-recovery.                 |
+| Web           | [`apps/web`](./apps/web)                                                 | Next.js console: redeem (any amount), status timeline, agent statistics, self-recovery.     |
 | Protocol      | [`packages/protocol`](./packages/protocol)                               | Chain data, addresses, ABIs, generated `HarborRedeemer` artifact.                           |
 | Shared        | [`packages/shared`](./packages/shared)                                   | Domain types, DTOs, env parsing, bigint-safe JSON.                                          |
 
@@ -352,15 +354,25 @@ curl -s "https://api-production-6f3ec.up.railway.app/redemptions/38177650" | jq
 
 ### Redeem flow
 
-From the redemption console you burn FXRP for underlying XRP: choose a number of
-lots, enter an XRPL destination address, and optionally prefer an agent
-(advisory — the AssetManager fills from its own queue). The flow approves the
-AssetManager and submits the redemption with the Harbor executor nominated, then
-hands off to the live status view, which polls `GET /redemptions/:id` until the
-request reaches a terminal state and renders the timeline, the XRPL settlement
+From the redemption console you burn FXRP for underlying XRP: enter an amount of
+FXRP (any amount — decimals are supported via `redeemAmount`; a whole-lot
+`redeem` mode is available as an advanced option) and an XRPL destination
+address. **You do not choose an agent.** FAssets processes redemptions FIFO: it
+selects one or more redemption tickets from the front of the queue and assigns
+the backing agent(s) automatically, so there is no "preferred agent" step. The
+flow approves the AssetManager for the exact amount and submits the redemption
+with the Harbor executor nominated, then hands off to the live status view,
+which polls `GET /redemptions/:id` until the request reaches a terminal state
+and renders the timeline, the protocol-assigned agent, the XRPL settlement
 receipt, and — when a default was needed — the recovery detail.
 
-[![Agent reliability leaderboard](./assets/screenshots/agent-leaderboard.png)](https://harbor-web-olive.vercel.app/agents)
+[![Agent statistics — informational analytics only](./assets/screenshots/agent-leaderboard.png)](https://harbor-web-olive.vercel.app/agents)
+
+The `/agents` page is **informational analytics only**. It surfaces observed
+agent reliability — fulfillment, settlement speed, availability, collateral, and
+a transparent heuristic score — to help you understand network behavior. It does
+**not** select, prefer, or influence which agent fulfills a redemption; that is
+always the protocol's FIFO assignment.
 
 ## Implementation notes
 
@@ -516,14 +528,14 @@ pnpm --filter @harbor/web dev | build | test | test:e2e
 Tests are split by cost, so the fast suites run without any external service and
 the on-chain suites gate on the relevant environment variables.
 
-| Suite                         | Cases | Scope                                                      |
-| ----------------------------- | ----: | ---------------------------------------------------------- |
-| Contracts (Foundry)           |    34 | `HarborRedeemer` unit + invariants + deploy script.        |
-| API (`node:test`)             |   108 | server, repositories, keeper, FDC, indexer, XRPL, scoring. |
-| Web unit / component (Vitest) |   239 | lib logic + component behaviour against a mocked API.      |
-| Web end-to-end (Playwright)   |    14 | redeem, status, agents, self-recovery, smoke.              |
-| Shared                        |    15 | domain, env, JSON, and normalization helpers.              |
-| Protocol                      |     9 | ABIs, addresses, and the generated artifact.               |
+| Suite                         | Cases | Scope                                                                          |
+| ----------------------------- | ----: | ------------------------------------------------------------------------------ |
+| Contracts (Foundry)           |    34 | `HarborRedeemer` unit + invariants + deploy script.                            |
+| API (`node:test`)             |   108 | server, repositories, keeper, FDC, indexer, XRPL, scoring.                     |
+| Web unit / component (Vitest) |   255 | lib logic + component behaviour against a mocked API.                          |
+| Web end-to-end (Playwright)   |    18 | redeem (any amount), no-agent-selection, status, agents, self-recovery, smoke. |
+| Shared                        |    15 | domain, env, JSON, and normalization helpers.                                  |
+| Protocol                      |     9 | ABIs, addresses, and the generated artifact.                                   |
 
 ### Codebase at a glance
 

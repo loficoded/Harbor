@@ -1,7 +1,4 @@
-import {
-  isValidXrplClassicAddress,
-  validateXrplDestination,
-} from "@/lib/xrpl";
+import { isValidXrplClassicAddress, validateXrplDestination } from "@/lib/xrpl";
 import { describe, expect, it } from "vitest";
 
 // Well-known checksum-valid XRPL classic addresses.
@@ -31,9 +28,9 @@ describe("isValidXrplClassicAddress", () => {
     expect(
       isValidXrplClassicAddress("XVXdnJULOanEs5NfHBWLwZBBqTWNR7dJpM"),
     ).toBe(false);
-    expect(isValidXrplClassicAddress("0x0000000000000000000000000000000000000000")).toBe(
-      false,
-    );
+    expect(
+      isValidXrplClassicAddress("0x0000000000000000000000000000000000000000"),
+    ).toBe(false);
   });
 
   it("rejects characters outside the base58 dictionary", () => {
@@ -47,9 +44,9 @@ describe("isValidXrplClassicAddress", () => {
     expect(isValidXrplClassicAddress("")).toBe(false);
     expect(isValidXrplClassicAddress("r")).toBe(false);
     expect(isValidXrplClassicAddress("notanaddress")).toBe(false);
-    expect(
-      isValidXrplClassicAddress("rHb9CJAWyB4rj91VRWn96DkukG4bwdty"),
-    ).toBe(false);
+    expect(isValidXrplClassicAddress("rHb9CJAWyB4rj91VRWn96DkukG4bwdty")).toBe(
+      false,
+    );
   });
 
   it("ignores surrounding whitespace", () => {

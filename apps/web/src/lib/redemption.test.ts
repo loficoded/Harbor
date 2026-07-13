@@ -1,25 +1,85 @@
 import {
   buildStatusPath,
   DEFAULT_FXRP_LOT_SIZE_UBA,
+  FXRP_DECIMALS,
   formatFxrpAmount,
   hasSufficientBalance,
   isApprovalRequired,
   lotSizeUbaFromSettings,
   lotsToUba,
   parseLotCount,
+  parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
   resolveExecutor,
   type RedemptionReadiness,
 } from "@/lib/redemption";
-import {
-  NOISE_LOG,
-  redemptionRequestedLog,
-} from "@/test/redemption-fixtures";
+import { NOISE_LOG, redemptionRequestedLog } from "@/test/redemption-fixtures";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it } from "vitest";
 
-// --- lot count --------------------------------------------------------------
+// --- arbitrary amount (primary flow) ---------------------------------------
+
+describe("parseRedeemAmount", () => {
+  it("treats an empty field as incomplete, not an error", () => {
+    expect(parseRedeemAmount("")).toEqual({ amountUba: null, error: null });
+    expect(parseRedeemAmount("   ")).toEqual({ amountUba: null, error: null });
+  });
+
+  it("parses whole and decimal amounts into exact UBA (6 decimals)", () => {
+    expect(FXRP_DECIMALS).toBe(6);
+    expect(parseRedeemAmount("1")).toEqual({
+      amountUba: 1_000_000n,
+      error: null,
+    });
+    expect(parseRedeemAmount("2.37")).toEqual({
+      amountUba: 2_370_000n,
+      error: null,
+    });
+    // Leading and trailing dot forms are accepted and normalized.
+    expect(parseRedeemAmount(".5").amountUba).toBe(500_000n);
+    expect(parseRedeemAmount("10.").amountUba).toBe(10_000_000n);
+    // The smallest representable unit (1 drop).
+    expect(parseRedeemAmount("0.000001").amountUba).toBe(1n);
+  });
+
+  it("uses exact bigint math (no floating point) for large amounts", () => {
+    expect(parseRedeemAmount("1000000").amountUba).toBe(1_000_000_000_000n);
+    // 9007199254.740993 exceeds Number.MAX_SAFE_INTEGER when scaled; must stay exact.
+    expect(parseRedeemAmount("9007199254.740993").amountUba).toBe(
+      9_007_199_254_740_993n,
+    );
+  });
+
+  it("rejects zero and non-positive amounts", () => {
+    expect(parseRedeemAmount("0").amountUba).toBeNull();
+    expect(parseRedeemAmount("0").error).toMatch(/greater than zero/i);
+    expect(parseRedeemAmount("0.0").error).toMatch(/greater than zero/i);
+    expect(parseRedeemAmount("0.000000").error).toMatch(/greater than zero/i);
+  });
+
+  it("rejects negative, non-numeric, and malformed input", () => {
+    expect(parseRedeemAmount("-1").error).toMatch(/valid fxrp amount/i);
+    expect(parseRedeemAmount("abc").error).toMatch(/valid fxrp amount/i);
+    expect(parseRedeemAmount("1.2.3").error).toMatch(/valid fxrp amount/i);
+    expect(parseRedeemAmount(".").error).toMatch(/valid fxrp amount/i);
+    expect(parseRedeemAmount("1e3").error).toMatch(/valid fxrp amount/i);
+  });
+
+  it("rejects more fractional digits than the asset supports", () => {
+    // 7 decimals for a 6-decimal asset.
+    const result = parseRedeemAmount("1.1234567");
+    expect(result.amountUba).toBeNull();
+    expect(result.error).toMatch(/up to 6 decimal places/i);
+  });
+
+  it("respects a custom decimal count", () => {
+    expect(parseRedeemAmount("1.23", 2).amountUba).toBe(123n);
+    expect(parseRedeemAmount("1.234", 2).error).toMatch(/2 decimal places/i);
+  });
+});
+
+// --- lot count (advanced mode) ---------------------------------------------
 
 describe("parseLotCount", () => {
   it("treats an empty field as incomplete, not an error", () => {
@@ -71,7 +131,11 @@ describe("lot size and amount", () => {
     const uba = lotsToUba(3n, DEFAULT_FXRP_LOT_SIZE_UBA);
     expect(uba).toBe(30_000_000n);
     expect(formatFxrpAmount(uba)).toBe("30");
-    expect(formatFxrpAmount(lotsToUba(1n, DEFAULT_FXRP_LOT_SIZE_UBA))).toBe("10");
+    expect(formatFxrpAmount(lotsToUba(1n, DEFAULT_FXRP_LOT_SIZE_UBA))).toBe(
+      "10",
+    );
+    // Round-trips an arbitrary parsed amount back to its display form.
+    expect(formatFxrpAmount(2_370_000n)).toBe("2.37");
   });
 });
 
@@ -176,9 +240,7 @@ describe("parseRedemptionRequestIds", () => {
   });
 
   it("ignores logs with no topics", () => {
-    expect(
-      parseRedemptionRequestIds([{ data: "0x", topics: [] }]),
-    ).toEqual([]);
+    expect(parseRedemptionRequestIds([{ data: "0x", topics: [] }])).toEqual([]);
   });
 });
 
@@ -194,20 +256,26 @@ describe("buildStatusPath", () => {
   });
 
   it("preserves additional ids in the more query param", () => {
-    expect(
-      buildStatusPath({ requestIds: ["4207", "4208", "4209"] }),
-    ).toBe("/status/4207?more=4208%2C4209");
+    expect(buildStatusPath({ requestIds: ["4207", "4208", "4209"] })).toBe(
+      "/status/4207?more=4208%2C4209",
+    );
   });
 
-  it("preserves the transaction hash and preferred agent", () => {
+  it("preserves the transaction hash", () => {
     const path = buildStatusPath({
       requestIds: ["4207"],
       transactionHash: "0xabc",
-      agentVault: "0xdef",
     });
     expect(path).toContain("/status/4207?");
     expect(path).toContain("tx=0xabc");
-    expect(path).toContain("agent=0xdef");
+  });
+
+  it("never carries an agent in the route (protocol assigns FIFO)", () => {
+    const path = buildStatusPath({
+      requestIds: ["4207"],
+      transactionHash: "0xabc",
+    });
+    expect(path).not.toContain("agent");
   });
 });
 
@@ -216,8 +284,8 @@ describe("buildStatusPath", () => {
 const readyState: RedemptionReadiness = {
   isConnected: true,
   correctNetwork: true,
-  lots: 1n,
-  lotError: null,
+  requiredUba: 1_000_000n,
+  inputError: null,
   addressValid: true,
   balanceKnown: true,
   sufficientBalance: true,
@@ -240,16 +308,16 @@ describe("redemptionBlockedReason", () => {
     ).toMatch(/coston2/i);
   });
 
-  it("surfaces the lot error, then the empty lot state", () => {
+  it("surfaces the input error, then the empty-amount state", () => {
     expect(
       redemptionBlockedReason({
         ...readyState,
-        lotError: "Enter a whole number of lots.",
+        inputError: "FXRP supports up to 6 decimal places.",
       }),
-    ).toMatch(/whole number/i);
+    ).toMatch(/decimal places/i);
     expect(
-      redemptionBlockedReason({ ...readyState, lots: null }),
-    ).toMatch(/lot count/i);
+      redemptionBlockedReason({ ...readyState, requiredUba: null }),
+    ).toMatch(/enter an amount/i);
   });
 
   it("blocks an invalid address", () => {

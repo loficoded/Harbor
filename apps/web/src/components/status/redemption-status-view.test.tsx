@@ -45,7 +45,6 @@ const baseFreshness: StatusFreshness = {
 
 const baseSubmission: StatusSubmission = {
   transactionHash: null,
-  preferredAgent: null,
   relatedRequests: [{ requestId: "4207", isCurrent: true }],
 };
 
@@ -294,18 +293,37 @@ describe("RedemptionStatusView — related requests", () => {
   });
 });
 
+describe("RedemptionStatusView — protocol-assigned agent (FIFO)", () => {
+  it("shows the indexed agent as protocol-assigned, not user-selected", () => {
+    renderReady(settledResponse());
+    expect(screen.getByText("Assigned agent")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Selected automatically by the FAssets protocol \(FIFO\)/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/You did not choose it/i)).toBeInTheDocument();
+  });
+
+  it("never labels any agent as 'preferred' or offers a selection CTA", () => {
+    renderReady(settledResponse());
+    expect(screen.queryByText(/preferred agent/i)).toBeNull();
+    expect(screen.queryByText(/choose (an |your )?agent/i)).toBeNull();
+    expect(screen.queryByText(/select agent/i)).toBeNull();
+    expect(screen.queryByText(/redeem with this agent/i)).toBeNull();
+  });
+});
+
 describe("RedemptionStatusView — submission details and honest copy", () => {
-  it("shows preserved submission details", () => {
+  it("shows preserved submission details (redeem transaction only)", () => {
     renderReady(settledResponse(), {
       submission: {
         transactionHash: `0x${"ab".repeat(32)}`,
-        preferredAgent: "0x00000000000000000000000000000000000000a1",
         relatedRequests: baseSubmission.relatedRequests,
       },
     });
     expect(screen.getByText("Submission details")).toBeInTheDocument();
     expect(screen.getByText("Redeem transaction")).toBeInTheDocument();
-    expect(screen.getByText("Preferred agent")).toBeInTheDocument();
   });
 
   it("always includes the heuristic-score honest note", () => {

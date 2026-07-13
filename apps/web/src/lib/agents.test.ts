@@ -12,7 +12,6 @@ import {
   formatSettlementSeconds,
   rankAgents,
   sortAgents,
-  toAgentOption,
 } from "@/lib/agents";
 import { AGENT_A, AGENT_B, AGENT_C, agentView } from "@/test/agents-fixtures";
 
@@ -126,23 +125,6 @@ describe("rankAgents", () => {
     ];
     const ranked = rankAgents(agents, "score", { hideUnavailable: true });
     expect(order(ranked)).toEqual([AGENT_C, AGENT_A]);
-  });
-});
-
-describe("toAgentOption", () => {
-  it("projects the compact picker option shape", () => {
-    const agent = agentView({
-      agentVault: AGENT_A,
-      score: 77,
-      availableLots: "12",
-      availability: "AVAILABLE",
-    });
-    expect(toAgentOption(agent)).toEqual({
-      agentVault: AGENT_A,
-      score: 77,
-      availableLots: "12",
-      availability: "AVAILABLE",
-    });
   });
 });
 

@@ -1,6 +1,5 @@
 import { RedemptionForm } from "@/components/redemption/redemption-form";
 import {
-  DEFAULT_FXRP_LOT_SIZE_UBA,
   FXRP_ASSET_MANAGER_ADDRESS,
   FXRP_TOKEN_ADDRESS,
 } from "@/lib/redemption";
@@ -12,6 +11,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const VALID_XRPL = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
 const USER = "0x00000000000000000000000000000000000000b2" as const;
+
+// FXRP has 6 decimals, so 1 FXRP == 1_000_000 UBA and 2.37 FXRP == 2_370_000.
+const ONE_FXRP_UBA = 1_000_000n;
+const AMOUNT_2_37_UBA = 2_370_000n;
 
 // Controllable wagmi/router state shared with the hoisted module mocks.
 const h = vi.hoisted(() => {
@@ -55,12 +58,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: h.push }),
 }));
 
-// The agent picker performs its own network fetch; stub it here so these tests
-// focus on the transaction flow.
-vi.mock("@/components/redemption/agent-picker", () => ({
-  AgentPicker: () => null,
-}));
-
 vi.mock("wagmi", () => ({
   useAccount: () => {
     h.state.writeIndex = 0;
@@ -80,8 +77,7 @@ vi.mock("wagmi", () => ({
     return { data: undefined, isLoading: false, refetch: vi.fn() };
   },
   useWriteContract: () => {
-    const which =
-      h.state.writeIndex === 0 ? h.state.approve : h.state.redeem;
+    const which = h.state.writeIndex === 0 ? h.state.approve : h.state.redeem;
     h.state.writeIndex += 1;
     return which;
   },
@@ -134,19 +130,22 @@ beforeEach(() => {
   h.state.writeIndex = 0;
 });
 
-async function fillForm() {
-  await userEvent.type(screen.getByLabelText("Lots to redeem"), "1");
+async function fillAmountForm(amount = "1") {
+  await userEvent.type(
+    screen.getByLabelText(/amount to redeem \(fxrp\)/i),
+    amount,
+  );
   await userEvent.type(
     screen.getByLabelText("XRPL destination address"),
     VALID_XRPL,
   );
 }
 
-describe("RedemptionForm transaction flow", () => {
-  it("submits an approve transaction for the exact lot amount when allowance is short", async () => {
+describe("RedemptionForm — arbitrary amount flow", () => {
+  it("submits an approve transaction for the exact amount when allowance is short", async () => {
     h.state.allowance = 0n;
     render(<RedemptionForm />);
-    await fillForm();
+    await fillAmountForm("1");
 
     const approve = screen.getByRole("button", { name: /approve fxrp/i });
     expect(approve).toBeEnabled();
@@ -159,7 +158,7 @@ describe("RedemptionForm transaction flow", () => {
       expect.objectContaining({
         address: FXRP_TOKEN_ADDRESS,
         functionName: "approve",
-        args: [FXRP_ASSET_MANAGER_ADDRESS, DEFAULT_FXRP_LOT_SIZE_UBA],
+        args: [FXRP_ASSET_MANAGER_ADDRESS, ONE_FXRP_UBA],
       }),
     );
   });
@@ -180,23 +179,61 @@ describe("RedemptionForm transaction flow", () => {
     };
 
     render(<RedemptionForm />);
-    await fillForm();
+    await fillAmountForm("1");
 
     expect(screen.getByText("Approving FXRP")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /approving/i }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /approving/i })).toBeDisabled();
   });
 
-  it("submits a redeem transaction with the resolved executor when already approved", async () => {
+  it("submits a redeemAmount transaction for a decimal amount when already approved", async () => {
     h.state.allowance = 10n ** 30n; // effectively unlimited
     render(<RedemptionForm />);
-    await fillForm();
+    await fillAmountForm("2.37");
 
     // No approve step when already approved.
+    expect(screen.queryByRole("button", { name: /approve fxrp/i })).toBeNull();
+
+    const redeem = screen.getByRole("button", { name: "Redeem" });
+    expect(redeem).toBeEnabled();
+    await userEvent.click(redeem);
+
+    expect(h.state.redeem.writeContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: FXRP_ASSET_MANAGER_ADDRESS,
+        // Arbitrary amount uses redeemAmount with the exact UBA amount.
+        functionName: "redeemAmount",
+        // mock mode: no Harbor contract configured -> zero executor, zero fee.
+        args: [AMOUNT_2_37_UBA, VALID_XRPL, zeroAddress],
+        value: 0n,
+      }),
+    );
+  });
+
+  it("rejects an amount with too many decimals before submission", async () => {
+    h.state.allowance = 10n ** 30n;
+    render(<RedemptionForm />);
+    await fillAmountForm("1.1234567"); // 7 dp > FXRP's 6
+
+    // The error is surfaced both inline under the field and in the blocked-
+    // reason line beneath the actions.
     expect(
-      screen.queryByRole("button", { name: /approve fxrp/i }),
-    ).toBeNull();
+      screen.getAllByText(/supports up to 6 decimal places/i).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Redeem" })).toBeDisabled();
+  });
+});
+
+describe("RedemptionForm — lots mode", () => {
+  it("submits a whole-lot redeem when the lots mode is selected", async () => {
+    h.state.allowance = 10n ** 30n;
+    render(<RedemptionForm />);
+
+    await userEvent.click(screen.getByRole("radio", { name: "Lots" }));
+    await userEvent.type(screen.getByLabelText("Lots to redeem"), "1");
+    await userEvent.type(
+      screen.getByLabelText("XRPL destination address"),
+      VALID_XRPL,
+    );
 
     const redeem = screen.getByRole("button", { name: "Redeem" });
     expect(redeem).toBeEnabled();
@@ -206,14 +243,15 @@ describe("RedemptionForm transaction flow", () => {
       expect.objectContaining({
         address: FXRP_ASSET_MANAGER_ADDRESS,
         functionName: "redeem",
-        // mock mode: no Harbor contract configured -> zero executor, zero fee.
         args: [1n, VALID_XRPL, zeroAddress],
         value: 0n,
       }),
     );
   });
+});
 
-  it("parses request ids from the receipt and routes to the status page", async () => {
+describe("RedemptionForm — receipt routing and error states", () => {
+  it("parses request ids from the receipt and routes to the status page (no agent in route)", async () => {
     h.state.allowance = 10n ** 30n;
     h.state.redeem = {
       data: "0xredeemhash",
@@ -233,7 +271,6 @@ describe("RedemptionForm transaction flow", () => {
 
     render(<RedemptionForm />);
 
-    // Success state is shown and navigation is triggered from the receipt.
     expect(
       await screen.findByText("Redemption request submitted"),
     ).toBeInTheDocument();
@@ -253,10 +290,7 @@ describe("RedemptionForm transaction flow", () => {
     h.state.redeemReceipt = {
       data: {
         transactionHash: "0xredeemhash",
-        logs: [
-          redemptionRequestedLog(4207n),
-          redemptionRequestedLog(4208n),
-        ],
+        logs: [redemptionRequestedLog(4207n), redemptionRequestedLog(4208n)],
       },
       isLoading: false,
       isSuccess: true,
@@ -278,16 +312,16 @@ describe("RedemptionForm transaction flow", () => {
     h.state.redeem = {
       data: undefined,
       isPending: false,
-      error: new Error("execution reverted: agent unavailable"),
+      error: new Error("execution reverted: redemption amount too small"),
       writeContract: vi.fn(),
     } as never;
 
     render(<RedemptionForm />);
-    await fillForm();
+    await fillAmountForm("2.37");
 
     expect(screen.getByText("Transaction failed")).toBeInTheDocument();
     expect(
-      screen.getByText(/execution reverted: agent unavailable/i),
+      screen.getByText(/execution reverted: redemption amount too small/i),
     ).toBeInTheDocument();
   });
 
@@ -311,7 +345,7 @@ describe("RedemptionForm transaction flow", () => {
     };
     h.state.allowance = 10n ** 30n;
     render(<RedemptionForm />);
-    await fillForm();
+    await fillAmountForm("2.37");
 
     expect(screen.getByRole("button", { name: "Redeem" })).toBeDisabled();
     expect(screen.getByText(/wrong network/i)).toBeInTheDocument();

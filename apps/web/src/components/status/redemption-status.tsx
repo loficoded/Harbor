@@ -43,14 +43,12 @@ export type RedemptionStatusProps = Readonly<{
   requestId: string;
   additionalRequestIds?: readonly string[];
   transactionHash?: string | null;
-  preferredAgent?: string | null;
 }>;
 
 export function RedemptionStatus({
   requestId,
   additionalRequestIds = [],
   transactionHash = null,
-  preferredAgent = null,
 }: RedemptionStatusProps) {
   const client = useMemo(() => createHarborApiClient(), []);
   const enabled = requestId !== "";
@@ -182,7 +180,7 @@ export function RedemptionStatus({
       requestId={requestId}
       phase={phase}
       viewModel={viewModel}
-      submission={{ transactionHash, preferredAgent, relatedRequests }}
+      submission={{ transactionHash, relatedRequests }}
       freshness={freshness}
       errorMessage={errorMessage}
       errorRequestId={errorRequestId}
