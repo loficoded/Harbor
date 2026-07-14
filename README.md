@@ -366,7 +366,7 @@ which polls `GET /redemptions/:id` until the request reaches a terminal state
 and renders the timeline, the protocol-assigned agent, the XRPL settlement
 receipt, and — when a default was needed — the recovery detail.
 
-[![Agent statistics — informational analytics only](./assets/screenshots/agent-leaderboard.png)](https://harbor-web-olive.vercel.app/agents)
+[![Agent statistics — informational analytics only](./assets/screenshots/agents_v2.png)](https://harbor-web-olive.vercel.app/agents)
 
 The `/agents` page is **informational analytics only**. It surfaces observed
 agent reliability — fulfillment, settlement speed, availability, collateral, and
