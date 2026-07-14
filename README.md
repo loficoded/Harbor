@@ -40,7 +40,7 @@ The system drives one settlement lifecycle end to end:
 | Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)                                      |
 | Walkthrough | ▶ [Watch on YouTube](https://www.youtube.com/watch?v=97Q2v0fn6VI) (2 min) · [4K capture](./assets/demo/harbor-demo.mp4) |
 
-[![Harbor — watch the 2-minute FXRP redemption walkthrough on Flare Coston2](./assets/screenshots/demo_v2.png)](https://www.youtube.com/watch?v=97Q2v0fn6VI)
+[![Harbor — watch the 2-minute FXRP redemption walkthrough on Flare Coston2](./assets/screenshots/redemption-console.png)](https://www.youtube.com/watch?v=97Q2v0fn6VI)
 
 <p align="center"><em>▶ <a href="https://www.youtube.com/watch?v=97Q2v0fn6VI">Watch the 2-minute walkthrough</a> — redeem → watch XRPL → settle, or prove non-payment → execute default → recover collateral.</em></p>
 
@@ -366,7 +366,17 @@ which polls `GET /redemptions/:id` until the request reaches a terminal state
 and renders the timeline, the protocol-assigned agent, the XRPL settlement
 receipt, and — when a default was needed — the recovery detail.
 
-[![Agent statistics — informational analytics only](./assets/screenshots/agents_v2.png)](https://harbor-web-olive.vercel.app/agents)
+The happy path — from a submitted redemption to on-chain settlement:
+
+[![Redemption submitted — request id captured, handing off to live status](./assets/screenshots/redemption-submitted.png)](https://harbor-web-olive.vercel.app)
+
+<p align="center"><em>After approving the AssetManager and calling <code>redeemAmount</code>, the emitted request id (<code>38217645</code>) is parsed and the console hands off to the live status view — no agent was ever chosen.</em></p>
+
+[![Settled — XRPL settlement observed, with a settlement receipt](./assets/screenshots/redemption-status-settled.png)](https://harbor-web-olive.vercel.app/status/38217645)
+
+<p align="center"><em>The FIFO-assigned agent paid on the XRP Ledger, so the request settled: the evidence-based timeline completes and a settlement receipt records 42.5 FXRP delivered.</em></p>
+
+[![Agent statistics — informational analytics only](./assets/screenshots/agent-statistics.png)](https://harbor-web-olive.vercel.app/agents)
 
 The `/agents` page is **informational analytics only**. It surfaces observed
 agent reliability — fulfillment, settlement speed, availability, collateral, and
@@ -410,7 +420,9 @@ the proof, and — at `PROOF_READY` — calls `executeDefault` on `HarborRedeeme
 before moving to `DEFAULT_SUBMITTED`. Work is idempotent and backed by a durable
 job table, so restarts resume rather than duplicate.
 
-[![Live redemption status timeline](./assets/screenshots/redemption-status.png)](https://harbor-web-olive.vercel.app)
+[![Default recovery in progress — FDC proof ready, self-recovery available](./assets/screenshots/redemption-status-recovery.png)](https://harbor-web-olive.vercel.app/status/38216902)
+
+<p align="center"><em>The edge case: the FIFO-assigned agent missed its payment window, so the keeper drove the FDC non-payment proof to <code>PROOF_READY</code>. The permissionless self-recovery panel can submit the default from any wallet.</em></p>
 
 ### FDC non-payment proofs
 
@@ -471,6 +483,10 @@ itself. The self-recovery panel takes the already-prepared FDC proof from
 the protocol's canonical ABI, assembles the exact `executeDefault` arguments, and
 submits them from the connected wallet — mirroring how the backend keeper builds
 the same calldata, so the UI never fabricates or accepts arbitrary proof data.
+
+[![Recovered — the AssetManager released the redemption collateral](./assets/screenshots/redemption-status-recovered.png)](https://harbor-web-olive.vercel.app/status/38216902)
+
+<p align="center"><em>Submitting <code>executeDefault</code> with the proof drives the request to <code>RECOVERED</code> — the AssetManager releases the redeemer's collateral. Front-running is harmless: whoever lands the default first, the redeemer is still made whole.</em></p>
 
 ## On-chain deployment
 
