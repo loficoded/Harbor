@@ -40,7 +40,7 @@ The system drives one settlement lifecycle end to end:
 | Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)                                      |
 | Walkthrough | ▶ [Watch on YouTube](https://www.youtube.com/watch?v=97Q2v0fn6VI) (2 min) · [4K capture](./assets/demo/harbor-demo.mp4) |
 
-[![Harbor — watch the 2-minute FXRP redemption walkthrough on Flare Coston2](./assets/screenshots/redemption-console.png)](https://www.youtube.com/watch?v=97Q2v0fn6VI)
+[![Harbor — watch the 2-minute FXRP redemption walkthrough on Flare Coston2](./assets/screenshots/demo_v2.png)](https://www.youtube.com/watch?v=97Q2v0fn6VI)
 
 <p align="center"><em>▶ <a href="https://www.youtube.com/watch?v=97Q2v0fn6VI">Watch the 2-minute walkthrough</a> — redeem → watch XRPL → settle, or prove non-payment → execute default → recover collateral.</em></p>
 
