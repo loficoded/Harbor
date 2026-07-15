@@ -11,8 +11,10 @@ import {
   PageHeader,
   Spinner,
 } from "@/components/ui";
+import { AgentIdentity } from "@/components/agents/agent-identity";
 import { cn } from "@/lib/cn";
 import { coston2AddressUrl, coston2TransactionUrl } from "@/lib/chain";
+import type { MaybeAgentDetails } from "@/lib/agents";
 import { formatAddress, formatHash, formatUtcTimestamp } from "@/lib/format";
 import type {
   DefaultRecoveryInfo,
@@ -261,7 +263,10 @@ function ReadyPhase({
         />
       ) : null}
 
-      <AssignedAgentCard agentVault={viewModel.agentVault} />
+      <AssignedAgentCard
+        agentVault={viewModel.agentVault}
+        agentDetails={viewModel.agentDetails}
+      />
 
       <TimelineCard steps={viewModel.timeline} />
 
@@ -681,7 +686,13 @@ function RelatedRequestsCard({
  * assigned agent. Rendered only once a real agent has been indexed (i.e. not
  * the zero sentinel).
  */
-function AssignedAgentCard({ agentVault }: { agentVault: string }) {
+function AssignedAgentCard({
+  agentVault,
+  agentDetails,
+}: {
+  agentVault: string;
+  agentDetails: MaybeAgentDetails;
+}) {
   if (!isAssignedAgent(agentVault)) {
     return null;
   }
@@ -692,11 +703,14 @@ function AssignedAgentCard({ agentVault }: { agentVault: string }) {
         title="Assigned agent"
         description="Selected automatically by the FAssets protocol (FIFO)."
       />
-      <dl className="flex flex-col gap-3 text-sm">
-        <DetailRow label="Vault address">
-          <AddressLink address={agentVault} />
-        </DetailRow>
-      </dl>
+      <div className="flex flex-col gap-4 text-sm">
+        <AgentIdentity details={agentDetails} agentVault={agentVault} />
+        <dl className="flex flex-col gap-3">
+          <DetailRow label="Vault address">
+            <AddressLink address={agentVault} />
+          </DetailRow>
+        </dl>
+      </div>
       <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
         The FAssets protocol assigned this agent from the front of the FIFO
         redemption queue. You did not choose it — Harbor only monitors the

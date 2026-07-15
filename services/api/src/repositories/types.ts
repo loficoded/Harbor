@@ -1,6 +1,7 @@
 import type {
   AgentAvailability,
   AgentCollateralRatioSource,
+  AgentDetails,
   AgentRecord,
   AgentReliabilityFtsoStatus,
   AgentScore,
@@ -109,6 +110,15 @@ export type UpsertAgentInput = Readonly<{
   availability?: AgentAvailability;
   redemptionFeeBips?: number | null;
   availableLots?: bigint;
+  /**
+   * Official agent details read from the `AgentOwnerRegistry`. Omit (leave
+   * `undefined`) when details were not fetched this refresh — existing stored
+   * values are then preserved. Pass an `AgentDetails` object (even with `null`
+   * fields) when details *were* read, so cleared fields are reflected and
+   * stale metadata is never kept. This mirrors the existing `availability` /
+   * `score` "fetched vs. not fetched" upsert semantics.
+   */
+  details?: AgentDetails;
   score?: Partial<AgentScore>;
   feeFieldsJson?: string | null;
   collateralMetadataJson?: string | null;

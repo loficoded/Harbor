@@ -1,13 +1,15 @@
 import { referencedPaymentNonexistenceResponseAbi } from "@harbor/protocol";
-import type {
-  FdcRequestStatus,
-  GetRedemptionResponse,
-  RedemptionStatus,
-  RedemptionTimelineEntry,
-  SerializedFdcProofRecord,
-  SerializedFdcRequestRecord,
-  SerializedRedemptionDetail,
-  SerializedXrplPaymentObservation,
+import {
+  emptyAgentDetails,
+  type AgentDetails,
+  type FdcRequestStatus,
+  type GetRedemptionResponse,
+  type RedemptionStatus,
+  type RedemptionTimelineEntry,
+  type SerializedFdcProofRecord,
+  type SerializedFdcRequestRecord,
+  type SerializedRedemptionDetail,
+  type SerializedXrplPaymentObservation,
 } from "@harbor/shared";
 import { encodeAbiParameters } from "viem";
 
@@ -62,6 +64,12 @@ export type RedemptionScenarioOptions = Readonly<{
   withDefaultTransaction?: boolean;
   timeline?: readonly RedemptionTimelineEntry[];
   generatedAt?: string;
+  /**
+   * Official details for the assigned agent. Defaults to `emptyAgentDetails`
+   * (all `null`) so the status view falls back to the vault address unless a
+   * test opts into official metadata.
+   */
+  agentDetails?: AgentDetails;
 }>;
 
 function makeReceipt(
@@ -274,6 +282,7 @@ export function makeRedemptionResponse(
     statusReason: options.statusReason ?? null,
     redeemer: DEFAULT_REDEEMER,
     agentVault: DEFAULT_AGENT_VAULT,
+    agentDetails: options.agentDetails ?? emptyAgentDetails,
     paymentAddress: DEFAULT_XRPL_ADDRESS,
     valueUBA: "10000000",
     feeUBA: "0",

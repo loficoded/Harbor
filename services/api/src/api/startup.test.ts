@@ -140,7 +140,7 @@ describe("startHarborService", () => {
 
     t.after(() => handle.stop());
 
-    assert.equal(listAppliedMigrations(database).length, 5);
+    assert.equal(listAppliedMigrations(database).length, 6);
     assert.deepEqual(handle.components, []);
     assert.ok(handle.server !== null);
     assert.equal(typeof handle.port, "number");
@@ -211,6 +211,6 @@ describe("startHarborService", () => {
 
     assert.equal(server.listening, false);
     // The injected database must remain usable (the caller owns it).
-    assert.equal(listAppliedMigrations(database).length, 5);
+    assert.equal(listAppliedMigrations(database).length, 6);
   });
 });

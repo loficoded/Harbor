@@ -1,7 +1,13 @@
-import { iAssetManagerAbi, type Abi as ProtocolAbi } from "@harbor/protocol";
 import {
+  agentOwnerRegistryAbi,
+  iAssetManagerAbi,
+  type Abi as ProtocolAbi,
+} from "@harbor/protocol";
+import {
+  normalizeAgentDetailField,
   normalizeEvmAddress,
   serializeBigints,
+  type AgentDetails,
   type EvmAddress,
   type IsoTimestamp,
   type XrplAddress,
@@ -15,6 +21,20 @@ import type { UpsertAgentInput } from "../repositories/types.js";
 export const defaultAgentInventoryPageSize = 25;
 
 const assetManagerReadAbi = iAssetManagerAbi as unknown as ViemAbi;
+const agentOwnerRegistryReadAbi = agentOwnerRegistryAbi as unknown as ViemAbi;
+
+const zeroAddress = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Ordered `AgentOwnerRegistry` getters (Flare FAssets spec) mapped to the
+ * `AgentDetails` field each populates. Read together for a management address.
+ */
+const agentDetailFunctions = [
+  ["name", "getAgentName"],
+  ["description", "getAgentDescription"],
+  ["iconUrl", "getAgentIconUrl"],
+  ["termsOfUseUrl", "getAgentTermsOfUseUrl"],
+] as const satisfies readonly (readonly [keyof AgentDetails, string])[];
 
 const availableAgentDetailFields = [
   ["agentVault", 0],
@@ -106,6 +126,19 @@ export type RefreshAgentInventoryInput = PaginatedReadInput &
   Readonly<{
     database: SqliteDatabase;
     includeAllAgents?: boolean;
+    /**
+     * Whether to read official agent details (name/description/icon/terms)
+     * from the `AgentOwnerRegistry`. Defaults to `true`. Detail reads are
+     * always non-fatal: a failure leaves the agent's stored details untouched
+     * and never aborts the inventory refresh.
+     */
+    includeAgentDetails?: boolean;
+    /**
+     * Explicit `AgentOwnerRegistry` address. When omitted (and detail reads are
+     * enabled) it is resolved from `AssetManager.getSettings()`. `null` skips
+     * detail reads entirely.
+     */
+    agentOwnerRegistryAddress?: EvmAddress | null;
     refreshedAt?: IsoTimestamp;
   }>;
 
@@ -119,6 +152,13 @@ export type AgentInventoryRefreshSummary = Readonly<{
   allAgentsRead: number;
   agentsRefreshed: number;
   agentsPersisted: number;
+  /**
+   * Resolved `AgentOwnerRegistry` address used for detail reads, or `null`
+   * when detail reads were disabled or the registry could not be resolved.
+   */
+  agentOwnerRegistryAddress: EvmAddress | null;
+  /** Number of agents for which official details were read this refresh. */
+  agentDetailsRead: number;
 }>;
 
 export function assetManagerAbiHasFunction(
@@ -180,6 +220,115 @@ export async function readAgentInfo(
   };
 }
 
+/**
+ * Resolve the `AgentOwnerRegistry` address from the AssetManager settings
+ * (`getSettings().agentOwnerRegistry`), per the Flare FAssets spec. Non-fatal:
+ * returns `null` when settings cannot be read or the registry is unset/zero,
+ * so a missing registry degrades to "no official details" rather than aborting
+ * the inventory refresh.
+ */
+export async function readAgentOwnerRegistryAddress(input: {
+  publicClient: ViemReadContractClient;
+  assetManagerAddress: EvmAddress;
+}): Promise<EvmAddress | null> {
+  try {
+    const settings = await input.publicClient.readContract({
+      address: input.assetManagerAddress as Address,
+      abi: assetManagerReadAbi,
+      functionName: "getSettings",
+    });
+    const registry = optionalEvmAddress(
+      readResultField(settings, ["agentOwnerRegistry"], 7),
+      "agentOwnerRegistry",
+    );
+
+    return registry === null || registry.toLowerCase() === zeroAddress
+      ? null
+      : registry;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read an agent owner's official details from the `AgentOwnerRegistry` for a
+ * management address. Each getter is read independently and resiliently: a
+ * getter that reverts or returns a non-string yields `null` for that field
+ * only, so incomplete metadata still surfaces the fields that are available.
+ * This function never throws; an all-`null` result is the documented fallback.
+ */
+export async function readAgentDetails(input: {
+  publicClient: ViemReadContractClient;
+  agentOwnerRegistryAddress: EvmAddress;
+  managementAddress: EvmAddress;
+}): Promise<AgentDetails> {
+  const entries = await Promise.all(
+    agentDetailFunctions.map(async ([field, functionName]) => {
+      try {
+        const result = await input.publicClient.readContract({
+          address: input.agentOwnerRegistryAddress as Address,
+          abi: agentOwnerRegistryReadAbi,
+          functionName,
+          args: [input.managementAddress as Address],
+        });
+
+        return [field, normalizeAgentDetailField(result)] as const;
+      } catch {
+        return [field, null] as const;
+      }
+    }),
+  );
+
+  return {
+    name: null,
+    description: null,
+    iconUrl: null,
+    termsOfUseUrl: null,
+    ...Object.fromEntries(entries),
+  };
+}
+
+/**
+ * Read official details for a set of agents, keyed by agent vault. Reads are
+ * deduplicated per management address (multiple vaults can share one owner),
+ * so each owner's registry entry is fetched at most once per refresh. Agents
+ * with no resolvable management address map to `undefined` (details not
+ * fetched — existing stored values are preserved on upsert).
+ */
+async function readAgentDetailsForAgents(input: {
+  publicClient: ViemReadContractClient;
+  agentOwnerRegistryAddress: EvmAddress;
+  agents: readonly Readonly<{
+    agentVault: EvmAddress;
+    ownerManagementAddress: EvmAddress | null;
+  }>[];
+}): Promise<ReadonlyMap<EvmAddress, AgentDetails | undefined>> {
+  const detailsByVault = new Map<EvmAddress, AgentDetails | undefined>();
+  const detailsByOwner = new Map<EvmAddress, AgentDetails>();
+
+  for (const { agentVault, ownerManagementAddress } of input.agents) {
+    if (ownerManagementAddress === null) {
+      detailsByVault.set(agentVault, undefined);
+      continue;
+    }
+
+    let details = detailsByOwner.get(ownerManagementAddress);
+
+    if (details === undefined) {
+      details = await readAgentDetails({
+        publicClient: input.publicClient,
+        agentOwnerRegistryAddress: input.agentOwnerRegistryAddress,
+        managementAddress: ownerManagementAddress,
+      });
+      detailsByOwner.set(ownerManagementAddress, details);
+    }
+
+    detailsByVault.set(agentVault, details);
+  }
+
+  return detailsByVault;
+}
+
 export async function refreshAgentInventory(
   input: RefreshAgentInventoryInput,
 ): Promise<AgentInventoryRefreshSummary> {
@@ -212,6 +361,36 @@ export async function refreshAgentInventory(
     assetManagerAddress: input.assetManagerAddress,
     agentVaults: uniqueAgentVaults,
   });
+  const ownerByVault = new Map(
+    agentInfoDetails.map((agentInfo) => [
+      agentInfo.agentVault,
+      resolveOwnerManagementAddress(
+        agentInfo.raw,
+        availableAgentDetailsByVault.get(agentInfo.agentVault),
+      ),
+    ]),
+  );
+
+  const includeAgentDetails = input.includeAgentDetails ?? true;
+  const agentOwnerRegistryAddress = !includeAgentDetails
+    ? null
+    : (input.agentOwnerRegistryAddress ??
+      (await readAgentOwnerRegistryAddress({
+        publicClient: input.publicClient,
+        assetManagerAddress: input.assetManagerAddress,
+      })));
+  const detailsByVault =
+    agentOwnerRegistryAddress === null
+      ? new Map<EvmAddress, AgentDetails | undefined>()
+      : await readAgentDetailsForAgents({
+          publicClient: input.publicClient,
+          agentOwnerRegistryAddress,
+          agents: agentInfoDetails.map((agentInfo) => ({
+            agentVault: agentInfo.agentVault,
+            ownerManagementAddress: ownerByVault.get(agentInfo.agentVault) ?? null,
+          })),
+        });
+
   const upsertInputs = agentInfoDetails.map((agentInfo) =>
     buildAgentUpsertInput({
       assetManagerAddress: input.assetManagerAddress,
@@ -220,6 +399,7 @@ export async function refreshAgentInventory(
       availableDetail: availableAgentDetailsByVault.get(agentInfo.agentVault),
       listedByAvailableAgents: availableAgentVaultSet.has(agentInfo.agentVault),
       listedByAllAgents: allAgentVaultSet.has(agentInfo.agentVault),
+      details: detailsByVault.get(agentInfo.agentVault),
     }),
   );
 
@@ -242,6 +422,10 @@ export async function refreshAgentInventory(
     allAgentsRead: allAgentVaults.length,
     agentsRefreshed: agentInfoDetails.length,
     agentsPersisted: upsertInputs.length,
+    agentOwnerRegistryAddress,
+    agentDetailsRead: [...detailsByVault.values()].filter(
+      (details) => details !== undefined,
+    ).length,
   };
 }
 
@@ -409,6 +593,26 @@ function parseAvailableAgentDetail(value: unknown): AvailableAgentDetail {
   };
 }
 
+/**
+ * Resolve an agent's owner management address, preferring the value from
+ * `getAgentInfo` and falling back to the available-agents detailed list. This
+ * address keys the agent's `AgentOwnerRegistry` entry, so it is shared by both
+ * inventory persistence and official-details reads.
+ */
+function resolveOwnerManagementAddress(
+  agentInfo: Readonly<Record<string, unknown>>,
+  availableDetail: AvailableAgentDetail | undefined,
+): EvmAddress | null {
+  return (
+    optionalEvmAddress(
+      agentInfo.ownerManagementAddress,
+      "ownerManagementAddress",
+    ) ??
+    availableDetail?.ownerManagementAddress ??
+    null
+  );
+}
+
 function buildAgentUpsertInput(input: {
   assetManagerAddress: EvmAddress;
   refreshedAt: IsoTimestamp;
@@ -416,15 +620,10 @@ function buildAgentUpsertInput(input: {
   availableDetail: AvailableAgentDetail | undefined;
   listedByAvailableAgents: boolean;
   listedByAllAgents: boolean;
+  details?: AgentDetails | undefined;
 }): UpsertAgentInput {
   const agentInfo = input.agentInfo.raw;
-  const owner =
-    optionalEvmAddress(
-      agentInfo.ownerManagementAddress,
-      "ownerManagementAddress",
-    ) ??
-    input.availableDetail?.ownerManagementAddress ??
-    null;
+  const owner = resolveOwnerManagementAddress(agentInfo, input.availableDetail);
   const paymentAddress = optionalString(
     agentInfo.underlyingAddressString,
     "underlyingAddressString",
@@ -475,6 +674,7 @@ function buildAgentUpsertInput(input: {
     availability,
     redemptionFeeBips: bigintToSafeNumberOrNull(feeBIPS),
     availableLots: freeCollateralLots,
+    ...(input.details === undefined ? {} : { details: input.details }),
     feeFieldsJson: stringifyJsonSafe(feeFields),
     collateralMetadataJson: stringifyJsonSafe(collateralMetadata),
     rawInventoryJson: stringifyJsonSafe(rawInventory),

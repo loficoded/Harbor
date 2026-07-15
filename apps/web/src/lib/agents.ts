@@ -1,5 +1,6 @@
-import type { SerializedAgentScoreView } from "@harbor/shared";
+import type { AgentDetails, SerializedAgentScoreView } from "@harbor/shared";
 
+import { formatAddress } from "@/lib/format";
 import type { StatusTone } from "@/lib/status";
 
 /**
@@ -116,6 +117,113 @@ export function rankAgents(
   filter: AgentFilter,
 ): RankedAgent[] {
   return filterAgents(sortAgents(agents, sortKey), filter);
+}
+
+// ---------------------------------------------------------------------------
+// Official agent details (AgentOwnerRegistry)
+// ---------------------------------------------------------------------------
+
+/**
+ * Details as they may arrive on the wire: an `AgentDetails` object, or absent
+ * entirely from an older/partial payload. Helpers accept the loose shape and
+ * degrade gracefully so rendering never depends on the field being present.
+ */
+export type MaybeAgentDetails = AgentDetails | null | undefined;
+
+/**
+ * The agent's official display name, trimmed, or `null` when unset. Whitespace
+ * and empty strings collapse to `null` so they trigger the address fallback.
+ */
+export function officialAgentName(details: MaybeAgentDetails): string | null {
+  const raw = details?.name;
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/** Whether an agent has a usable official name (vs. falling back to address). */
+export function hasOfficialAgentName(details: MaybeAgentDetails): boolean {
+  return officialAgentName(details) !== null;
+}
+
+/**
+ * Name to display for an agent: the official name when present, otherwise the
+ * truncated vault address — the exact behavior in use before official details
+ * existed, so the fallback is a pure no-op on legacy data.
+ */
+export function agentDisplayName(
+  details: MaybeAgentDetails,
+  agentVault: string,
+): string {
+  return officialAgentName(details) ?? formatAddress(agentVault);
+}
+
+/**
+ * A safe, renderable icon URL, or `null` when none is usable. Only absolute
+ * `http`/`https` URLs are accepted; anything else (empty, relative, `data:`,
+ * `javascript:`, `ipfs:`, malformed) collapses to `null` so callers fall back
+ * to a monogram. This guards against unsafe or unrenderable `<img>` sources
+ * coming from agent-controlled on-chain metadata.
+ */
+export function resolveAgentIconUrl(details: MaybeAgentDetails): string | null {
+  const raw = details?.iconUrl;
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  try {
+    const { protocol } = new URL(trimmed);
+    return protocol === "http:" || protocol === "https:" ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A safe terms-of-use URL for linking, or `null`. Same `http`/`https`-only
+ * validation as the icon URL.
+ */
+export function resolveAgentTermsOfUseUrl(
+  details: MaybeAgentDetails,
+): string | null {
+  const raw = details?.termsOfUseUrl;
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  try {
+    const { protocol } = new URL(trimmed);
+    return protocol === "http:" || protocol === "https:" ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A single-character monogram for an agent's fallback avatar. Uses the first
+ * alphanumeric character of the official name when present, otherwise the first
+ * hex character of the vault address, so every agent renders a stable initial
+ * even without an icon.
+ */
+export function agentMonogram(
+  details: MaybeAgentDetails,
+  agentVault: string,
+): string {
+  const name = officialAgentName(details);
+  if (name !== null) {
+    const alphanumeric = name.match(/[\p{L}\p{N}]/u);
+    return (alphanumeric?.[0] ?? name[0] ?? "?").toUpperCase();
+  }
+  const hex = agentVault.startsWith("0x") ? agentVault.slice(2) : agentVault;
+  return (hex[0] ?? "?").toUpperCase();
 }
 
 // ---------------------------------------------------------------------------

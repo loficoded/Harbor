@@ -961,6 +961,63 @@ export const flareContractRegistryAbi = [
   },
 ] as const satisfies Abi;
 
+/**
+ * `IAgentOwnerRegistry` — the FAssets registry that stores official agent
+ * owner metadata (name, description, icon, terms of use) keyed by an agent
+ * owner's management address, plus the management/work address mapping.
+ *
+ * Sourced from the official Flare FAssets specification:
+ *   - https://dev.flare.network/fassets/developer-guides/fassets-agent-details
+ *   - https://dev.flare.network/fassets/reference/IAgentOwnerRegistry
+ *
+ * The registry's own address is not hard-coded; it is read at runtime from
+ * `AssetManager.getSettings().agentOwnerRegistry` (see `settingsComponents`).
+ */
+export const agentOwnerRegistryAbi = [
+  {
+    type: "function",
+    name: "getAgentName",
+    inputs: [address("_managementAddress")],
+    outputs: [{ name: "", internalType: "string", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAgentDescription",
+    inputs: [address("_managementAddress")],
+    outputs: [{ name: "", internalType: "string", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAgentIconUrl",
+    inputs: [address("_managementAddress")],
+    outputs: [{ name: "", internalType: "string", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAgentTermsOfUseUrl",
+    inputs: [address("_managementAddress")],
+    outputs: [{ name: "", internalType: "string", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getWorkAddress",
+    inputs: [address("_managementAddress")],
+    outputs: [address("")],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getManagementAddress",
+    inputs: [address("_workAddress")],
+    outputs: [address("")],
+    stateMutability: "view",
+  },
+] as const satisfies Abi;
+
 export {
   harborRedeemerAbi,
   harborRedeemerArtifactContractName,
@@ -974,4 +1031,5 @@ export const iFdcHubAbi = fdcHubAbi;
 export const ftsoV2InterfaceAbi = ftsoV2Abi;
 export const iRelayAbi = relayAbi;
 export const iFlareContractRegistryAbi = flareContractRegistryAbi;
+export const iAgentOwnerRegistryAbi = agentOwnerRegistryAbi;
 export const harborContractAbi = harborRedeemerAbi;

@@ -1,3 +1,4 @@
+export { AgentIdentity, type AgentIdentityProps } from "./agent-identity";
 export {
   AgentLeaderboard,
   type AgentLeaderboardProps,

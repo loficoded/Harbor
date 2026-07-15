@@ -1,5 +1,7 @@
 import {
+  emptyAgentDetails,
   serializeBigint,
+  type AgentDetails,
   type AgentScoreView,
   type AgentsResponseData,
   type FdcProofRecord,
@@ -23,10 +25,12 @@ import { listAppliedMigrations, type SqliteDatabase } from "../db/index.js";
 import { buildFAssetIndexerCursorName } from "../indexer/index.js";
 import { nowIso } from "../repositories/common.js";
 import {
+  getAgent,
   getLatestFdcRound,
   getRedemptionByRequestId,
   getSyncCursor,
   listAgentReliabilityScores,
+  listAgents,
   listFdcProofsForRedemption,
   listFdcRequestsForRedemption,
   listXrplObservationsForRedemption,
@@ -51,9 +55,15 @@ function errorMessage(error: unknown): string {
  * Project a stored Prompt #10 reliability record onto the public score view.
  * `scoreIsHeuristic` is pinned to `true`: the score is a transparent heuristic,
  * never a settlement guarantee.
+ *
+ * Official agent details (name/icon/description/terms) are joined from the
+ * indexed agent inventory and passed in by the caller. They default to
+ * `emptyAgentDetails` when the agent has published none, so the leaderboard
+ * always has a value to fall back on.
  */
 export function toAgentScoreView(
   record: StoredAgentReliabilityScoreRecord,
+  details: AgentDetails = emptyAgentDetails,
 ): AgentScoreView {
   return {
     agentVault: record.agentVault,
@@ -75,6 +85,7 @@ export function toAgentScoreView(
     collateralRatioBips: record.collateralRatioBips,
     collateralRatioSource: record.collateralRatioSource,
     ftsoStatus: record.ftsoStatus,
+    details,
     updatedAt: record.updatedAt,
   };
 }
@@ -82,18 +93,29 @@ export function toAgentScoreView(
 /**
  * Ranked agent score records for the given asset. Records arrive already
  * ordered by score (descending) then vault address from the repository, which
- * is the ranking the frontend renders.
+ * is the ranking the frontend renders. Each score is joined with its indexed
+ * agent record so official `AgentDetails` ride along on the leaderboard; a
+ * score with no matching agent (or no published details) falls back to
+ * `emptyAgentDetails`.
  */
 export function buildAgentsResponseData(
   database: SqliteDatabase,
   asset: string,
 ): AgentsResponseData {
   const records = listAgentReliabilityScores(database);
+  const detailsByVault = new Map(
+    listAgents(database).map((agent) => [agent.agentVault, agent.details]),
+  );
 
   return {
     asset,
     scoreIsHeuristic: true,
-    agents: records.map(toAgentScoreView),
+    agents: records.map((record) =>
+      toAgentScoreView(
+        record,
+        detailsByVault.get(record.agentVault) ?? emptyAgentDetails,
+      ),
+    ),
     generatedAt: nowIso(),
   };
 }
@@ -102,7 +124,10 @@ export function buildAgentsResponseData(
 // Redemption detail
 // ---------------------------------------------------------------------------
 
-function toRedemptionDetail(record: StoredRedemptionRequest): RedemptionDetail {
+function toRedemptionDetail(
+  record: StoredRedemptionRequest,
+  agentDetails: AgentDetails = emptyAgentDetails,
+): RedemptionDetail {
   return {
     requestId: record.requestId,
     assetManagerAddress: record.assetManagerAddress,
@@ -110,6 +135,7 @@ function toRedemptionDetail(record: StoredRedemptionRequest): RedemptionDetail {
     statusReason: record.statusReason,
     redeemer: record.redeemer,
     agentVault: record.agentVault,
+    agentDetails,
     paymentAddress: record.paymentAddress,
     valueUBA: record.valueUBA,
     feeUBA: record.feeUBA,
@@ -287,9 +313,10 @@ export function buildRedemptionResponseData(
   const observations = listXrplObservationsForRedemption(database, requestId);
   const fdcRequests = listFdcRequestsForRedemption(database, requestId);
   const fdcProofs = listFdcProofsForRedemption(database, requestId);
+  const agent = getAgent(database, redemption.agentVault);
 
   return {
-    redemption: toRedemptionDetail(redemption),
+    redemption: toRedemptionDetail(redemption, agent?.details ?? emptyAgentDetails),
     statusTimeline: buildRedemptionTimeline(
       redemption,
       observations,

@@ -14,6 +14,7 @@ import {
 } from "../db/index.js";
 import {
   getFdcProofByRequestAndRound,
+  getAgent,
   insertFdcProof,
   insertRedemptionEvent,
   listAgents,
@@ -111,6 +112,7 @@ describe("SQLite migrations", () => {
       { id: "0003_agent_reliability_scores", applied: true },
       { id: "0004_xrpl_observation_receipts", applied: true },
       { id: "0005_fdc_request_proof_ready_status", applied: true },
+      { id: "0006_agent_details_fields", applied: true },
     ]);
 
     const tableNames = database
@@ -158,6 +160,10 @@ ORDER BY name
         id: "0005_fdc_request_proof_ready_status",
         appliedAt: listAppliedMigrations(database)[4]?.appliedAt,
       },
+      {
+        id: "0006_agent_details_fields",
+        appliedAt: listAppliedMigrations(database)[5]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
@@ -165,6 +171,7 @@ ORDER BY name
       { id: "0003_agent_reliability_scores", applied: false },
       { id: "0004_xrpl_observation_receipts", applied: false },
       { id: "0005_fdc_request_proof_ready_status", applied: false },
+      { id: "0006_agent_details_fields", applied: false },
     ]);
   });
 });
@@ -418,6 +425,77 @@ describe("XRPL and FDC repositories", () => {
 });
 
 describe("agent, keeper, and cursor repositories", () => {
+  test("defaults agent details to all-null and round-trips fetched details", (t) => {
+    const database = createTestDatabase(t);
+
+    const created = upsertAgent(database, { agentVault });
+    assert.deepEqual(created.details, {
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
+
+    const withDetails = upsertAgent(database, {
+      agentVault,
+      details: {
+        name: "Acme Redeemer",
+        description: "Reliable FXRP agent",
+        iconUrl: "https://cdn.example.com/acme.png",
+        termsOfUseUrl: "https://acme.example.com/terms",
+      },
+    });
+    assert.deepEqual(withDetails.details, {
+      name: "Acme Redeemer",
+      description: "Reliable FXRP agent",
+      iconUrl: "https://cdn.example.com/acme.png",
+      termsOfUseUrl: "https://acme.example.com/terms",
+    });
+    assert.deepEqual(
+      getAgent(database, agentVault)?.details,
+      withDetails.details,
+    );
+  });
+
+  test("preserves details when omitted and clears them when fetched empty", (t) => {
+    const database = createTestDatabase(t);
+    upsertAgent(database, {
+      agentVault,
+      details: {
+        name: "Acme",
+        description: null,
+        iconUrl: "https://x.example.com/i.png",
+        termsOfUseUrl: null,
+      },
+    });
+
+    // An upsert that omits details (not fetched) preserves stored values,
+    // matching the availability/score "fetched vs. not fetched" semantics.
+    upsertAgent(database, { agentVault, availability: "AVAILABLE" });
+    assert.equal(getAgent(database, agentVault)?.details.name, "Acme");
+    assert.equal(
+      getAgent(database, agentVault)?.details.iconUrl,
+      "https://x.example.com/i.png",
+    );
+
+    // Passing all-null details (fetched, but the owner cleared them) clears.
+    upsertAgent(database, {
+      agentVault,
+      details: {
+        name: null,
+        description: null,
+        iconUrl: null,
+        termsOfUseUrl: null,
+      },
+    });
+    assert.deepEqual(getAgent(database, agentVault)?.details, {
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
+  });
+
   test("persists agents, keeper jobs, and sync cursors", (t) => {
     const database = createTestDatabase(t);
 

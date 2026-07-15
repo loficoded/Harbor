@@ -1,3 +1,4 @@
+import { AgentIdentity } from "@/components/agents/agent-identity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -17,7 +18,6 @@ import {
   type AgentSortKey,
   type RankedAgent,
 } from "@/lib/agents";
-import { formatAddress } from "@/lib/format";
 import type { RankedAgentsStatus } from "@/lib/use-ranked-agents";
 import type { ReactElement, ReactNode } from "react";
 
@@ -338,11 +338,12 @@ function LeaderboardTable({
               <td className={`${BODY_CELL} tabular-nums text-gray-500`}>
                 {index + 1}
               </td>
-              <th
-                scope="row"
-                className={`${BODY_CELL} font-mono text-xs font-normal`}
-              >
-                {formatAddress(agent.agentVault)}
+              <th scope="row" className={`${BODY_CELL} font-normal`}>
+                <AgentIdentity
+                  details={agent.details}
+                  agentVault={agent.agentVault}
+                  size="sm"
+                />
               </th>
               <td className={BODY_CELL}>
                 <ScoreDetails agent={agent} />
@@ -409,13 +410,15 @@ function LeaderboardCards({
           className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
         >
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex min-w-0 items-start gap-2">
+              <span className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 #{index + 1}
               </span>
-              <p className="font-mono text-sm text-gray-900 dark:text-gray-100">
-                {formatAddress(agent.agentVault)}
-              </p>
+              <AgentIdentity
+                details={agent.details}
+                agentVault={agent.agentVault}
+                size="sm"
+              />
             </div>
             <ScoreDetails agent={agent} />
           </div>
