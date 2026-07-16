@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { agentDetails } from "../../src/test/agents-fixtures";
 import {
   proofReadyResponse,
   recoveredResponse,
@@ -159,5 +160,59 @@ test.describe("Status view — not found", () => {
     await page.goto("/status/9999");
 
     await expect(page.getByText("Redemption not found")).toBeVisible();
+  });
+});
+
+/** A 1×1 transparent PNG, used to serve the official agent icon deterministically. */
+const TRANSPARENT_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+test.describe("Status view — assigned agent official identity", () => {
+  test("shows the assigned agent's official name and icon", async ({
+    page,
+  }) => {
+    await page.route("https://example.com/agent.png", async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "image/png" },
+        body: Buffer.from(TRANSPARENT_PNG_BASE64, "base64"),
+      });
+    });
+    await mockRedemption(
+      page,
+      settledResponse({
+        requestId: "4207",
+        agentDetails: agentDetails({
+          name: "Acme Redeemer",
+          iconUrl: "https://example.com/agent.png",
+        }),
+      }),
+    );
+    await page.goto("/status/4207");
+
+    await expect(
+      page.getByRole("heading", { name: "Assigned agent" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("agent-identity-name")).toContainText(
+      "Acme Redeemer",
+    );
+    await expect(
+      page.getByRole("img", { name: "Acme Redeemer agent icon" }),
+    ).toBeVisible();
+  });
+
+  test("falls back to the vault address when the agent has no official details", async ({
+    page,
+  }) => {
+    await mockRedemption(page, settledResponse({ requestId: "4207" }));
+    await page.goto("/status/4207");
+
+    await expect(
+      page.getByRole("heading", { name: "Assigned agent" }),
+    ).toBeVisible();
+    // The identity label is the truncated vault address, and the decorative
+    // monogram stands in for the missing icon.
+    await expect(page.getByTestId("agent-identity-name")).toContainText("00a1");
+    await expect(page.getByTestId("agent-identity-monogram")).toBeVisible();
   });
 });

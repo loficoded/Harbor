@@ -25,6 +25,14 @@ const AGENT_A = "0x00000000000000000000000000000000000000a1"; // suffix 00a1
 const AGENT_B = "0x00000000000000000000000000000000000000b2"; // suffix 00b2
 const AGENT_C = "0x00000000000000000000000000000000000000c3"; // suffix 00c3
 
+/** Official `AgentOwnerRegistry` details; every field defaults to `null`. */
+type AgentDetailsInit = {
+  name?: string | null;
+  description?: string | null;
+  iconUrl?: string | null;
+  termsOfUseUrl?: string | null;
+};
+
 type AgentInit = {
   agentVault: string;
   score?: number;
@@ -34,6 +42,7 @@ type AgentInit = {
   collateralRatioBips?: string | null;
   collateralRatioSource?: "INVENTORY" | "FTSO_DERIVED" | "UNAVAILABLE";
   ftsoStatus?: "AVAILABLE" | "UNAVAILABLE" | "STALE" | "FAILED";
+  details?: AgentDetailsInit;
 };
 
 function agent(init: AgentInit): Record<string, unknown> {
@@ -63,9 +72,21 @@ function agent(init: AgentInit): Record<string, unknown> {
         : init.collateralRatioBips,
     collateralRatioSource: init.collateralRatioSource ?? "INVENTORY",
     ftsoStatus: init.ftsoStatus ?? "AVAILABLE",
+    // Official agent details always ride along; all fields default to null so
+    // existing specs render the vault-address fallback unchanged.
+    details: {
+      name: init.details?.name ?? null,
+      description: init.details?.description ?? null,
+      iconUrl: init.details?.iconUrl ?? null,
+      termsOfUseUrl: init.details?.termsOfUseUrl ?? null,
+    },
     updatedAt: "2026-07-08T00:00:00.000Z",
   };
 }
+
+/** A 1×1 transparent PNG, used to serve official agent icons deterministically. */
+const TRANSPARENT_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 /** Serve a ranked agents payload for every backend request. */
 async function mockAgents(
@@ -211,5 +232,48 @@ test.describe("Agents leaderboard — non-ready states", () => {
 
     await expect(page.getByText("Could not load agents")).toBeVisible();
     await expect(page.getByRole("button", { name: /retry/i })).toBeVisible();
+  });
+});
+
+test.describe("Agents leaderboard — official agent details", () => {
+  test("shows the official name and icon, falling back to the address", async ({
+    page,
+  }) => {
+    // Serve the official icon so it loads instead of the onError monogram.
+    await page.route("https://example.com/icon.png", async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "image/png" },
+        body: Buffer.from(TRANSPARENT_PNG_BASE64, "base64"),
+      });
+    });
+    await mockAgents(page, [
+      agent({
+        agentVault: AGENT_A,
+        score: 90,
+        details: {
+          name: "Acme Redeemer",
+          iconUrl: "https://example.com/icon.png",
+        },
+      }),
+      agent({ agentVault: AGENT_B, score: 40 }),
+    ]);
+    await page.goto("/agents");
+
+    await expect(visibleItems(page)).toHaveCount(2);
+
+    // The top-ranked agent (A) surfaces its official name and icon in whichever
+    // layout is visible — the desktop table or the mobile cards.
+    const named = visibleItems(page).nth(0);
+    await expect(named).toContainText("Acme Redeemer");
+    await expect(
+      named.getByRole("img", { name: "Acme Redeemer agent icon" }),
+    ).toBeVisible();
+
+    // The agent without published details (B) falls back to its truncated vault
+    // address and shows no invented name.
+    const unnamed = visibleItems(page).nth(1);
+    await expect(unnamed).toContainText("00b2");
+    await expect(unnamed).not.toContainText("Acme Redeemer");
   });
 });

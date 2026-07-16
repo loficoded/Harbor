@@ -1,7 +1,25 @@
 import type {
+  AgentDetails,
   GetAgentsResponse,
   SerializedAgentScoreView,
 } from "@harbor/shared";
+
+/**
+ * Build an `AgentDetails` value with all fields `null` by default (the
+ * "no official metadata" case that triggers address fallbacks). Override only
+ * the fields a test exercises, e.g. `agentDetails({ name: "Acme Redeemer" })`.
+ */
+export function agentDetails(
+  overrides: Partial<AgentDetails> = {},
+): AgentDetails {
+  return {
+    name: null,
+    description: null,
+    iconUrl: null,
+    termsOfUseUrl: null,
+    ...overrides,
+  };
+}
 
 /**
  * Test builders for ranked agent data. `agentView` returns a fully-populated
@@ -32,6 +50,7 @@ export function agentView(
     collateralRatioBips: "25000",
     collateralRatioSource: "INVENTORY",
     ftsoStatus: "AVAILABLE",
+    details: agentDetails(),
     updatedAt: "2026-07-08T00:00:00.000Z",
     ...overrides,
   };

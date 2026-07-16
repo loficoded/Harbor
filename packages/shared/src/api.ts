@@ -1,6 +1,7 @@
 import type {
   AgentAvailability,
   AgentCollateralRatioSource,
+  AgentDetails,
   AgentReliabilityFtsoStatus,
   FdcProofRecord,
   FdcRequestRecord,
@@ -69,6 +70,14 @@ export type AgentScoreView = Readonly<{
    * the already-persisted scoring field; it introduces no new scoring logic.
    */
   ftsoStatus: AgentReliabilityFtsoStatus;
+  /**
+   * Official agent details from the `AgentOwnerRegistry` (name, description,
+   * icon, terms of use), joined from the indexed agent inventory. Always
+   * present; individual fields are `null` when unavailable so the leaderboard
+   * falls back to the vault address. Analytics only — it never influences
+   * agent selection (the protocol assigns agents FIFO).
+   */
+  details: AgentDetails;
   updatedAt: IsoTimestamp;
 }>;
 
@@ -94,6 +103,13 @@ export type RedemptionDetail = Readonly<{
   statusReason: string | null;
   redeemer: EvmAddress;
   agentVault: EvmAddress;
+  /**
+   * Official details of the protocol-assigned agent, joined from the indexed
+   * agent inventory by `agentVault`. Always present; individual fields are
+   * `null` when unavailable so the status view falls back to the vault
+   * address. Informational only — Harbor never selects the agent.
+   */
+  agentDetails: AgentDetails;
   paymentAddress: XrplAddress;
   valueUBA: bigint;
   feeUBA: bigint;

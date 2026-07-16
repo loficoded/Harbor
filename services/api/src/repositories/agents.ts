@@ -15,6 +15,10 @@ type AgentRow = Readonly<{
   availability: StoredAgentRecord["availability"];
   redemption_fee_bips: number | null;
   available_lots: string;
+  agent_name: string | null;
+  agent_description: string | null;
+  agent_icon_url: string | null;
+  agent_terms_of_use_url: string | null;
   score: number;
   successful_redemptions: number;
   failed_redemptions: number;
@@ -36,6 +40,12 @@ function mapAgentRow(row: AgentRow): StoredAgentRecord {
     availability: row.availability,
     redemptionFeeBips: row.redemption_fee_bips,
     availableLots: parseSerializedBigint(row.available_lots),
+    details: {
+      name: row.agent_name,
+      description: row.agent_description,
+      iconUrl: row.agent_icon_url,
+      termsOfUseUrl: row.agent_terms_of_use_url,
+    },
     score: {
       agentVault: row.agent_vault as EvmAddress,
       score: row.score,
@@ -63,6 +73,7 @@ export function upsertAgent(
   const hasAvailability = input.availability === undefined ? 0 : 1;
   const hasAvailableLots = input.availableLots === undefined ? 0 : 1;
   const hasScore = input.score === undefined ? 0 : 1;
+  const hasDetails = input.details === undefined ? 0 : 1;
 
   database
     .prepare(
@@ -74,6 +85,10 @@ INSERT INTO agents (
   availability,
   redemption_fee_bips,
   available_lots,
+  agent_name,
+  agent_description,
+  agent_icon_url,
+  agent_terms_of_use_url,
   score,
   successful_redemptions,
   failed_redemptions,
@@ -92,6 +107,10 @@ INSERT INTO agents (
   @availability,
   @redemptionFeeBips,
   @availableLots,
+  @agentName,
+  @agentDescription,
+  @agentIconUrl,
+  @agentTermsOfUseUrl,
   @score,
   @successfulRedemptions,
   @failedRedemptions,
@@ -110,6 +129,10 @@ ON CONFLICT(agent_vault) DO UPDATE SET
   availability = CASE WHEN @hasAvailability = 1 THEN excluded.availability ELSE agents.availability END,
   redemption_fee_bips = COALESCE(excluded.redemption_fee_bips, agents.redemption_fee_bips),
   available_lots = CASE WHEN @hasAvailableLots = 1 THEN excluded.available_lots ELSE agents.available_lots END,
+  agent_name = CASE WHEN @hasDetails = 1 THEN excluded.agent_name ELSE agents.agent_name END,
+  agent_description = CASE WHEN @hasDetails = 1 THEN excluded.agent_description ELSE agents.agent_description END,
+  agent_icon_url = CASE WHEN @hasDetails = 1 THEN excluded.agent_icon_url ELSE agents.agent_icon_url END,
+  agent_terms_of_use_url = CASE WHEN @hasDetails = 1 THEN excluded.agent_terms_of_use_url ELSE agents.agent_terms_of_use_url END,
   score = CASE WHEN @hasScore = 1 THEN excluded.score ELSE agents.score END,
   successful_redemptions = CASE WHEN @hasScore = 1 THEN excluded.successful_redemptions ELSE agents.successful_redemptions END,
   failed_redemptions = CASE WHEN @hasScore = 1 THEN excluded.failed_redemptions ELSE agents.failed_redemptions END,
@@ -129,6 +152,10 @@ ON CONFLICT(agent_vault) DO UPDATE SET
       availability: input.availability ?? "UNKNOWN",
       redemptionFeeBips: input.redemptionFeeBips ?? null,
       availableLots: serializeBigint(input.availableLots ?? 0n),
+      agentName: input.details?.name ?? null,
+      agentDescription: input.details?.description ?? null,
+      agentIconUrl: input.details?.iconUrl ?? null,
+      agentTermsOfUseUrl: input.details?.termsOfUseUrl ?? null,
       score: input.score?.score ?? 0,
       successfulRedemptions: input.score?.successfulRedemptions ?? 0,
       failedRedemptions: input.score?.failedRedemptions ?? 0,
@@ -143,6 +170,7 @@ ON CONFLICT(agent_vault) DO UPDATE SET
       hasAvailability,
       hasAvailableLots,
       hasScore,
+      hasDetails,
     });
 
   return requireRow(

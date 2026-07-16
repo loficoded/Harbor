@@ -277,10 +277,10 @@ describe("GET /health", () => {
     assert.equal(report.status, "ok");
     assert.equal(report.api.status, "ok");
     assert.equal(report.database.status, "ok");
-    assert.equal(report.database.migrationsApplied, 5);
+    assert.equal(report.database.migrationsApplied, 6);
     assert.equal(
       report.database.latestMigrationId,
-      "0005_fdc_request_proof_ready_status",
+      "0006_agent_details_fields",
     );
     assert.equal(report.database.error, null);
     assert.equal(report.indexer.cursor?.blockNumber, "987654");
@@ -448,6 +448,62 @@ describe("GET /agents", () => {
       supportedAssets: ["FXRP"],
     });
   });
+
+  test("joins official agent details onto the ranked records", async (t) => {
+    const database = createTestDatabase(t);
+
+    // Agent A publishes official details in the AgentOwnerRegistry; agent B has
+    // none and must fall back to an all-null AgentDetails so the leaderboard can
+    // render the vault address unchanged.
+    seedAgentScore(
+      database,
+      reliabilityScore({ agentVault: agentVaultA, score: 90 }),
+    );
+    upsertAgent(database, {
+      agentVault: agentVaultA,
+      details: {
+        name: "Acme Redeemer",
+        description: "Fast, reliable settlement.",
+        iconUrl: "https://example.com/acme.png",
+        termsOfUseUrl: "https://example.com/terms",
+      },
+    });
+    seedAgentScore(
+      database,
+      reliabilityScore({ agentVault: agentVaultB, score: 40 }),
+    );
+
+    const { baseUrl } = await startTestServer(t, database);
+    const { status, body } = await getJson(baseUrl, "/agents");
+    const response = body as GetAgentsResponse;
+
+    assert.equal(status, 200);
+
+    const withDetails = response.agents.find(
+      (agent) => agent.agentVault === agentVaultA,
+    );
+    const withoutDetails = response.agents.find(
+      (agent) => agent.agentVault === agentVaultB,
+    );
+    assert.ok(withDetails !== undefined, "expected agent A in the response");
+    assert.ok(withoutDetails !== undefined, "expected agent B in the response");
+
+    // The official name and icon ride along on the leaderboard record.
+    assert.deepEqual(withDetails.details, {
+      name: "Acme Redeemer",
+      description: "Fast, reliable settlement.",
+      iconUrl: "https://example.com/acme.png",
+      termsOfUseUrl: "https://example.com/terms",
+    });
+
+    // An agent without published details falls back to all-null fields.
+    assert.deepEqual(withoutDetails.details, {
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -611,6 +667,59 @@ describe("GET /redemptions/:id", () => {
     const statuses = response.statusTimeline.map((entry) => entry.status);
     assert.ok(statuses.includes("DEFAULT_SUBMITTED"));
     assert.equal(statuses.at(-1), "RECOVERED");
+  });
+
+  test("includes official details for the protocol-assigned agent", async (t) => {
+    const database = createTestDatabase(t);
+    upsertRedemption(
+      database,
+      redemptionInput({ requestId: "20", agentVault: agentVaultA }),
+    );
+    // The assigned agent has published official details in the registry.
+    upsertAgent(database, {
+      agentVault: agentVaultA,
+      details: {
+        name: "Acme Redeemer",
+        description: null,
+        iconUrl: "https://example.com/acme.png",
+        termsOfUseUrl: null,
+      },
+    });
+
+    const { baseUrl } = await startTestServer(t, database);
+    const { status, body } = await getJson(baseUrl, "/redemptions/20");
+    const response = body as GetRedemptionResponse;
+
+    assert.equal(status, 200);
+    assert.equal(response.redemption.agentVault, agentVaultA);
+    assert.deepEqual(response.redemption.agentDetails, {
+      name: "Acme Redeemer",
+      description: null,
+      iconUrl: "https://example.com/acme.png",
+      termsOfUseUrl: null,
+    });
+  });
+
+  test("falls back to all-null agent details when the agent has none", async (t) => {
+    const database = createTestDatabase(t);
+    upsertRedemption(
+      database,
+      redemptionInput({ requestId: "21", agentVault: agentVaultA }),
+    );
+    // The assigned agent is indexed but has published no official metadata.
+    upsertAgent(database, { agentVault: agentVaultA });
+
+    const { baseUrl } = await startTestServer(t, database);
+    const { status, body } = await getJson(baseUrl, "/redemptions/21");
+    const response = body as GetRedemptionResponse;
+
+    assert.equal(status, 200);
+    assert.deepEqual(response.redemption.agentDetails, {
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
   });
 });
 

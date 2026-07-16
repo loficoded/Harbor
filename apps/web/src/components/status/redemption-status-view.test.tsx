@@ -6,7 +6,9 @@ import {
   type StatusFreshness,
   type StatusSubmission,
 } from "@/components/status/redemption-status-view";
+import { formatAddress } from "@/lib/format";
 import { deriveRedemptionStatusViewModel } from "@/lib/redemption-status";
+import { agentDetails } from "@/test/agents-fixtures";
 import {
   defaultSubmittedResponse,
   makeRedemptionResponse,
@@ -331,5 +333,36 @@ describe("RedemptionStatusView — submission details and honest copy", () => {
     expect(
       screen.getByText(/scores shown elsewhere are a heuristic/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("RedemptionStatusView — assigned agent official identity", () => {
+  it("renders the assigned agent's official name and icon when available", () => {
+    renderReady(
+      settledResponse({
+        agentDetails: agentDetails({
+          name: "Acme Redeemer",
+          iconUrl: "https://example.com/acme.png",
+        }),
+      }),
+    );
+
+    expect(screen.getByTestId("agent-identity-name")).toHaveTextContent(
+      "Acme Redeemer",
+    );
+    expect(
+      screen.getByRole("img", { name: "Acme Redeemer agent icon" }),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the vault address when the agent has no official details", () => {
+    const response = settledResponse();
+    renderReady(response);
+
+    // The identity label is the truncated vault address, and no icon renders.
+    expect(screen.getByTestId("agent-identity-name")).toHaveTextContent(
+      formatAddress(response.redemption.agentVault),
+    );
+    expect(screen.queryByTestId("agent-identity-icon")).toBeNull();
   });
 });

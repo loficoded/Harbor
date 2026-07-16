@@ -1,10 +1,12 @@
-import type {
-  FdcRequestStatus,
-  GetRedemptionResponse,
-  RedemptionStatus,
-  SerializedFdcProofRecord,
-  SerializedFdcRequestRecord,
-  SerializedXrplPaymentObservation,
+import {
+  emptyAgentDetails,
+  type AgentDetails,
+  type FdcRequestStatus,
+  type GetRedemptionResponse,
+  type RedemptionStatus,
+  type SerializedFdcProofRecord,
+  type SerializedFdcRequestRecord,
+  type SerializedXrplPaymentObservation,
 } from "@harbor/shared";
 
 import { formatFxrpAmount, FXRP_LABEL } from "@/lib/redemption";
@@ -589,6 +591,12 @@ export type RedemptionStatusViewModel = Readonly<{
   recovery: DefaultRecoveryInfo | null;
   selfRecovery: SelfRecoveryInfo;
   agentVault: string;
+  /**
+   * Official details of the protocol-assigned agent (name/icon/etc.), from the
+   * `AgentOwnerRegistry`. Always present; individual fields are `null` when
+   * unavailable so the assigned-agent card falls back to the vault address.
+   */
+  agentDetails: AgentDetails;
   redeemer: string;
   paymentReference: string;
   generatedAt: string;
@@ -633,6 +641,7 @@ export function deriveRedemptionStatusViewModel(
     recovery: deriveDefaultRecovery(response),
     selfRecovery: deriveSelfRecovery(response),
     agentVault: response.redemption.agentVault,
+    agentDetails: response.redemption.agentDetails ?? emptyAgentDetails,
     redeemer: response.redemption.redeemer,
     paymentReference: response.redemption.paymentReference,
     generatedAt: response.generatedAt,

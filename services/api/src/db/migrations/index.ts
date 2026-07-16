@@ -3,6 +3,7 @@ import { agentInventoryFieldsMigration } from "./0002_agent_inventory_fields.js"
 import { agentReliabilityScoresMigration } from "./0003_agent_reliability_scores.js";
 import { xrplObservationReceiptsMigration } from "./0004_xrpl_observation_receipts.js";
 import { fdcRequestProofReadyStatusMigration } from "./0005_fdc_request_proof_ready_status.js";
+import { agentDetailsFieldsMigration } from "./0006_agent_details_fields.js";
 
 export type SqlMigration = Readonly<{
   id: string;
@@ -16,4 +17,5 @@ export const migrations: readonly SqlMigration[] = [
   agentReliabilityScoresMigration,
   xrplObservationReceiptsMigration,
   fdcRequestProofReadyStatusMigration,
+  agentDetailsFieldsMigration,
 ];

@@ -17,6 +17,8 @@ import { getAgent, upsertAgent } from "../repositories/agents.js";
 import {
   assetManagerAbiHasFunction,
   defaultAgentInventoryPageSize,
+  readAgentDetails,
+  readAgentOwnerRegistryAddress,
   readAllAgentVaults,
   readAvailableAgentDetailedList,
   readAvailableAgentVaults,
@@ -400,5 +402,326 @@ describe("Agent inventory AssetManager reader", () => {
 
   test("documents the default page size used by the refresh command", () => {
     assert.equal(defaultAgentInventoryPageSize, 25);
+  });
+});
+
+const agentOwnerRegistryAddress = `0x${"a0".repeat(20)}` as EvmAddress;
+
+describe("AgentOwnerRegistry official agent details", () => {
+  describe("readAgentOwnerRegistryAddress", () => {
+    test("resolves the registry from the settings struct (named field)", async () => {
+      const { client } = createMockReadClient(({ functionName }) => {
+        assert.equal(functionName, "getSettings");
+        return { agentOwnerRegistry: agentOwnerRegistryAddress };
+      });
+
+      const resolved = await readAgentOwnerRegistryAddress({
+        publicClient: client,
+        assetManagerAddress,
+      });
+
+      assert.equal(resolved, agentOwnerRegistryAddress);
+    });
+
+    test("resolves the registry from a positional settings tuple", async () => {
+      const { client } = createMockReadClient(() => {
+        // agentOwnerRegistry is index 7 in the settings tuple.
+        const tuple = new Array(8).fill(`0x${"00".repeat(20)}`);
+        tuple[7] = agentOwnerRegistryAddress;
+        return tuple;
+      });
+
+      const resolved = await readAgentOwnerRegistryAddress({
+        publicClient: client,
+        assetManagerAddress,
+      });
+
+      assert.equal(resolved, agentOwnerRegistryAddress);
+    });
+
+    test("returns null for a zero/unset registry address", async () => {
+      const { client } = createMockReadClient(() => ({
+        agentOwnerRegistry: `0x${"00".repeat(20)}`,
+      }));
+
+      assert.equal(
+        await readAgentOwnerRegistryAddress({
+          publicClient: client,
+          assetManagerAddress,
+        }),
+        null,
+      );
+    });
+
+    test("is non-fatal: returns null when getSettings reverts", async () => {
+      const { client } = createMockReadClient(() => {
+        throw new Error("settings unavailable");
+      });
+
+      assert.equal(
+        await readAgentOwnerRegistryAddress({
+          publicClient: client,
+          assetManagerAddress,
+        }),
+        null,
+      );
+    });
+  });
+
+  describe("readAgentDetails", () => {
+    test("reads all four getters, trimming and null-collapsing empties", async () => {
+      const { client, calls } = createMockReadClient(({ functionName }) => {
+        switch (functionName) {
+          case "getAgentName":
+            return "  Acme Redeemer  ";
+          case "getAgentDescription":
+            return "";
+          case "getAgentIconUrl":
+            return "https://cdn.example.com/acme.png";
+          case "getAgentTermsOfUseUrl":
+            return "   ";
+          default:
+            throw new Error(`unexpected function ${functionName}`);
+        }
+      });
+
+      const details = await readAgentDetails({
+        publicClient: client,
+        agentOwnerRegistryAddress,
+        managementAddress: ownerAddress,
+      });
+
+      assert.deepEqual(details, {
+        name: "Acme Redeemer",
+        description: null,
+        iconUrl: "https://cdn.example.com/acme.png",
+        termsOfUseUrl: null,
+      });
+      // Every getter is passed the management address.
+      for (const call of calls) {
+        assert.deepEqual(call.args, [ownerAddress]);
+      }
+    });
+
+    test("is resilient per field: a reverting getter yields null for that field only", async () => {
+      const { client } = createMockReadClient(({ functionName }) => {
+        if (functionName === "getAgentIconUrl") {
+          throw new Error("icon getter reverted");
+        }
+        if (functionName === "getAgentName") {
+          return "Acme";
+        }
+        return "";
+      });
+
+      const details = await readAgentDetails({
+        publicClient: client,
+        agentOwnerRegistryAddress,
+        managementAddress: ownerAddress,
+      });
+
+      assert.equal(details.name, "Acme");
+      assert.equal(details.iconUrl, null);
+    });
+
+    test("never throws when the whole registry is unreadable", async () => {
+      const { client } = createMockReadClient(() => {
+        throw new Error("registry down");
+      });
+
+      const details = await readAgentDetails({
+        publicClient: client,
+        agentOwnerRegistryAddress,
+        managementAddress: ownerAddress,
+      });
+
+      assert.deepEqual(details, {
+        name: null,
+        description: null,
+        iconUrl: null,
+        termsOfUseUrl: null,
+      });
+    });
+  });
+
+  function detailAwareHandler(
+    overrides: {
+      settings?: () => unknown;
+      details?: Partial<Record<string, string>>;
+    } = {},
+  ) {
+    return ({ functionName }: { functionName: string }) => {
+      switch (functionName) {
+        case "getAvailableAgentsDetailedList":
+          return [[availableAgentDetail({ agentVault: agentVaultA })], 1n];
+        case "getAllAgents":
+          return [[agentVaultA], 1n];
+        case "getAgentInfo":
+          return agentInfo();
+        case "getSettings":
+          return overrides.settings
+            ? overrides.settings()
+            : { agentOwnerRegistry: agentOwnerRegistryAddress };
+        case "getAgentName":
+        case "getAgentDescription":
+        case "getAgentIconUrl":
+        case "getAgentTermsOfUseUrl":
+          return overrides.details?.[functionName] ?? "";
+        default:
+          throw new Error(`unexpected function ${functionName}`);
+      }
+    };
+  }
+
+  test("refresh persists official details resolved from the registry", async (t) => {
+    const database = createTestDatabase(t);
+    const { client } = createMockReadClient(
+      detailAwareHandler({
+        details: {
+          getAgentName: "Acme Redeemer",
+          getAgentDescription: "Reliable FXRP agent",
+          getAgentIconUrl: "https://cdn.example.com/acme.png",
+        },
+      }),
+    );
+
+    const summary = await refreshAgentInventory({
+      database,
+      publicClient: client,
+      assetManagerAddress,
+      pageSize: 5,
+      refreshedAt: "2026-07-08T05:00:00.000Z",
+    });
+
+    assert.equal(summary.agentOwnerRegistryAddress, agentOwnerRegistryAddress);
+    assert.equal(summary.agentDetailsRead, 1);
+
+    const stored = getAgent(database, agentVaultA);
+    assert.deepEqual(stored?.details, {
+      name: "Acme Redeemer",
+      description: "Reliable FXRP agent",
+      iconUrl: "https://cdn.example.com/acme.png",
+      termsOfUseUrl: null,
+    });
+  });
+
+  test("refresh is non-fatal when the registry cannot be resolved", async (t) => {
+    const database = createTestDatabase(t);
+    const { client } = createMockReadClient(
+      detailAwareHandler({
+        settings: () => {
+          throw new Error("settings unavailable");
+        },
+      }),
+    );
+
+    const summary = await refreshAgentInventory({
+      database,
+      publicClient: client,
+      assetManagerAddress,
+      pageSize: 5,
+      refreshedAt: "2026-07-08T05:10:00.000Z",
+    });
+
+    assert.equal(summary.agentOwnerRegistryAddress, null);
+    assert.equal(summary.agentDetailsRead, 0);
+    assert.equal(summary.agentsPersisted, 1);
+
+    const stored = getAgent(database, agentVaultA);
+    assert.deepEqual(stored?.details, {
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
+  });
+
+  test("refresh skips detail reads when includeAgentDetails is false", async (t) => {
+    const database = createTestDatabase(t);
+    const { client, calls } = createMockReadClient(detailAwareHandler());
+
+    const summary = await refreshAgentInventory({
+      database,
+      publicClient: client,
+      assetManagerAddress,
+      pageSize: 5,
+      includeAgentDetails: false,
+      refreshedAt: "2026-07-08T05:20:00.000Z",
+    });
+
+    assert.equal(summary.agentOwnerRegistryAddress, null);
+    assert.equal(summary.agentDetailsRead, 0);
+    assert.equal(
+      calls.some((call) => call.functionName === "getSettings"),
+      false,
+    );
+    assert.equal(
+      calls.some((call) => call.functionName === "getAgentName"),
+      false,
+    );
+  });
+
+  test("refresh reflects cleared registry fields (fetched empties overwrite)", async (t) => {
+    const database = createTestDatabase(t);
+    upsertAgent(database, {
+      agentVault: agentVaultA,
+      details: {
+        name: "Stale Name",
+        description: "Stale description",
+        iconUrl: "https://old.example.com/logo.png",
+        termsOfUseUrl: null,
+      },
+    });
+
+    const { client } = createMockReadClient(
+      detailAwareHandler({ details: {} }),
+    );
+    await refreshAgentInventory({
+      database,
+      publicClient: client,
+      assetManagerAddress,
+      pageSize: 5,
+      refreshedAt: "2026-07-08T05:30:00.000Z",
+    });
+
+    const stored = getAgent(database, agentVaultA);
+    assert.deepEqual(stored?.details, {
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
+  });
+
+  test("refresh preserves stored details when details are not fetched", async (t) => {
+    const database = createTestDatabase(t);
+    upsertAgent(database, {
+      agentVault: agentVaultA,
+      details: {
+        name: "Kept Name",
+        description: null,
+        iconUrl: "https://kept.example.com/logo.png",
+        termsOfUseUrl: null,
+      },
+    });
+
+    const { client } = createMockReadClient(
+      detailAwareHandler({
+        settings: () => {
+          throw new Error("settings unavailable");
+        },
+      }),
+    );
+    await refreshAgentInventory({
+      database,
+      publicClient: client,
+      assetManagerAddress,
+      pageSize: 5,
+      refreshedAt: "2026-07-08T05:40:00.000Z",
+    });
+
+    const stored = getAgent(database, agentVaultA);
+    assert.equal(stored?.details.name, "Kept Name");
+    assert.equal(stored?.details.iconUrl, "https://kept.example.com/logo.png");
   });
 });
