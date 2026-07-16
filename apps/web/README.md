@@ -2,10 +2,10 @@
 
 The Harbor dApp shell: a Next.js 14 App Router application (TypeScript, Tailwind
 CSS) that provides the operational surface for FXRP redemption on Flare Coston2.
-Users redeem an arbitrary amount of FXRP (via `redeemAmount`, with a whole-lot
-`redeem` mode available as an advanced option) and track settlement. The FAssets
-protocol assigns redemption agents automatically (FIFO), so the console has no
-agent-selection control; the `/agents` page is informational analytics only.
+Users redeem an arbitrary amount of FXRP (via `redeemAmount`) and track
+settlement. The FAssets protocol assigns redemption agents automatically (FIFO),
+so the console has no agent-selection control; the `/agents` page is
+informational analytics only.
 
 ## Commands
 

@@ -355,16 +355,16 @@ curl -s "https://api-production-6f3ec.up.railway.app/redemptions/38177650" | jq
 ### Redeem flow
 
 From the redemption console you burn FXRP for underlying XRP: enter an amount of
-FXRP (any amount — decimals are supported via `redeemAmount`; a whole-lot
-`redeem` mode is available as an advanced option) and an XRPL destination
-address. **You do not choose an agent.** FAssets processes redemptions FIFO: it
-selects one or more redemption tickets from the front of the queue and assigns
-the backing agent(s) automatically, so there is no "preferred agent" step. The
-flow approves the AssetManager for the exact amount and submits the redemption
-with the Harbor executor nominated, then hands off to the live status view,
-which polls `GET /redemptions/:id` until the request reaches a terminal state
-and renders the timeline, the protocol-assigned agent, the XRPL settlement
-receipt, and — when a default was needed — the recovery detail.
+FXRP (any amount — decimals are supported via `redeemAmount`) and an XRPL
+destination address. **You do not choose an agent.** FAssets processes
+redemptions FIFO: it selects one or more redemption tickets from the front of
+the queue and assigns the backing agent(s) automatically, so there is no
+"preferred agent" step. The flow approves the AssetManager for the exact amount
+and submits the redemption with the Harbor executor nominated, then hands off to
+the live status view, which polls `GET /redemptions/:id` until the request
+reaches a terminal state and renders the timeline, the protocol-assigned agent,
+the XRPL settlement receipt, and — when a default was needed — the recovery
+detail.
 
 The happy path — from a submitted redemption to on-chain settlement:
 

@@ -17,17 +17,16 @@ import {
 
 /**
  * Pure redemption domain helpers for the `/` console. Kept free of React and
- * wagmi so every branch (amount validation, lot validation, UBA math, approval
- * gating, executor resolution, receipt parsing, routing) is directly unit
- * testable. The container component wires wallet/chain state into these
- * functions.
+ * wagmi so every branch (amount validation, UBA math, approval gating, executor
+ * resolution, receipt parsing, routing) is directly unit testable. The
+ * container component wires wallet/chain state into these functions.
  *
  * Protocol model (see the official Flare FAssets redemption docs):
  * `AssetManager.redeemAmount(amountUBA, xrplAddress, executor)` redeems an
- * arbitrary FXRP amount, while `redeem(lots, …)` redeems whole lots. In both
- * cases the FAssets protocol selects redemption tickets FIFO from the front of
- * the queue — the redeemer never chooses an agent. This module therefore
- * carries no agent-selection concept at all.
+ * arbitrary FXRP amount. The redeemer always enters an amount — there is no
+ * lot-based input path. The FAssets protocol selects redemption tickets FIFO
+ * from the front of the queue, so the redeemer never chooses an agent. This
+ * module therefore carries no agent-selection concept at all.
  */
 
 /** FXRP FAsset ERC-20 decimals (base units == underlying UBA / XRP drops). */
@@ -35,9 +34,6 @@ export const FXRP_DECIMALS = coston2FxrpAsset.decimals;
 
 /** Display label for the asset (the token symbol is the test-net `FTestXRP`). */
 export const FXRP_LABEL = coston2FxrpAsset.name;
-
-/** Fallback lot size in UBA when the AssetManager settings are unavailable. */
-export const DEFAULT_FXRP_LOT_SIZE_UBA = coston2FxrpAsset.lotSizeUBA;
 
 /** Coston2 FXRP AssetManager — the redeem target and approval spender. */
 export const FXRP_ASSET_MANAGER_ADDRESS: EvmAddress =
@@ -47,25 +43,12 @@ export const FXRP_ASSET_MANAGER_ADDRESS: EvmAddress =
 export const FXRP_TOKEN_ADDRESS: EvmAddress = coston2FAssetTokenAddress;
 
 // ---------------------------------------------------------------------------
-// Redeem input mode
-// ---------------------------------------------------------------------------
-
-/**
- * How the redeemer expresses the amount to redeem.
- *
- * - `amount`: an arbitrary FXRP amount, submitted via `redeemAmount`. This is
- *   the primary, modern flow — FAssets supports redeeming any amount, not only
- *   whole lots (https://dev.flare.network/fassets/redemption#redeem-any-amount).
- * - `lots`: a whole number of lots, submitted via the classic `redeem`. Kept
- *   as an optional advanced mode for users who think in lots; it is no longer
- *   the only user-facing path.
- */
-export type RedeemMode = "amount" | "lots";
-
-export const DEFAULT_REDEEM_MODE: RedeemMode = "amount";
-
-// ---------------------------------------------------------------------------
-// Arbitrary amount (primary flow: redeemAmount)
+// Redeem amount (redeemAmount)
+//
+// FAssets supports redeeming any amount, not only whole lots
+// (https://dev.flare.network/fassets/redemption#redeem-any-amount). The console
+// always redeems an arbitrary FXRP amount via `redeemAmount`; there is no
+// lot-based input path.
 // ---------------------------------------------------------------------------
 
 export type AmountParseResult = Readonly<{
@@ -126,69 +109,8 @@ export function parseRedeemAmount(
 }
 
 // ---------------------------------------------------------------------------
-// Lot count (optional advanced mode: redeem)
+// Amount formatting
 // ---------------------------------------------------------------------------
-
-export type LotParseResult = Readonly<{
-  /** Parsed positive lot count, or `null` when empty/invalid. */
-  lots: bigint | null;
-  /** User-facing error, or `null` for empty (quiet) and valid inputs. */
-  error: string | null;
-}>;
-
-/**
- * Parse a raw lot-count input. Empty is not an error (the field is simply
- * incomplete); non-integers and non-positive values are.
- */
-export function parseLotCount(raw: string): LotParseResult {
-  const trimmed = raw.trim();
-
-  if (trimmed === "") {
-    return { lots: null, error: null };
-  }
-
-  if (!/^\d+$/.test(trimmed)) {
-    return { lots: null, error: "Enter a whole number of lots." };
-  }
-
-  const lots = BigInt(trimmed);
-  if (lots <= 0n) {
-    return { lots: null, error: "Enter at least one lot." };
-  }
-
-  return { lots, error: null };
-}
-
-// ---------------------------------------------------------------------------
-// Amount math
-// ---------------------------------------------------------------------------
-
-type LotSizeSettings = Readonly<{
-  lotSizeAMG: bigint;
-  assetMintingGranularityUBA: bigint;
-}>;
-
-/**
- * Resolve the lot size in UBA from live AssetManager settings when present,
- * falling back to the protocol helper constant. `lotSizeUBA = lotSizeAMG ×
- * assetMintingGranularityUBA`.
- */
-export function lotSizeUbaFromSettings(
-  settings: LotSizeSettings | undefined,
-  fallback: bigint = DEFAULT_FXRP_LOT_SIZE_UBA,
-): bigint {
-  if (settings === undefined) {
-    return fallback;
-  }
-
-  const derived = settings.lotSizeAMG * settings.assetMintingGranularityUBA;
-  return derived > 0n ? derived : fallback;
-}
-
-/** Total UBA (== FAsset base units) required to redeem `lots` lots. */
-export function lotsToUba(lots: bigint, lotSizeUba: bigint): bigint {
-  return lots * lotSizeUba;
-}
 
 /** Format a UBA/base-unit amount as a human FXRP string. */
 export function formatFxrpAmount(
@@ -382,7 +304,7 @@ export type RedemptionReadiness = Readonly<{
   correctNetwork: boolean;
   /** Amount to redeem in UBA, or `null` when the input is empty/invalid. */
   requiredUba: bigint | null;
-  /** Validation error for the amount/lots input, or `null`. */
+  /** Validation error for the amount input, or `null`. */
   inputError: string | null;
   addressValid: boolean;
   /** Whether the on-chain balance has been read yet. */
@@ -394,8 +316,7 @@ export type RedemptionReadiness = Readonly<{
  * Reason the primary approve/redeem action must stay disabled, or `null` when
  * the form is ready to proceed. Ordered from the most fundamental prerequisite
  * (wallet) to the most specific (balance) so the surfaced message is the next
- * actionable step. The wording is amount-based since arbitrary amount is the
- * primary flow; the lot mode surfaces its own input error via `inputError`.
+ * actionable step.
  */
 export function redemptionBlockedReason(
   state: RedemptionReadiness,
