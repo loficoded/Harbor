@@ -1,5 +1,3 @@
-import { URL } from "node:url";
-
 import {
   normalizeEvmAddress,
   type EvmAddress,

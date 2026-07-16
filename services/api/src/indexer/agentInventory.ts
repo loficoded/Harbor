@@ -387,7 +387,8 @@ export async function refreshAgentInventory(
           agentOwnerRegistryAddress,
           agents: agentInfoDetails.map((agentInfo) => ({
             agentVault: agentInfo.agentVault,
-            ownerManagementAddress: ownerByVault.get(agentInfo.agentVault) ?? null,
+            ownerManagementAddress:
+              ownerByVault.get(agentInfo.agentVault) ?? null,
           })),
         });
 

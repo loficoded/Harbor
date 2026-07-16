@@ -14,6 +14,7 @@ import {
   type TimelineStep,
   type TimelineStepState,
 } from "@/lib/redemption-status";
+import { agentDetails } from "@/test/agents-fixtures";
 import {
   defaultSubmittedResponse,
   makeRedemptionResponse,
@@ -347,5 +348,36 @@ describe("deriveRedemptionStatusViewModel", () => {
     expect(model.settlement?.deliveredAmountLabel).toBe("10 FXRP");
     expect(model.recovery).toBeNull();
     expect(model.needsAttention).toBe(false);
+  });
+});
+
+describe("deriveRedemptionStatusViewModel — agent details", () => {
+  it("carries the assigned agent's official details from the response", () => {
+    const viewModel = deriveRedemptionStatusViewModel(
+      makeRedemptionResponse({
+        agentDetails: agentDetails({
+          name: "Acme Redeemer",
+          iconUrl: "https://example.com/acme.png",
+        }),
+      }),
+    );
+
+    expect(viewModel.agentDetails).toEqual({
+      name: "Acme Redeemer",
+      description: null,
+      iconUrl: "https://example.com/acme.png",
+      termsOfUseUrl: null,
+    });
+  });
+
+  it("defaults to all-null agent details when the agent published none", () => {
+    const viewModel = deriveRedemptionStatusViewModel(makeRedemptionResponse());
+
+    expect(viewModel.agentDetails).toEqual({
+      name: null,
+      description: null,
+      iconUrl: null,
+      termsOfUseUrl: null,
+    });
   });
 });

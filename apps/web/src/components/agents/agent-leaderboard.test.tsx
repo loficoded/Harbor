@@ -1,9 +1,11 @@
 import { AgentLeaderboard } from "@/components/agents/agent-leaderboard";
 import type { HarborApiClient } from "@/lib/api-client";
+import { formatAddress } from "@/lib/format";
 import {
   AGENT_A,
   AGENT_B,
   AGENT_C,
+  agentDetails,
   agentsResponse,
   agentView,
 } from "@/test/agents-fixtures";
@@ -255,5 +257,54 @@ describe("AgentLeaderboard accessibility", () => {
     await userEvent.keyboard(" ");
 
     expect(await tableRows()).toHaveLength(1);
+  });
+});
+
+describe("AgentLeaderboard official agent identity", () => {
+  const withOfficialIdentity = agentsResponse([
+    agentView({
+      agentVault: AGENT_A,
+      score: 90,
+      details: agentDetails({
+        name: "Acme Redeemer",
+        iconUrl: "https://example.com/acme.png",
+      }),
+    }),
+    agentView({ agentVault: AGENT_B, score: 40, details: agentDetails() }),
+  ]);
+
+  it("shows the official name and icon in the desktop table", async () => {
+    render(<AgentLeaderboard client={resolvingClient(withOfficialIdentity)} />);
+    const table = await screen.findByRole("table");
+
+    expect(within(table).getByText("Acme Redeemer")).toBeInTheDocument();
+    expect(
+      within(table).getByRole("img", { name: "Acme Redeemer agent icon" }),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the vault address for an agent without official details", async () => {
+    render(<AgentLeaderboard client={resolvingClient(withOfficialIdentity)} />);
+    const table = await screen.findByRole("table");
+
+    // The unnamed agent renders its truncated vault address, not an invented
+    // name; no icon is shown for it.
+    expect(within(table).getByText(formatAddress(AGENT_B))).toBeInTheDocument();
+    expect(
+      within(table).queryByRole("img", { name: `Agent ${AGENT_B} icon` }),
+    ).toBeNull();
+  });
+
+  it("shows the official name in the mobile cards too", async () => {
+    render(<AgentLeaderboard client={resolvingClient(withOfficialIdentity)} />);
+    await screen.findByRole("table");
+
+    const cardList = screen.getByRole("list", {
+      name: /agent reliability leaderboard/i,
+    });
+    expect(within(cardList).getByText("Acme Redeemer")).toBeInTheDocument();
+    expect(
+      within(cardList).getByText(formatAddress(AGENT_B)),
+    ).toBeInTheDocument();
   });
 });

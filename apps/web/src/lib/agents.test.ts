@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   agentAvailabilityLabel,
   agentAvailabilityTone,
+  agentDisplayName,
+  agentMonogram,
   collateralFieldIndicator,
   filterAgents,
   formatCollateralRatioBips,
@@ -10,10 +12,21 @@ import {
   formatLots,
   formatScoreBreakdown,
   formatSettlementSeconds,
+  hasOfficialAgentName,
+  officialAgentName,
   rankAgents,
+  resolveAgentIconUrl,
+  resolveAgentTermsOfUseUrl,
   sortAgents,
 } from "@/lib/agents";
-import { AGENT_A, AGENT_B, AGENT_C, agentView } from "@/test/agents-fixtures";
+import { formatAddress } from "@/lib/format";
+import {
+  AGENT_A,
+  AGENT_B,
+  AGENT_C,
+  agentDetails,
+  agentView,
+} from "@/test/agents-fixtures";
 
 const order = (agents: ReadonlyArray<{ agentVault: string }>) =>
   agents.map((agent) => agent.agentVault);
@@ -239,5 +252,147 @@ describe("collateralFieldIndicator", () => {
       }),
     );
     expect(indicator).toBeNull();
+  });
+});
+
+describe("official agent detail helpers", () => {
+  const NAMED = agentDetails({ name: "Acme Redeemer" });
+
+  describe("officialAgentName", () => {
+    it("returns the trimmed official name when present", () => {
+      expect(
+        officialAgentName(agentDetails({ name: "  Acme Redeemer  " })),
+      ).toBe("Acme Redeemer");
+    });
+
+    it("collapses empty and whitespace-only names to null", () => {
+      expect(officialAgentName(agentDetails({ name: "" }))).toBeNull();
+      expect(officialAgentName(agentDetails({ name: "   " }))).toBeNull();
+    });
+
+    it("returns null when details are missing or unset", () => {
+      expect(officialAgentName(agentDetails())).toBeNull();
+      expect(officialAgentName(null)).toBeNull();
+      expect(officialAgentName(undefined)).toBeNull();
+    });
+  });
+
+  describe("hasOfficialAgentName", () => {
+    it("is true only when a usable name resolves", () => {
+      expect(hasOfficialAgentName(NAMED)).toBe(true);
+      expect(hasOfficialAgentName(agentDetails({ name: "   " }))).toBe(false);
+      expect(hasOfficialAgentName(agentDetails())).toBe(false);
+      expect(hasOfficialAgentName(null)).toBe(false);
+    });
+  });
+
+  describe("agentDisplayName", () => {
+    it("prefers the official name over the address", () => {
+      expect(agentDisplayName(NAMED, AGENT_A)).toBe("Acme Redeemer");
+    });
+
+    it("falls back to the truncated vault address when unnamed", () => {
+      expect(agentDisplayName(agentDetails(), AGENT_A)).toBe(
+        formatAddress(AGENT_A),
+      );
+      expect(agentDisplayName(null, AGENT_B)).toBe(formatAddress(AGENT_B));
+    });
+  });
+
+  describe("resolveAgentIconUrl", () => {
+    it("accepts absolute http and https URLs", () => {
+      expect(
+        resolveAgentIconUrl(
+          agentDetails({ iconUrl: "https://cdn.example/i.png" }),
+        ),
+      ).toBe("https://cdn.example/i.png");
+      expect(
+        resolveAgentIconUrl(
+          agentDetails({ iconUrl: "http://cdn.example/i.png" }),
+        ),
+      ).toBe("http://cdn.example/i.png");
+    });
+
+    it("trims surrounding whitespace before validating", () => {
+      expect(
+        resolveAgentIconUrl(
+          agentDetails({ iconUrl: "  https://cdn.example/i.png  " }),
+        ),
+      ).toBe("https://cdn.example/i.png");
+    });
+
+    it("rejects empty, whitespace-only, and missing values", () => {
+      expect(resolveAgentIconUrl(agentDetails({ iconUrl: "" }))).toBeNull();
+      expect(resolveAgentIconUrl(agentDetails({ iconUrl: "   " }))).toBeNull();
+      expect(resolveAgentIconUrl(agentDetails())).toBeNull();
+      expect(resolveAgentIconUrl(null)).toBeNull();
+    });
+
+    it("rejects relative URLs and non-http(s) protocols", () => {
+      expect(
+        resolveAgentIconUrl(agentDetails({ iconUrl: "/icons/a.png" })),
+      ).toBeNull();
+      expect(
+        resolveAgentIconUrl(agentDetails({ iconUrl: "icons/a.png" })),
+      ).toBeNull();
+      expect(
+        resolveAgentIconUrl(
+          agentDetails({ iconUrl: "data:image/png;base64,AAAA" }),
+        ),
+      ).toBeNull();
+      expect(
+        resolveAgentIconUrl(agentDetails({ iconUrl: "javascript:alert(1)" })),
+      ).toBeNull();
+      expect(
+        resolveAgentIconUrl(
+          agentDetails({ iconUrl: "ipfs://QmHash/icon.png" }),
+        ),
+      ).toBeNull();
+      expect(
+        resolveAgentIconUrl(agentDetails({ iconUrl: "not a url" })),
+      ).toBeNull();
+    });
+  });
+
+  describe("resolveAgentTermsOfUseUrl", () => {
+    it("accepts absolute http(s) URLs and rejects everything else", () => {
+      expect(
+        resolveAgentTermsOfUseUrl(
+          agentDetails({ termsOfUseUrl: "https://example.com/terms" }),
+        ),
+      ).toBe("https://example.com/terms");
+      expect(
+        resolveAgentTermsOfUseUrl(
+          agentDetails({ termsOfUseUrl: "javascript:alert(1)" }),
+        ),
+      ).toBeNull();
+      expect(
+        resolveAgentTermsOfUseUrl(agentDetails({ termsOfUseUrl: "" })),
+      ).toBeNull();
+      expect(resolveAgentTermsOfUseUrl(agentDetails())).toBeNull();
+      expect(resolveAgentTermsOfUseUrl(null)).toBeNull();
+    });
+  });
+
+  describe("agentMonogram", () => {
+    it("uses the first alphanumeric character of the official name, uppercased", () => {
+      expect(agentMonogram(agentDetails({ name: "acme" }), AGENT_A)).toBe("A");
+      // Leading non-alphanumeric characters are skipped.
+      expect(agentMonogram(agentDetails({ name: "🚀 rocket" }), AGENT_A)).toBe(
+        "R",
+      );
+    });
+
+    it("falls back to the first hex character of the vault, uppercased", () => {
+      expect(
+        agentMonogram(
+          agentDetails(),
+          "0xDeadBeefCafeBabeCafeBabeCafeBabeCafeBabe",
+        ),
+      ).toBe("D");
+      expect(
+        agentMonogram(null, "0xabc0000000000000000000000000000000000000"),
+      ).toBe("A");
+    });
   });
 });

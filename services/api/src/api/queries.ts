@@ -316,7 +316,10 @@ export function buildRedemptionResponseData(
   const agent = getAgent(database, redemption.agentVault);
 
   return {
-    redemption: toRedemptionDetail(redemption, agent?.details ?? emptyAgentDetails),
+    redemption: toRedemptionDetail(
+      redemption,
+      agent?.details ?? emptyAgentDetails,
+    ),
     statusTimeline: buildRedemptionTimeline(
       redemption,
       observations,

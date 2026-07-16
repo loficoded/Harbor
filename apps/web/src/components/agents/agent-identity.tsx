@@ -67,9 +67,7 @@ export function AgentIdentity({
   const showIcon = iconUrl !== null && !iconFailed;
   const monogram = agentMonogram(details, agentVault);
   const sizeClasses = SIZE_CLASSES[size];
-  const iconAlt = hasName
-    ? `${name} agent icon`
-    : `Agent ${agentVault} icon`;
+  const iconAlt = hasName ? `${name} agent icon` : `Agent ${agentVault} icon`;
 
   return (
     <span

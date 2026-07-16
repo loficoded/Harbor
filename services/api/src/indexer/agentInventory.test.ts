@@ -673,7 +673,9 @@ describe("AgentOwnerRegistry official agent details", () => {
       },
     });
 
-    const { client } = createMockReadClient(detailAwareHandler({ details: {} }));
+    const { client } = createMockReadClient(
+      detailAwareHandler({ details: {} }),
+    );
     await refreshAgentInventory({
       database,
       publicClient: client,

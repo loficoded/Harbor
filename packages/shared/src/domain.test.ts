@@ -20,7 +20,10 @@ describe("agent details value object", () => {
 
   describe("normalizeAgentDetailField", () => {
     test("returns the trimmed value for a non-empty string", () => {
-      assert.equal(normalizeAgentDetailField("  Acme Redeemer  "), "Acme Redeemer");
+      assert.equal(
+        normalizeAgentDetailField("  Acme Redeemer  "),
+        "Acme Redeemer",
+      );
       assert.equal(
         normalizeAgentDetailField("https://example.com/icon.png"),
         "https://example.com/icon.png",

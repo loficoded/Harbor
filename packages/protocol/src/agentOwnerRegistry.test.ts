@@ -4,11 +4,19 @@ import { describe, test } from "node:test";
 import {
   agentOwnerRegistryAbi,
   iAgentOwnerRegistryAbi,
+  type AbiFragment,
   type AbiFunctionFragment,
 } from "./index.js";
 
+/**
+ * Find a function fragment by name in the AgentOwnerRegistry ABI. The ABI is
+ * declared `as const`, so it is widened to the general `AbiFragment[]` shape
+ * before searching; that keeps the `AbiFunctionFragment` type guard valid (the
+ * predicate type must be assignable to the element type).
+ */
 function functionFragment(name: string): AbiFunctionFragment {
-  const fragment = agentOwnerRegistryAbi.find(
+  const fragments: readonly AbiFragment[] = agentOwnerRegistryAbi;
+  const fragment = fragments.find(
     (item): item is AbiFunctionFragment =>
       item.type === "function" && item.name === name,
   );
