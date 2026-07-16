@@ -21,7 +21,7 @@ export function AppShell({ children, headerRight, banner }: AppShellProps) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3">
           <Link href="/" className="flex items-baseline gap-2">
             <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
               Harbor
@@ -38,15 +38,17 @@ export function AppShell({ children, headerRight, banner }: AppShellProps) {
       </header>
 
       {banner !== undefined ? (
-        <div className="mx-auto w-full max-w-6xl px-4 pt-4">{banner}</div>
+        <div className="mx-auto w-full max-w-4xl px-5 pt-4 empty:hidden">
+          {banner}
+        </div>
       ) : null}
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-5 py-8">
         {children}
       </main>
 
       <footer className="border-t border-gray-200 py-4 dark:border-gray-800">
-        <div className="mx-auto w-full max-w-6xl px-4 text-xs text-gray-400">
+        <div className="mx-auto w-full max-w-4xl px-5 text-xs text-gray-400">
           Harbor operates on the Flare Coston2 testnet. Redemption amounts and
           agent scores are heuristic and for operational use only.
         </div>

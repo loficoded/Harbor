@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost";
-export type ButtonSize = "sm" | "md";
+export type ButtonSize = "sm" | "md" | "lg";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -28,7 +28,30 @@ const variantClasses: Record<ButtonVariant, string> = {
 const sizeClasses: Record<ButtonSize, string> = {
   sm: "h-8 px-3 text-sm",
   md: "h-10 px-4 text-sm",
+  lg: "h-11 px-5 text-sm",
 };
+
+export type ButtonClassOptions = {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  // Explicit `| undefined` so callers can forward an optional className under
+  // the project's `exactOptionalPropertyTypes` setting.
+  className?: string | undefined;
+};
+
+/**
+ * Compose the shared control styling. Exported so link-based actions (e.g. the
+ * hero CTAs rendered as `<a>`/`next/link`) can look and focus exactly like a
+ * {@link Button} without duplicating class strings or nesting a button in a
+ * link.
+ */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  className,
+}: ButtonClassOptions = {}): string {
+  return cn(base, variantClasses[variant], sizeClasses[size], className);
+}
 
 /** Primary interactive control for the shell. Server/client safe. */
 export function Button({
@@ -42,12 +65,7 @@ export function Button({
   return (
     <button
       type={type ?? "button"}
-      className={cn(
-        base,
-        variantClasses[variant],
-        sizeClasses[size],
-        className,
-      )}
+      className={buttonClasses({ variant, size, className })}
       {...rest}
     >
       {children}
