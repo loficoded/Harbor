@@ -6,20 +6,15 @@ import { getClientEnv } from "@/lib/env";
 import { formatAddress } from "@/lib/format";
 import {
   buildStatusPath,
-  DEFAULT_FXRP_LOT_SIZE_UBA,
-  DEFAULT_REDEEM_MODE,
   formatFxrpAmount,
   FXRP_ASSET_MANAGER_ADDRESS,
   FXRP_TOKEN_ADDRESS,
   hasSufficientBalance,
   isApprovalRequired,
-  lotsToUba,
-  parseLotCount,
   parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
   resolveExecutor,
-  type RedeemMode,
   type RedemptionLogInput,
 } from "@/lib/redemption";
 import { validateXrplDestination } from "@/lib/xrpl";
@@ -58,14 +53,14 @@ function firstErrorMessage(
  * pure {@link RedemptionFormView}.
  *
  * Contract path (Prompt #04): a direct `AssetManager` redeem from the user's
- * wallet after approving the AssetManager for the exact amount. Arbitrary FXRP
- * amounts (the primary flow) use `redeemAmount(amountUBA, xrplAddress,
- * executor)`; the optional whole-lot mode uses `redeem(lots, …)`. In both cases
- * the FAssets protocol assigns the redemption agent(s) FIFO — Harbor sends no
- * agent selection. The executor is the configured Harbor keeper (or the zero
- * address when unconfigured), keeping default recovery permissionless via
- * Harbor. On a confirmed receipt the emitted `RedemptionRequested` ids are
- * parsed and the app routes to the status page for the first id.
+ * wallet after approving the AssetManager for the exact amount. The user always
+ * enters an arbitrary FXRP amount, submitted via `redeemAmount(amountUBA,
+ * xrplAddress, executor)`. The FAssets protocol assigns the redemption agent(s)
+ * FIFO — Harbor sends no agent selection. The executor is the configured Harbor
+ * keeper (or the zero address when unconfigured), keeping default recovery
+ * permissionless via Harbor. On a confirmed receipt the emitted
+ * `RedemptionRequested` ids are parsed and the app routes to the status page
+ * for the first id.
  */
 export function RedemptionForm() {
   const router = useRouter();
@@ -74,31 +69,19 @@ export function RedemptionForm() {
   const connected = Boolean(isConnected && address);
   const correctNetwork = chainId === coston2.id;
 
-  const [mode, setMode] = useState<RedeemMode>(DEFAULT_REDEEM_MODE);
   const [amountInput, setAmountInput] = useState("");
-  const [lotInput, setLotInput] = useState("");
   const [addressInput, setAddressInput] = useState("");
   const [submittedIds, setSubmittedIds] = useState<readonly string[] | null>(
     null,
   );
 
   const { amountUba, error: amountError } = parseRedeemAmount(amountInput);
-  const { lots, error: lotError } = parseLotCount(lotInput);
   const addressValidation = validateXrplDestination(addressInput);
 
-  const lotSizeUba = DEFAULT_FXRP_LOT_SIZE_UBA;
-
-  // Resolve the amount to redeem (UBA) and the active input's validation state
-  // from the current mode. `requiredUba` is 0n whenever the input is empty or
-  // invalid so approval/balance gating stays inert until a real amount exists.
-  const inputProvided = mode === "amount" ? amountUba !== null : lots !== null;
-  const inputError = mode === "amount" ? amountError : lotError;
-  const requiredUba =
-    mode === "amount"
-      ? (amountUba ?? 0n)
-      : lots !== null
-        ? lotsToUba(lots, lotSizeUba)
-        : 0n;
+  // `requiredUba` is 0n whenever the amount is empty or invalid so
+  // approval/balance gating stays inert until a real amount exists.
+  const inputProvided = amountUba !== null;
+  const requiredUba = amountUba ?? 0n;
   const amountLabel = requiredUba > 0n ? formatFxrpAmount(requiredUba) : null;
 
   const executor = resolveExecutor(env.contractAddress, env.executorFeeWei);
@@ -180,7 +163,7 @@ export function RedemptionForm() {
     isConnected: connected,
     correctNetwork,
     requiredUba: inputProvided ? requiredUba : null,
-    inputError,
+    inputError: amountError,
     addressValid: addressValidation.valid,
     balanceKnown: balance !== undefined,
     sufficientBalance,
@@ -195,11 +178,6 @@ export function RedemptionForm() {
 
   function resetSubmission() {
     setSubmittedIds(null);
-  }
-
-  function handleModeChange(next: RedeemMode) {
-    setMode(next);
-    resetSubmission();
   }
 
   function handleApprove() {
@@ -218,35 +196,18 @@ export function RedemptionForm() {
     if (
       blockedReason !== null ||
       approvalRequired ||
-      addressValidation.address === null
+      addressValidation.address === null ||
+      amountUba === null
     ) {
       return;
     }
 
-    // Arbitrary amount (primary): redeemAmount(amountUBA, xrplAddress, executor).
-    if (mode === "amount") {
-      if (amountUba === null) {
-        return;
-      }
-      redeemTx.writeContract({
-        address: FXRP_ASSET_MANAGER_ADDRESS,
-        abi: ASSET_MANAGER_ABI,
-        functionName: "redeemAmount",
-        args: [amountUba, addressValidation.address, executor.executor],
-        value: executor.executorFeeWei,
-      });
-      return;
-    }
-
-    // Whole lots (advanced): redeem(lots, xrplAddress, executor).
-    if (lots === null) {
-      return;
-    }
+    // redeemAmount(amountUBA, xrplAddress, executor) redeems an arbitrary amount.
     redeemTx.writeContract({
       address: FXRP_ASSET_MANAGER_ADDRESS,
       abi: ASSET_MANAGER_ABI,
-      functionName: "redeem",
-      args: [lots, addressValidation.address, executor.executor],
+      functionName: "redeemAmount",
+      args: [amountUba, addressValidation.address, executor.executor],
       value: executor.executorFeeWei,
     });
   }
@@ -264,20 +225,12 @@ export function RedemptionForm() {
       correctNetwork={correctNetwork}
       balanceLabel={balanceLabel}
       balanceLoading={balanceRead.isLoading && connected}
-      mode={mode}
-      onModeChange={handleModeChange}
       amountInput={amountInput}
       onAmountInputChange={(value) => {
         setAmountInput(value);
         resetSubmission();
       }}
       amountError={amountError}
-      lotInput={lotInput}
-      onLotInputChange={(value) => {
-        setLotInput(value);
-        resetSubmission();
-      }}
-      lotError={lotError}
       amountLabel={amountLabel}
       addressInput={addressInput}
       onAddressChange={(value) => {

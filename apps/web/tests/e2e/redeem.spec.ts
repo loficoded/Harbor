@@ -6,10 +6,10 @@ import { redemptionRequestedLog } from "../../src/test/redemption-fixtures";
  * EIP-1193 provider is injected as `window.ethereum` (picked up by wagmi's
  * injected connector) and on-chain reads/receipts are served by intercepting
  * the Coston2 RPC endpoint. The tests drive the full UI: connect -> enter an
- * arbitrary FXRP amount (or, in the advanced lots mode, a lot count) + XRPL
- * address -> redeem -> receipt parsed -> navigate to the status route for the
- * emitted request id. They also assert that no agent-selection control exists
- * and that the FIFO explanatory copy is shown.
+ * FXRP amount + XRPL address -> redeem -> receipt parsed -> navigate to the
+ * status route for the emitted request id. Redemption is amount-only: the tests
+ * assert there is no Amount/Lots mode toggle and no agent-selection control, and
+ * that the FIFO explanatory copy is shown.
  */
 
 const ADDRESS = "0x00000000000000000000000000000000000000b2";
@@ -255,8 +255,15 @@ test.describe("Redemption happy path", () => {
     await expect(page.getByText(/preferred agent/i)).toHaveCount(0);
     await expect(page.getByRole("combobox", { name: /agent/i })).toHaveCount(0);
 
-    // Amount is the primary input and accepts decimals.
-    await page.getByLabel(/amount to redeem \(fxrp\)/i).fill("2.37");
+    // Redemption is amount-only: there is no Amount/Lots mode toggle.
+    await expect(
+      page.getByRole("radiogroup", { name: /redemption input mode/i }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("radio", { name: "Lots" })).toHaveCount(0);
+    await expect(page.getByLabel(/lots to redeem/i)).toHaveCount(0);
+
+    // Amount is the only input and accepts decimals.
+    await page.getByLabel(/amount \(fxrp\)/i).fill("2.37");
     await expect(page.getByText(/Redeems 2.37 FXRP/)).toBeVisible();
     await page.getByLabel("XRPL destination address").fill(VALID_XRPL);
 
@@ -279,7 +286,7 @@ test.describe("Redemption happy path", () => {
     page,
   }) => {
     await connect(page);
-    const amount = page.getByLabel(/amount to redeem \(fxrp\)/i);
+    const amount = page.getByLabel(/amount \(fxrp\)/i);
     await page.getByLabel("XRPL destination address").fill(VALID_XRPL);
     const redeem = page.getByRole("button", { name: "Redeem" });
 
@@ -308,20 +315,16 @@ test.describe("Redemption happy path", () => {
     await expect(redeem).toBeEnabled();
   });
 
-  test("supports the advanced whole-lot mode without any agent selection", async ({
+  test("redeems the exact wallet balance (upper boundary) and routes to status", async ({
     page,
   }) => {
     await connect(page);
 
-    // Switch to the advanced lots mode.
-    await page.getByRole("radio", { name: "Lots" }).click();
-    await page.getByLabel("Lots to redeem").fill("1");
-    // 1 lot == 10 FXRP for FXRP on Coston2.
-    await expect(page.getByText(/Redeems 10 FXRP/)).toBeVisible();
+    // The mocked balance is exactly 1000 FXRP; redeeming all of it is valid.
+    await page.getByLabel(/amount \(fxrp\)/i).fill("1000");
+    await expect(page.getByText(/Redeems 1000 FXRP/)).toBeVisible();
     await page.getByLabel("XRPL destination address").fill(VALID_XRPL);
-
-    // Still no agent-selection control in lots mode.
-    await expect(page.getByText(/preferred agent/i)).toHaveCount(0);
+    await expect(page.getByText(/insufficient/i)).toHaveCount(0);
 
     const redeem = page.getByRole("button", { name: "Redeem" });
     await expect(redeem).toBeEnabled();

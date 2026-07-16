@@ -131,10 +131,7 @@ beforeEach(() => {
 });
 
 async function fillAmountForm(amount = "1") {
-  await userEvent.type(
-    screen.getByLabelText(/amount to redeem \(fxrp\)/i),
-    amount,
-  );
+  await userEvent.type(screen.getByLabelText(/amount \(fxrp\)/i), amount);
   await userEvent.type(
     screen.getByLabelText("XRPL destination address"),
     VALID_XRPL,
@@ -221,31 +218,85 @@ describe("RedemptionForm — arbitrary amount flow", () => {
     ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Redeem" })).toBeDisabled();
   });
-});
 
-describe("RedemptionForm — lots mode", () => {
-  it("submits a whole-lot redeem when the lots mode is selected", async () => {
+  it("normalizes trailing/leading zeros into the exact UBA amount", async () => {
     h.state.allowance = 10n ** 30n;
     render(<RedemptionForm />);
+    // "02.370" is the same value as "2.37" -> 2_370_000 UBA.
+    await fillAmountForm("02.370");
 
-    await userEvent.click(screen.getByRole("radio", { name: "Lots" }));
-    await userEvent.type(screen.getByLabelText("Lots to redeem"), "1");
+    const redeem = screen.getByRole("button", { name: "Redeem" });
+    await userEvent.click(redeem);
+
+    expect(h.state.redeem.writeContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        functionName: "redeemAmount",
+        args: [AMOUNT_2_37_UBA, VALID_XRPL, zeroAddress],
+      }),
+    );
+  });
+
+  it("approves the exact decimal amount, not a rounded or whole value", async () => {
+    h.state.allowance = 0n;
+    render(<RedemptionForm />);
+    await fillAmountForm("2.37");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /approve fxrp/i }),
+    );
+
+    expect(h.state.approve.writeContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: FXRP_TOKEN_ADDRESS,
+        functionName: "approve",
+        args: [FXRP_ASSET_MANAGER_ADDRESS, AMOUNT_2_37_UBA],
+      }),
+    );
+  });
+
+  it("keeps redeem disabled with a prompt until an amount is entered", async () => {
+    h.state.allowance = 10n ** 30n;
+    render(<RedemptionForm />);
     await userEvent.type(
       screen.getByLabelText("XRPL destination address"),
       VALID_XRPL,
     );
 
-    const redeem = screen.getByRole("button", { name: "Redeem" });
-    expect(redeem).toBeEnabled();
-    await userEvent.click(redeem);
+    expect(screen.getByRole("button", { name: "Redeem" })).toBeDisabled();
+    expect(screen.getByText(/enter an amount to redeem/i)).toBeInTheDocument();
+  });
 
+  it("treats a balance exactly equal to the amount as sufficient", async () => {
+    h.state.allowance = 10n ** 30n;
+    h.state.balance = AMOUNT_2_37_UBA; // exactly the required amount
+    render(<RedemptionForm />);
+    await fillAmountForm("2.37");
+
+    expect(screen.getByRole("button", { name: "Redeem" })).toBeEnabled();
+    expect(screen.queryByText(/insufficient/i)).toBeNull();
+  });
+
+  it("is amount-only: no mode toggle and it never calls the whole-lot redeem", async () => {
+    h.state.allowance = 10n ** 30n;
+    render(<RedemptionForm />);
+
+    // The Amount/Lots toggle is gone entirely.
+    expect(
+      screen.queryByRole("radiogroup", { name: /redemption input mode/i }),
+    ).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Lots" })).toBeNull();
+    expect(screen.queryByLabelText(/lots to redeem/i)).toBeNull();
+
+    await fillAmountForm("2.37");
+    await userEvent.click(screen.getByRole("button", { name: "Redeem" }));
+
+    // Only the arbitrary-amount function is ever invoked — never whole-lot redeem.
+    expect(h.state.redeem.writeContract).toHaveBeenCalledTimes(1);
     expect(h.state.redeem.writeContract).toHaveBeenCalledWith(
-      expect.objectContaining({
-        address: FXRP_ASSET_MANAGER_ADDRESS,
-        functionName: "redeem",
-        args: [1n, VALID_XRPL, zeroAddress],
-        value: 0n,
-      }),
+      expect.objectContaining({ functionName: "redeemAmount" }),
+    );
+    expect(h.state.redeem.writeContract).not.toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "redeem" }),
     );
   });
 });

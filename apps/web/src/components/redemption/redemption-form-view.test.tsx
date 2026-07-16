@@ -11,14 +11,9 @@ const baseProps: RedemptionFormViewProps = {
   correctNetwork: true,
   balanceLabel: "100",
   balanceLoading: false,
-  mode: "amount",
-  onModeChange: () => {},
   amountInput: "2.37",
   onAmountInputChange: () => {},
   amountError: null,
-  lotInput: "",
-  onLotInputChange: () => {},
-  lotError: null,
   amountLabel: "2.37",
   addressInput: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
   onAddressChange: () => {},
@@ -43,12 +38,18 @@ function renderView(overrides: Partial<RedemptionFormViewProps> = {}) {
 describe("RedemptionFormView — arbitrary amount (primary flow)", () => {
   it("shows the amount input, computed amount, and balance", () => {
     renderView();
-    expect(screen.getByLabelText(/amount to redeem \(fxrp\)/i)).toHaveValue(
-      "2.37",
-    );
+    expect(screen.getByLabelText(/amount \(fxrp\)/i)).toHaveValue("2.37");
     expect(screen.getByText(/Redeems 2.37 FXRP/)).toBeInTheDocument();
     expect(screen.getByText(/100 FXRP/)).toBeInTheDocument();
     expect(screen.getByText(/0.1 C2FLR/)).toBeInTheDocument();
+  });
+
+  it("associates a visible label with the amount input", () => {
+    renderView();
+    const input = screen.getByLabelText(/amount \(fxrp\)/i);
+    // The visible <label> is wired to the input via htmlFor/id.
+    expect(input).toHaveAttribute("id", "redeem-amount");
+    expect(input).toHaveAttribute("inputmode", "decimal");
   });
 
   it("explains that any amount can be redeemed", () => {
@@ -84,56 +85,27 @@ describe("RedemptionFormView — arbitrary amount (primary flow)", () => {
     }
   });
 
+  it("has no Amount/Lots mode toggle or lot controls (amount-only)", () => {
+    renderView();
+    // The redemption-input-mode radiogroup and its radios are gone.
+    expect(
+      screen.queryByRole("radiogroup", { name: /redemption input mode/i }),
+    ).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Amount" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Lots" })).toBeNull();
+    // No lot input, label, or helper copy remains anywhere in the form.
+    expect(screen.queryByLabelText(/lots to redeem/i)).toBeNull();
+    expect(screen.queryByText(/lots to redeem/i)).toBeNull();
+    expect(screen.queryByText(/whole number of lots/i)).toBeNull();
+    expect(screen.queryByText(/\blots?\b/i)).toBeNull();
+  });
+
   it("shows a decimal validation error", () => {
     renderView({
       amountError: "FXRP supports up to 6 decimal places.",
     });
     expect(
       screen.getByText("FXRP supports up to 6 decimal places."),
-    ).toBeInTheDocument();
-  });
-});
-
-describe("RedemptionFormView — input mode toggle", () => {
-  it("exposes an Amount/Lots radiogroup with Amount active by default", () => {
-    renderView();
-    const group = screen.getByRole("radiogroup", {
-      name: /redemption input mode/i,
-    });
-    expect(group).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Amount" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(screen.getByRole("radio", { name: "Lots" })).toHaveAttribute(
-      "aria-checked",
-      "false",
-    );
-  });
-
-  it("invokes onModeChange when switching to lots", async () => {
-    const onModeChange = vi.fn();
-    renderView({ onModeChange });
-    await userEvent.click(screen.getByRole("radio", { name: "Lots" }));
-    expect(onModeChange).toHaveBeenCalledWith("lots");
-  });
-
-  it("renders the lot input and its computed amount in lots mode", () => {
-    renderView({ mode: "lots", lotInput: "3", amountLabel: "30" });
-    expect(screen.getByLabelText("Lots to redeem")).toHaveValue("3");
-    expect(screen.getByText(/Redeems 30 FXRP/)).toBeInTheDocument();
-    // The amount input is not shown while in lots mode.
-    expect(screen.queryByLabelText(/amount to redeem \(fxrp\)/i)).toBeNull();
-  });
-
-  it("shows a lot validation error in lots mode", () => {
-    renderView({
-      mode: "lots",
-      lotInput: "1.5",
-      lotError: "Enter a whole number of lots.",
-    });
-    expect(
-      screen.getByText("Enter a whole number of lots."),
     ).toBeInTheDocument();
   });
 });

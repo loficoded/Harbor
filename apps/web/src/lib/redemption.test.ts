@@ -1,13 +1,9 @@
 import {
   buildStatusPath,
-  DEFAULT_FXRP_LOT_SIZE_UBA,
   FXRP_DECIMALS,
   formatFxrpAmount,
   hasSufficientBalance,
   isApprovalRequired,
-  lotSizeUbaFromSettings,
-  lotsToUba,
-  parseLotCount,
   parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
@@ -77,65 +73,69 @@ describe("parseRedeemAmount", () => {
     expect(parseRedeemAmount("1.23", 2).amountUba).toBe(123n);
     expect(parseRedeemAmount("1.234", 2).error).toMatch(/2 decimal places/i);
   });
-});
 
-// --- lot count (advanced mode) ---------------------------------------------
-
-describe("parseLotCount", () => {
-  it("treats an empty field as incomplete, not an error", () => {
-    expect(parseLotCount("")).toEqual({ lots: null, error: null });
-    expect(parseLotCount("   ")).toEqual({ lots: null, error: null });
+  it("trims surrounding whitespace before parsing", () => {
+    expect(parseRedeemAmount("  2.5  ").amountUba).toBe(2_500_000n);
+    expect(parseRedeemAmount("\t1\n").amountUba).toBe(1_000_000n);
   });
 
-  it("parses a positive whole number", () => {
-    expect(parseLotCount("3")).toEqual({ lots: 3n, error: null });
-    expect(parseLotCount(" 5 ")).toEqual({ lots: 5n, error: null });
+  it("normalizes leading zeros and trailing fractional zeros", () => {
+    expect(parseRedeemAmount("007").amountUba).toBe(7_000_000n);
+    expect(parseRedeemAmount("00.50").amountUba).toBe(500_000n);
+    // Exactly `decimals` fractional digits is the boundary and must be accepted.
+    expect(parseRedeemAmount("1.230000").amountUba).toBe(1_230_000n);
   });
 
-  it("rejects zero and negatives", () => {
-    expect(parseLotCount("0").lots).toBeNull();
-    expect(parseLotCount("0").error).toMatch(/at least one/i);
-    expect(parseLotCount("-2").lots).toBeNull();
-    expect(parseLotCount("-2").error).toMatch(/whole number/i);
-  });
-
-  it("rejects non-integers and non-numeric input", () => {
-    expect(parseLotCount("1.5").error).toMatch(/whole number/i);
-    expect(parseLotCount("abc").error).toMatch(/whole number/i);
-  });
-});
-
-// --- amount math ------------------------------------------------------------
-
-describe("lot size and amount", () => {
-  it("derives lot size from AssetManager settings when present", () => {
-    expect(
-      lotSizeUbaFromSettings({
-        lotSizeAMG: 5n,
-        assetMintingGranularityUBA: 2_000_000n,
-      }),
-    ).toBe(10_000_000n);
-  });
-
-  it("falls back to the protocol helper when settings are missing or zero", () => {
-    expect(lotSizeUbaFromSettings(undefined)).toBe(DEFAULT_FXRP_LOT_SIZE_UBA);
-    expect(
-      lotSizeUbaFromSettings({
-        lotSizeAMG: 0n,
-        assetMintingGranularityUBA: 0n,
-      }),
-    ).toBe(DEFAULT_FXRP_LOT_SIZE_UBA);
-  });
-
-  it("computes UBA and formats FXRP", () => {
-    const uba = lotsToUba(3n, DEFAULT_FXRP_LOT_SIZE_UBA);
-    expect(uba).toBe(30_000_000n);
-    expect(formatFxrpAmount(uba)).toBe("30");
-    expect(formatFxrpAmount(lotsToUba(1n, DEFAULT_FXRP_LOT_SIZE_UBA))).toBe(
-      "10",
+  it("accepts the maximum-precision fractional boundary but rejects one more", () => {
+    // 6 fractional digits is allowed; a 7th is rejected.
+    expect(parseRedeemAmount("0.123456").amountUba).toBe(123_456n);
+    expect(parseRedeemAmount("0.1234560").error).toMatch(
+      /up to 6 decimal places/i,
     );
-    // Round-trips an arbitrary parsed amount back to its display form.
+  });
+
+  it("does not use floating point for values that lose precision as Number", () => {
+    // 0.1 + 0.2 style drift must never appear: parse each exactly.
+    expect(parseRedeemAmount("0.1").amountUba).toBe(100_000n);
+    expect(parseRedeemAmount("0.2").amountUba).toBe(200_000n);
+    // A 30-digit whole amount stays exact (far beyond Number.MAX_SAFE_INTEGER).
+    expect(parseRedeemAmount("123456789012345678901234567890").amountUba).toBe(
+      123456789012345678901234567890n * 10n ** 6n,
+    );
+  });
+
+  it("rejects thousands separators, signs, and exponents", () => {
+    expect(parseRedeemAmount("1,000").error).toMatch(/valid fxrp amount/i);
+    expect(parseRedeemAmount("+1").error).toMatch(/valid fxrp amount/i);
+    expect(parseRedeemAmount("1e-3").error).toMatch(/valid fxrp amount/i);
+  });
+});
+
+// --- amount formatting ------------------------------------------------------
+
+describe("formatFxrpAmount", () => {
+  it("formats whole and fractional UBA amounts (6 decimals)", () => {
+    expect(formatFxrpAmount(30_000_000n)).toBe("30");
+    expect(formatFxrpAmount(10_000_000n)).toBe("10");
     expect(formatFxrpAmount(2_370_000n)).toBe("2.37");
+    // Smallest representable unit (1 drop) formats without loss.
+    expect(formatFxrpAmount(1n)).toBe("0.000001");
+    expect(formatFxrpAmount(0n)).toBe("0");
+  });
+
+  it("round-trips parse -> format -> parse to a stable UBA value", () => {
+    for (const input of ["1", "2.37", "0.000001", "1000000", "0.5", "10"]) {
+      const { amountUba } = parseRedeemAmount(input);
+      expect(amountUba).not.toBeNull();
+      // Formatting then re-parsing must yield the identical UBA amount.
+      const reparsed = parseRedeemAmount(formatFxrpAmount(amountUba as bigint));
+      expect(reparsed.amountUba).toBe(amountUba);
+    }
+  });
+
+  it("respects a custom decimal count", () => {
+    expect(formatFxrpAmount(123n, 2)).toBe("1.23");
+    expect(formatFxrpAmount(100n, 2)).toBe("1");
   });
 });
 
@@ -340,5 +340,44 @@ describe("redemptionBlockedReason", () => {
         sufficientBalance: false,
       }),
     ).toBeNull();
+  });
+
+  it("reports the most fundamental blocker first when several fail", () => {
+    // Everything is wrong at once; the wallet prerequisite wins.
+    const allBad: RedemptionReadiness = {
+      isConnected: false,
+      correctNetwork: false,
+      requiredUba: null,
+      inputError: "FXRP supports up to 6 decimal places.",
+      addressValid: false,
+      balanceKnown: true,
+      sufficientBalance: false,
+    };
+    expect(redemptionBlockedReason(allBad)).toMatch(/connect a wallet/i);
+
+    // With the wallet connected, the network prerequisite is next.
+    expect(redemptionBlockedReason({ ...allBad, isConnected: true })).toMatch(
+      /coston2/i,
+    );
+
+    // Then the input error takes precedence over the empty/address/balance states.
+    expect(
+      redemptionBlockedReason({
+        ...allBad,
+        isConnected: true,
+        correctNetwork: true,
+      }),
+    ).toMatch(/decimal places/i);
+
+    // Address validity is checked before balance.
+    expect(
+      redemptionBlockedReason({
+        ...allBad,
+        isConnected: true,
+        correctNetwork: true,
+        inputError: null,
+        requiredUba: 1_000_000n,
+      }),
+    ).toMatch(/destination address/i);
   });
 });

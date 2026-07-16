@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/cn";
-import { FXRP_DECIMALS, FXRP_LABEL, type RedeemMode } from "@/lib/redemption";
+import { FXRP_DECIMALS, FXRP_LABEL } from "@/lib/redemption";
 import type { ReactElement } from "react";
 
 export type RedemptionFormViewProps = {
@@ -14,19 +13,10 @@ export type RedemptionFormViewProps = {
   balanceLabel: string | null;
   balanceLoading: boolean;
 
-  // Redeem input mode (amount is the primary flow; lots is advanced)
-  mode: RedeemMode;
-  onModeChange: (mode: RedeemMode) => void;
-
-  // Arbitrary FXRP amount (primary)
+  // Arbitrary FXRP amount to redeem
   amountInput: string;
   onAmountInputChange: (value: string) => void;
   amountError: string | null;
-
-  // Lot count (advanced)
-  lotInput: string;
-  onLotInputChange: (value: string) => void;
-  lotError: string | null;
 
   // Computed amount (formatted FXRP) for the current input, or null when empty
   amountLabel: string | null;
@@ -76,7 +66,7 @@ function inputClass(): string {
  *
  * The form has no agent-selection control by design: the FAssets protocol
  * assigns redemption agents automatically, FIFO. The user only supplies an
- * amount (arbitrary FXRP, the primary input) and an XRPL destination.
+ * arbitrary FXRP amount and an XRPL destination.
  */
 export function RedemptionFormView(
   props: RedemptionFormViewProps,
@@ -86,14 +76,9 @@ export function RedemptionFormView(
     correctNetwork,
     balanceLabel,
     balanceLoading,
-    mode,
-    onModeChange,
     amountInput,
     onAmountInputChange,
     amountError,
-    lotInput,
-    onLotInputChange,
-    lotError,
     amountLabel,
     addressInput,
     onAddressChange,
@@ -143,65 +128,34 @@ export function RedemptionFormView(
         </span>
       </div>
 
-      {/* Input mode toggle + amount/lots field */}
+      {/* Amount to redeem */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <span className={fieldLabelClass()}>
-            {mode === "amount" ? `Amount (${FXRP_LABEL})` : "Lots to redeem"}
-          </span>
-          <ModeToggle mode={mode} onModeChange={onModeChange} />
-        </div>
-
-        {mode === "amount" ? (
-          <>
-            <input
-              id="redeem-amount"
-              type="text"
-              inputMode="decimal"
-              value={amountInput}
-              onChange={(event) => onAmountInputChange(event.target.value)}
-              placeholder="e.g. 2.37"
-              aria-label={`Amount to redeem (${FXRP_LABEL})`}
-              aria-invalid={amountError !== null}
-              className={inputClass()}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              FAssets supports redeeming any amount — enter a whole or decimal{" "}
-              {FXRP_LABEL} amount (up to {FXRP_DECIMALS} decimals).
-              {amountLabel !== null
-                ? ` Redeems ${amountLabel} ${FXRP_LABEL}.`
-                : ""}
-            </p>
-            {amountError !== null ? (
-              <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                {amountError}
-              </p>
-            ) : null}
-          </>
+        <label htmlFor="redeem-amount" className={fieldLabelClass()}>
+          Amount ({FXRP_LABEL})
+        </label>
+        <input
+          id="redeem-amount"
+          type="text"
+          inputMode="decimal"
+          value={amountInput}
+          onChange={(event) => onAmountInputChange(event.target.value)}
+          placeholder="e.g. 2.37"
+          aria-label={`Amount (${FXRP_LABEL})`}
+          aria-invalid={amountError !== null}
+          className={inputClass()}
+        />
+        {amountError !== null ? (
+          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+            {amountError}
+          </p>
         ) : (
-          <>
-            <input
-              id="lot-count"
-              type="text"
-              inputMode="numeric"
-              value={lotInput}
-              onChange={(event) => onLotInputChange(event.target.value)}
-              placeholder="e.g. 1"
-              aria-label="Lots to redeem"
-              aria-invalid={lotError !== null}
-              className={inputClass()}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {amountLabel !== null
-                ? `Redeems ${amountLabel} ${FXRP_LABEL}.`
-                : "Enter a whole number of lots."}
-            </p>
-            {lotError !== null ? (
-              <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                {lotError}
-              </p>
-            ) : null}
-          </>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            FAssets supports redeeming any amount — enter a whole or decimal{" "}
+            {FXRP_LABEL} amount (up to {FXRP_DECIMALS} decimals).
+            {amountLabel !== null
+              ? ` Redeems ${amountLabel} ${FXRP_LABEL}.`
+              : ""}
+          </p>
         )}
       </div>
 
@@ -315,54 +269,6 @@ export function RedemptionFormView(
           </p>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-/**
- * Small segmented control switching between the arbitrary-amount (primary) and
- * whole-lot (advanced) input modes. Neither mode exposes any agent selection —
- * the toggle only changes how the redemption amount is expressed.
- */
-function ModeToggle({
-  mode,
-  onModeChange,
-}: {
-  mode: RedeemMode;
-  onModeChange: (mode: RedeemMode) => void;
-}): ReactElement {
-  const options: readonly { value: RedeemMode; label: string }[] = [
-    { value: "amount", label: "Amount" },
-    { value: "lots", label: "Lots" },
-  ];
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Redemption input mode"
-      className="inline-flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
-    >
-      {options.map((option) => {
-        const active = option.value === mode;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={option.label}
-            onClick={() => onModeChange(option.value)}
-            className={cn(
-              "px-3 py-1 text-xs font-medium transition-colors",
-              active
-                ? "bg-accent/10 text-accent"
-                : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800",
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
     </div>
   );
 }
