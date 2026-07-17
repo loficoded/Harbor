@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { inputClasses } from "@/components/ui/control";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -31,9 +32,9 @@ export function RedemptionLookup() {
         onChange={(event) => setValue(event.target.value)}
         placeholder="Redemption request id"
         aria-label="Redemption request id"
-        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+        className={inputClasses("font-mono")}
       />
-      <Button type="submit" disabled={trimmed === ""}>
+      <Button type="submit" disabled={trimmed === ""} className="sm:shrink-0">
         View status
       </Button>
     </form>

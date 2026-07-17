@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { fieldLabelClasses, inputClasses } from "@/components/ui/control";
 import { Spinner } from "@/components/ui/spinner";
 import { FXRP_DECIMALS, FXRP_LABEL } from "@/lib/redemption";
 import type { ReactElement } from "react";
@@ -45,17 +46,14 @@ export type RedemptionFormViewProps = {
   onRedeem: () => void;
 };
 
+// Delegate to the shared control tokens so the redemption form, the redemption
+// lookup, and the agent leaderboard controls stay visually identical.
 function fieldLabelClass(): string {
-  return "text-xs font-medium text-gray-600 dark:text-gray-400";
+  return fieldLabelClasses();
 }
 
 function inputClass(): string {
-  return (
-    "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm " +
-    "text-gray-900 placeholder:text-gray-400 focus-visible:outline-none " +
-    "focus-visible:ring-2 focus-visible:ring-accent/60 dark:border-gray-700 " +
-    "dark:bg-gray-950 dark:text-gray-100"
-  );
+  return inputClasses();
 }
 
 /**
@@ -128,6 +126,7 @@ export function RedemptionFormView(
         </span>
       </div>
 
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
       {/* Amount to redeem */}
       <div className="flex flex-col gap-2">
         <label htmlFor="redeem-amount" className={fieldLabelClass()}>
@@ -184,6 +183,7 @@ export function RedemptionFormView(
             The XRP address that will receive the redeemed underlying XRP.
           </p>
         )}
+      </div>
       </div>
 
       {/* Executor fee */}

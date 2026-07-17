@@ -4,6 +4,8 @@ export type SectionHeaderProps = {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  /** Optional small overline shown above the title. */
+  eyebrow?: ReactNode;
 };
 
 /**
@@ -16,15 +18,21 @@ export function SectionHeader({
   title,
   description,
   actions,
+  eyebrow,
 }: SectionHeaderProps) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        {eyebrow !== undefined ? (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-accent">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h2 className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl dark:text-gray-100">
           {title}
         </h2>
         {description !== undefined ? (
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-500 dark:text-gray-400">
             {description}
           </p>
         ) : null}

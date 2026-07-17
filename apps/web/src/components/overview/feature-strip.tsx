@@ -33,17 +33,23 @@ const FEATURES: readonly Feature[] = [
 /**
  * Quiet reassurance strip anchored to the foot of the hero card. Three evenly
  * weighted properties, each an icon paired with a one-line claim, reinforcing
- * the pitch without competing with the primary CTA above it.
+ * the pitch without competing with the primary CTA above it. Dividers between
+ * the columns give it a spec-sheet rhythm on wider panels.
  */
 export function FeatureStrip() {
   return (
-    <div className="grid grid-cols-1 gap-x-6 gap-y-4 border-t border-gray-200 px-6 py-4 sm:grid-cols-3 sm:px-8 dark:border-gray-800">
+    <div className="grid grid-cols-1 divide-y divide-gray-200 border-t border-gray-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0 dark:divide-gray-800 dark:border-gray-800">
       {FEATURES.map((feature) => {
         const Icon = feature.icon;
 
         return (
-          <div key={feature.title} className="flex items-start gap-2.5">
-            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+          <div
+            key={feature.title}
+            className="flex items-start gap-3 px-6 py-4 sm:px-7"
+          >
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              <Icon className="h-4 w-4" />
+            </span>
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {feature.title}

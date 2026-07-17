@@ -94,20 +94,52 @@ export function sortAgents(
 // Filtering
 // ---------------------------------------------------------------------------
 
-export type AgentFilter = Readonly<{ hideUnavailable: boolean }>;
+export type AgentFilter = Readonly<{
+  hideUnavailable: boolean;
+  /**
+   * Free-text query matched against the agent's official name and vault
+   * address (case-insensitive). Optional so existing call sites that only pass
+   * `hideUnavailable` keep working; an empty/absent query is a no-op.
+   */
+  query?: string;
+}>;
 
-export const DEFAULT_AGENT_FILTER: AgentFilter = { hideUnavailable: false };
+export const DEFAULT_AGENT_FILTER: AgentFilter = {
+  hideUnavailable: false,
+  query: "",
+};
 
 /** An agent is treated as available only when the backend flags it AVAILABLE. */
 export function isAgentAvailable(agent: RankedAgent): boolean {
   return agent.availability === "AVAILABLE";
 }
 
+/** Whether an agent matches a normalized search query (name or vault address). */
+function matchesQuery(agent: RankedAgent, normalizedQuery: string): boolean {
+  if (normalizedQuery === "") {
+    return true;
+  }
+  const name = officialAgentName(agent.details);
+  if (name !== null && name.toLowerCase().includes(normalizedQuery)) {
+    return true;
+  }
+  return agent.agentVault.toLowerCase().includes(normalizedQuery);
+}
+
 export function filterAgents(
   agents: readonly RankedAgent[],
   filter: AgentFilter,
 ): RankedAgent[] {
-  return filter.hideUnavailable ? agents.filter(isAgentAvailable) : [...agents];
+  const normalizedQuery = (filter.query ?? "").trim().toLowerCase();
+  const availabilityFiltered = filter.hideUnavailable
+    ? agents.filter(isAgentAvailable)
+    : [...agents];
+
+  return normalizedQuery === ""
+    ? availabilityFiltered
+    : availabilityFiltered.filter((agent) =>
+        matchesQuery(agent, normalizedQuery),
+      );
 }
 
 /** Sort then filter (filtering after the sort keeps the ranking stable). */

@@ -250,8 +250,16 @@ function ReadyPhase({
   const hasNoActivity =
     viewModel.settlement === null && viewModel.recovery === null;
 
+  // Right rail carries the "who / from what" facts; only reserve the column
+  // when there is something to put in it so the main narrative can use the full
+  // width otherwise.
+  const hasSidebar =
+    isAssignedAgent(viewModel.agentVault) ||
+    submission.transactionHash !== null ||
+    submission.relatedRequests.length > 1;
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {freshness.isStale ? <StaleBanner freshness={freshness} /> : null}
 
       <StatusSummary viewModel={viewModel} />
@@ -263,35 +271,55 @@ function ReadyPhase({
         />
       ) : null}
 
-      <AssignedAgentCard
-        agentVault={viewModel.agentVault}
-        agentDetails={viewModel.agentDetails}
-      />
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-6",
+          hasSidebar && "lg:grid-cols-12",
+        )}
+      >
+        <div
+          className={cn(
+            "flex flex-col gap-6",
+            hasSidebar && "lg:col-span-8",
+          )}
+        >
+          <TimelineCard steps={viewModel.timeline} />
 
-      <TimelineCard steps={viewModel.timeline} />
+          {viewModel.settlement !== null ? (
+            <SettlementReceiptCard receipt={viewModel.settlement} />
+          ) : null}
 
-      {viewModel.settlement !== null ? (
-        <SettlementReceiptCard receipt={viewModel.settlement} />
-      ) : null}
+          {viewModel.recovery !== null ? (
+            <DefaultRecoveryCard recovery={viewModel.recovery} />
+          ) : null}
 
-      {viewModel.recovery !== null ? (
-        <DefaultRecoveryCard recovery={viewModel.recovery} />
-      ) : null}
+          {selfRecoverySlot ?? null}
 
-      {selfRecoverySlot ?? null}
+          {hasNoActivity && !viewModel.needsAttention ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No settlement receipt or default-recovery activity yet — this
+              redemption is still in progress.
+            </p>
+          ) : null}
+        </div>
 
-      {hasNoActivity && !viewModel.needsAttention ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          No settlement receipt or default-recovery activity yet — this
-          redemption is still in progress.
-        </p>
-      ) : null}
+        {hasSidebar ? (
+          <aside className="flex flex-col gap-6 lg:col-span-4 lg:self-start lg:sticky lg:top-24">
+            <AssignedAgentCard
+              agentVault={viewModel.agentVault}
+              agentDetails={viewModel.agentDetails}
+            />
 
-      {submission.relatedRequests.length > 1 ? (
-        <RelatedRequestsCard related={submission.relatedRequests} />
-      ) : null}
+            {submission.relatedRequests.length > 1 ? (
+              <RelatedRequestsCard related={submission.relatedRequests} />
+            ) : null}
 
-      <SubmissionDetailsCard transactionHash={submission.transactionHash} />
+            <SubmissionDetailsCard
+              transactionHash={submission.transactionHash}
+            />
+          </aside>
+        ) : null}
+      </div>
 
       <HonestCopyFooter />
     </div>

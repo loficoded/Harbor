@@ -16,6 +16,7 @@ export default function AgentsPage() {
   return (
     <div>
       <PageHeader
+        eyebrow="FXRP · Coston2"
         title="Agent statistics"
         description="Observed agent reliability analytics for FXRP on Coston2 — settlement history, availability, collateral, and heuristic scores. Informational only; it does not affect redemption assignment."
       />
