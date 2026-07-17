@@ -13,22 +13,29 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const base =
   "inline-flex items-center justify-center gap-2 rounded-md font-medium " +
-  "transition-colors focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-50";
+  "transition-[background-color,border-color,color,box-shadow] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 " +
+  "focus-visible:ring-accent/60 focus-visible:ring-offset-white " +
+  "dark:focus-visible:ring-offset-gray-900 active:translate-y-px " +
+  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50";
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-foreground hover:bg-accent/90",
+  primary:
+    "bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 " +
+    "active:bg-accent",
   secondary:
-    "border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 " +
-    "dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800",
+    "border border-gray-300 bg-white text-gray-900 shadow-sm hover:bg-gray-50 " +
+    "hover:border-gray-400 dark:border-gray-700 dark:bg-gray-900 " +
+    "dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:border-gray-600",
   ghost:
-    "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
+    "text-gray-600 hover:bg-gray-100 hover:text-gray-900 " +
+    "dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
   sm: "h-8 px-3 text-sm",
   md: "h-10 px-4 text-sm",
-  lg: "h-11 px-5 text-sm",
+  lg: "h-11 px-5 text-[0.95rem]",
 };
 
 export type ButtonClassOptions = {

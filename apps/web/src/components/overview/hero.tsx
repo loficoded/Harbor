@@ -8,29 +8,31 @@ import Link from "next/link";
  * Overview hero. Establishes what Harbor is and why it exists before the reader
  * reaches the console: an eyebrow tag, the headline claim, a one-sentence
  * explanation, and two CTAs, balanced against a comparison card that makes the
- * "manual vs. automatic" contrast concrete. The properties strip closes the
- * card. Both CTAs are in-page anchors, so the section is fully static (no
- * client runtime) and works without JavaScript.
+ * "manual vs. automatic" contrast concrete. On desktop the copy owns the left
+ * seven columns and the comparison card the right five, so the eye lands on the
+ * headline first (top-left) and the primary CTA and the card sit along the
+ * Z-diagonal. The properties strip closes the card. Both CTAs are in-page
+ * anchors, so the section is fully static (no client runtime).
  */
 export function Hero() {
   return (
-    <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="grid grid-cols-1 gap-8 p-6 sm:p-8 lg:grid-cols-12 lg:gap-10">
+    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="grid grid-cols-1 items-center gap-10 p-6 sm:p-8 lg:grid-cols-12 lg:gap-12 lg:p-10">
         <div className="flex flex-col lg:col-span-7">
           <p className="text-xs font-semibold uppercase tracking-wider text-accent">
             Redeem FXRP for XRP • Flare
           </p>
 
-          <h1 className="mt-4 max-w-[15ch] text-[2.375rem] font-bold leading-[1.05] tracking-tight text-gray-900 dark:text-gray-50">
+          <h1 className="mt-4 max-w-[18ch] text-[2.25rem] font-bold leading-[1.05] tracking-tight text-gray-900 sm:text-5xl dark:text-gray-50">
             Redeem FXRP. Harbor handles the rest.
           </h1>
 
-          <p className="mt-5 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-gray-600 sm:text-lg dark:text-gray-300">
             Usually, your XRP just arrives. If it ever doesn&rsquo;t, Harbor
             claims the compensation you&rsquo;re owed — for you, automatically.
           </p>
 
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="#redeem"
               className={buttonClasses({
