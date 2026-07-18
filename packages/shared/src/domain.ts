@@ -9,6 +9,62 @@ import type {
 export type IsoTimestamp = string;
 export type XrplAddress = string;
 
+/**
+ * The two redemption lanes Harbor tracks. `STANDARD` is the
+ * `redeem`/`redeemAmount` path settled/defaulted with a
+ * `ReferencedPaymentNonexistence` proof. `WITH_TAG` is the `redeemWithTag`
+ * path (XRP destination tag) settled/defaulted with the XRP-native
+ * `XRPPayment`/`XRPPaymentNonexistence` proofs. The discriminator selects the
+ * XRPL matcher, the FDC attestation type, and the contract default entrypoint.
+ *
+ * Tag `0` is a valid destination tag: an empty/absent tag input means
+ * `STANDARD`, while an explicit `0` means `WITH_TAG` with `destinationTag = 0n`.
+ */
+export const redemptionKinds = ["STANDARD", "WITH_TAG"] as const;
+
+export type RedemptionKind = (typeof redemptionKinds)[number];
+
+const redemptionKindSet: ReadonlySet<string> = new Set(redemptionKinds);
+
+export function isRedemptionKind(value: string): value is RedemptionKind {
+  return redemptionKindSet.has(value);
+}
+
+/** Maximum value of an XRPL destination tag (32-bit unsigned, per FAssets). */
+export const destinationTagMax = 0xffffffffn;
+
+/**
+ * Validate a destination tag candidate. Returns the normalized `bigint` for a
+ * valid uint32 (including `0`), or `null` when the input is absent/empty
+ * (meaning "no tag" → standard redemption). Throws nothing; callers decide
+ * whether an out-of-range tag is an error.
+ */
+export function normalizeDestinationTag(value: unknown): bigint | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "bigint") {
+    return value >= 0n && value <= destinationTagMax ? value : null;
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value)) {
+    return value >= 0 && value <= Number(destinationTagMax)
+      ? BigInt(value)
+      : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      return null;
+    }
+    if (!/^(0|[1-9]\d*)$/.test(trimmed)) {
+      return null;
+    }
+    const parsed = BigInt(trimmed);
+    return parsed >= 0n && parsed <= destinationTagMax ? parsed : null;
+  }
+  return null;
+}
+
 export const redemptionStatuses = [
   "REQUESTED",
   "WATCHING",
@@ -74,6 +130,20 @@ export type RedemptionRequest = Readonly<{
   executor: EvmAddress | null;
   executorFeeNatWei: bigint;
   status: RedemptionStatus;
+  /**
+   * Whether this is a standard (`redeemAmount`) or destination-tag
+   * (`redeemWithTag`) redemption. Selects the settlement matcher, FDC
+   * attestation type, and on-chain default entrypoint. Defaults to `STANDARD`
+   * for pre-existing rows.
+   */
+  redemptionKind: RedemptionKind;
+  /**
+   * The XRPL destination tag required for a `WITH_TAG` redemption's underlying
+   * payment. `null` for `STANDARD` redemptions; a uint32 (including `0`) for
+   * `WITH_TAG`. The agent's XRPL payment must carry this exact `DestinationTag`
+   * to settle.
+   */
+  destinationTag: bigint | null;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
 }>;
@@ -201,6 +271,12 @@ export type XrplPaymentObservation = Readonly<{
   ledgerIndex: bigint;
   closeTimestamp: IsoTimestamp;
   validatedAt: IsoTimestamp;
+  /**
+   * The XRPL `DestinationTag` carried by the observed payment, or `null` when
+   * the payment had no destination tag. Persisted so `WITH_TAG` matching can
+   * require an exact tag and so the UI can render it.
+   */
+  destinationTag: bigint | null;
   createdAt: IsoTimestamp;
 }>;
 

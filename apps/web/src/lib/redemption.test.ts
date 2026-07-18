@@ -1,16 +1,23 @@
 import {
+  buildRedeemCallArgs,
   buildStatusPath,
+  DESTINATION_TAG_MAX,
   FXRP_DECIMALS,
   formatFxrpAmount,
   hasSufficientBalance,
   isApprovalRequired,
+  parseDestinationTag,
   parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
   resolveExecutor,
   type RedemptionReadiness,
 } from "@/lib/redemption";
-import { NOISE_LOG, redemptionRequestedLog } from "@/test/redemption-fixtures";
+import {
+  NOISE_LOG,
+  redemptionRequestedLog,
+  redemptionWithTagRequestedLog,
+} from "@/test/redemption-fixtures";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it } from "vitest";
 
@@ -242,6 +249,89 @@ describe("parseRedemptionRequestIds", () => {
   it("ignores logs with no topics", () => {
     expect(parseRedemptionRequestIds([{ data: "0x", topics: [] }])).toEqual([]);
   });
+
+  it("parses RedemptionWithTagRequested ids (tag redemptions emit this, not RedemptionRequested)", () => {
+    expect(
+      parseRedemptionRequestIds([redemptionWithTagRequestedLog(5100n)]),
+    ).toEqual(["5100"]);
+  });
+
+  it("parses a mixed batch of standard and tag redemption logs in order", () => {
+    const ids = parseRedemptionRequestIds([
+      redemptionRequestedLog(1n),
+      redemptionWithTagRequestedLog(2n),
+      redemptionRequestedLog(3n),
+    ]);
+    expect(ids).toEqual(["1", "2", "3"]);
+  });
+});
+
+// --- destination tag (redeem-by-tag) ---------------------------------------
+
+describe("parseDestinationTag", () => {
+  it("treats empty input as 'no tag' (not an error)", () => {
+    expect(parseDestinationTag("")).toEqual({ tag: null, error: null });
+    expect(parseDestinationTag("   ")).toEqual({ tag: null, error: null });
+  });
+
+  it("accepts zero as a valid tag (selects the tag path)", () => {
+    expect(parseDestinationTag("0")).toEqual({ tag: 0n, error: null });
+  });
+
+  it("accepts the full uint32 range inclusive", () => {
+    expect(parseDestinationTag("1")).toEqual({ tag: 1n, error: null });
+    expect(parseDestinationTag("4294967295")).toEqual({
+      tag: DESTINATION_TAG_MAX,
+      error: null,
+    });
+  });
+
+  it("rejects values at or above 2**32", () => {
+    expect(parseDestinationTag("4294967296").error).toMatch(/32 bits/);
+  });
+
+  it("rejects non-numeric and negative input", () => {
+    expect(parseDestinationTag("abc").error).toMatch(/whole number/);
+    expect(parseDestinationTag("-1").error).toMatch(/whole number/);
+    expect(parseDestinationTag("1.5").error).toMatch(/whole number/);
+  });
+});
+
+describe("buildRedeemCallArgs", () => {
+  const executor = getAddress("0x00000000000000000000000000000000000000cc");
+
+  it("routes to redeemAmount when no tag is provided", () => {
+    const call = buildRedeemCallArgs({
+      amountUba: 10_000_000n,
+      xrplAddress: "rDestination",
+      executor,
+      destinationTag: null,
+    });
+    expect(call.functionName).toBe("redeemAmount");
+    expect(call.args).toEqual([10_000_000n, "rDestination", executor]);
+  });
+
+  it("routes to redeemWithTag with the tag as the 4th arg when a tag is present", () => {
+    const call = buildRedeemCallArgs({
+      amountUba: 10_000_000n,
+      xrplAddress: "rDestination",
+      executor,
+      destinationTag: 12345n,
+    });
+    expect(call.functionName).toBe("redeemWithTag");
+    expect(call.args).toEqual([10_000_000n, "rDestination", executor, 12345n]);
+  });
+
+  it("treats tag 0 as the tag path (not standard)", () => {
+    const call = buildRedeemCallArgs({
+      amountUba: 5_000_000n,
+      xrplAddress: "rDest",
+      executor,
+      destinationTag: 0n,
+    });
+    expect(call.functionName).toBe("redeemWithTag");
+    expect(call.args[3]).toBe(0n);
+  });
 });
 
 // --- routing ----------------------------------------------------------------
@@ -287,6 +377,7 @@ const readyState: RedemptionReadiness = {
   requiredUba: 1_000_000n,
   inputError: null,
   addressValid: true,
+  tagError: null,
   balanceKnown: true,
   sufficientBalance: true,
 };
@@ -326,6 +417,15 @@ describe("redemptionBlockedReason", () => {
     ).toMatch(/destination address/i);
   });
 
+  it("blocks an invalid destination tag (after a valid amount and address)", () => {
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagError: "Destination tag must fit in 32 bits (at most 4294967295).",
+      }),
+    ).toMatch(/32 bits/);
+  });
+
   it("blocks insufficient balance only when the balance is known", () => {
     expect(
       redemptionBlockedReason({
@@ -350,6 +450,7 @@ describe("redemptionBlockedReason", () => {
       requiredUba: null,
       inputError: "FXRP supports up to 6 decimal places.",
       addressValid: false,
+      tagError: null,
       balanceKnown: true,
       sufficientBalance: false,
     };

@@ -113,6 +113,7 @@ describe("SQLite migrations", () => {
       { id: "0004_xrpl_observation_receipts", applied: true },
       { id: "0005_fdc_request_proof_ready_status", applied: true },
       { id: "0006_agent_details_fields", applied: true },
+      { id: "0007_redemption_tag_fields", applied: true },
     ]);
 
     const tableNames = database
@@ -164,6 +165,10 @@ ORDER BY name
         id: "0006_agent_details_fields",
         appliedAt: listAppliedMigrations(database)[5]?.appliedAt,
       },
+      {
+        id: "0007_redemption_tag_fields",
+        appliedAt: listAppliedMigrations(database)[6]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
@@ -172,6 +177,7 @@ ORDER BY name
       { id: "0004_xrpl_observation_receipts", applied: false },
       { id: "0005_fdc_request_proof_ready_status", applied: false },
       { id: "0006_agent_details_fields", applied: false },
+      { id: "0007_redemption_tag_fields", applied: false },
     ]);
   });
 });

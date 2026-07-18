@@ -9,6 +9,9 @@ import {MockFAsset} from "../mocks/MockFAsset.sol";
 import {
     IReferencedPaymentNonexistence
 } from "@flarenetwork/flare-periphery-contracts/coston2/IReferencedPaymentNonexistence.sol";
+import {
+    IXRPPaymentNonexistence
+} from "@flarenetwork/flare-periphery-contracts/coston2/IXRPPaymentNonexistence.sol";
 
 interface Vm {
     function assume(bool condition) external;
@@ -87,6 +90,37 @@ abstract contract HarborRedeemerTestBase {
     }
 
     function proofHash(IReferencedPaymentNonexistence.Proof memory proof) internal pure returns (bytes32) {
+        return keccak256(abi.encode(proof));
+    }
+
+    function buildXrpProof(uint64 votingRound, uint256 destinationTag, bool checkDestinationTag)
+        internal
+        pure
+        returns (IXRPPaymentNonexistence.Proof memory proof)
+    {
+        proof.merkleProof = new bytes32[](2);
+        proof.merkleProof[0] = bytes32(uint256(1));
+        proof.merkleProof[1] = bytes32(uint256(2));
+        proof.data.attestationType = bytes32("XRPPaymentNonexist");
+        proof.data.sourceId = bytes32("testXRP");
+        proof.data.votingRound = votingRound;
+        proof.data.lowestUsedTimestamp = 5;
+        proof.data.requestBody.minimalBlockNumber = 10;
+        proof.data.requestBody.deadlineBlockNumber = 20;
+        proof.data.requestBody.deadlineTimestamp = 30;
+        proof.data.requestBody.destinationAddressHash = bytes32(uint256(40));
+        proof.data.requestBody.amount = 50;
+        proof.data.requestBody.checkFirstMemoData = true;
+        proof.data.requestBody.firstMemoDataHash = bytes32(uint256(60));
+        proof.data.requestBody.checkDestinationTag = checkDestinationTag;
+        proof.data.requestBody.destinationTag = destinationTag;
+        proof.data.requestBody.proofOwner = address(0);
+        proof.data.responseBody.minimalBlockTimestamp = 11;
+        proof.data.responseBody.firstOverflowBlockNumber = 21;
+        proof.data.responseBody.firstOverflowBlockTimestamp = 31;
+    }
+
+    function xrpProofHash(IXRPPaymentNonexistence.Proof memory proof) internal pure returns (bytes32) {
         return keccak256(abi.encode(proof));
     }
 

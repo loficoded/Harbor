@@ -138,6 +138,14 @@ Harbor disappears is that a redeemer submits `executeDefault` themselves.
 - **Durable indexing.** The FAssets indexer backfills from a persisted cursor on a
   poll loop, so events emitted during a restart, redeploy, or RPC gap are
   recovered instead of lost.
+- **Redeem-by-tag (destination tags).** The console supports FXRP redemptions
+  that require an XRPL destination tag (exchanges and custodials). An optional
+  tag input routes to `AssetManager.redeemWithTag`; the agent's XRPL payment
+  must carry that exact `DestinationTag` to settle, and a missed payment is
+  defaulted through the XRP-native FDC `XRPPaymentNonexistence` proof and the
+  permissionless `HarborRedeemer.executeXrpDefault` entrypoint — the tag-lane
+  mirror of the standard non-payment default. Tag `0` is a valid tag; an empty
+  input means the standard `redeemAmount` path.
 - **Runs with zero configuration.** Every service flag and every `NEXT_PUBLIC_*`
   value has a safe local default, so the API and console boot in "mock mode" with
   no secrets.
@@ -427,14 +435,19 @@ job table, so restarts resume rather than duplicate.
 ### FDC non-payment proofs
 
 Non-payment is proven with the Flare Data Connector's
-`ReferencedPaymentNonexistence` attestation over the `testXRP` source. The
-backend encodes the request body (destination-address hash, amount, standard
-payment reference, and the request's underlying block/time deadlines), submits it
-to the FdcHub, tracks the voting round to finalization, then fetches the response
-and Merkle proof from the data-availability layer. The decoded response tuple uses
-the protocol's canonical ABI, so the calldata the keeper assembles and the calldata
-the UI decodes for self-recovery are byte-for-byte the same shape the verifier
-expects.
+`ReferencedPaymentNonexistence` attestation over the `testXRP` source for
+standard redemptions, and with the XRP-native `XRPPaymentNonexistence`
+attestation for redeem-by-tag redemptions. The backend encodes the request body
+(destination-address hash, amount, payment reference / first-memo-data hash and,
+for the tag lane, the destination tag), submits it to the FdcHub, tracks the
+voting round to finalization, then fetches the response and Merkle proof from
+the data-availability layer. The decoded response tuple uses the protocol's
+canonical ABI, so the calldata the keeper assembles and the calldata the UI
+decodes for self-recovery are byte-for-byte the same shape the verifier expects.
+A `WITH_TAG` redemption is defaulted via `HarborRedeemer.executeXrpDefault`
+(forwarding to `AssetManager.xrpRedemptionPaymentDefault`); a standard
+redemption via `executeDefault` (forwarding to `redemptionPaymentDefault`). The
+two lanes are strictly isolated by `redemptionKind`.
 
 ### XRPL settlement observer
 
@@ -544,14 +557,14 @@ pnpm --filter @harbor/web dev | build | test | test:e2e
 Tests are split by cost, so the fast suites run without any external service and
 the on-chain suites gate on the relevant environment variables.
 
-| Suite                         | Cases | Scope                                                                          |
-| ----------------------------- | ----: | ------------------------------------------------------------------------------ |
-| Contracts (Foundry)           |    34 | `HarborRedeemer` unit + invariants + deploy script.                            |
-| API (`node:test`)             |   108 | server, repositories, keeper, FDC, indexer, XRPL, scoring.                     |
-| Web unit / component (Vitest) |   255 | lib logic + component behaviour against a mocked API.                          |
-| Web end-to-end (Playwright)   |    18 | redeem (any amount), no-agent-selection, status, agents, self-recovery, smoke. |
-| Shared                        |    15 | domain, env, JSON, and normalization helpers.                                  |
-| Protocol                      |     9 | ABIs, addresses, and the generated artifact.                                   |
+| Suite                         | Cases | Scope                                                                         |
+| ----------------------------- | ----: | ----------------------------------------------------------------------------- |
+| Contracts (Foundry)           |    45 | `HarborRedeemer` unit (standard + XRP default) + invariants + deploy script.  |
+| API (`node:test`)             |   170 | server, repositories, keeper, FDC (standard + XRP), indexer, XRPL, scoring.   |
+| Web unit / component (Vitest) |   303 | lib logic + component behaviour against a mocked API.                         |
+| Web end-to-end (Playwright)   |    21 | redeem (any amount + tag), no-agent-selection, status, agents, self-recovery. |
+| Shared                        |    29 | domain (kinds, destination tags), env, JSON, normalization helpers.           |
+| Protocol                      |    13 | ABIs (incl. XRP attestation tuples), addresses, and the generated artifact.   |
 
 ### Codebase at a glance
 

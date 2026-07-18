@@ -27,6 +27,7 @@ type XrplObservationRow = Readonly<{
   ledger_index: string;
   close_timestamp: string | null;
   validated_at: string;
+  destination_tag: string | null;
   raw_json: string | null;
   created_at: string;
 }>;
@@ -47,6 +48,10 @@ function mapXrplObservationRow(
     ledgerIndex: parseSerializedBigint(row.ledger_index),
     closeTimestamp: row.close_timestamp ?? row.validated_at,
     validatedAt: row.validated_at,
+    destinationTag:
+      row.destination_tag === null
+        ? null
+        : parseSerializedBigint(row.destination_tag),
     rawJson: row.raw_json,
     createdAt: row.created_at,
   };
@@ -74,6 +79,7 @@ INSERT INTO xrpl_observations (
   ledger_index,
   close_timestamp,
   validated_at,
+  destination_tag,
   raw_json,
   created_at
 ) VALUES (
@@ -89,6 +95,7 @@ INSERT INTO xrpl_observations (
   @ledgerIndex,
   @closeTimestamp,
   @validatedAt,
+  @destinationTag,
   @rawJson,
   @createdAt
 )
@@ -102,6 +109,7 @@ ON CONFLICT(transaction_hash, redemption_request_id) DO UPDATE SET
   ledger_index = excluded.ledger_index,
   close_timestamp = COALESCE(excluded.close_timestamp, xrpl_observations.close_timestamp),
   validated_at = excluded.validated_at,
+  destination_tag = COALESCE(excluded.destination_tag, xrpl_observations.destination_tag),
   raw_json = COALESCE(excluded.raw_json, xrpl_observations.raw_json)
 `,
     )
@@ -118,6 +126,10 @@ ON CONFLICT(transaction_hash, redemption_request_id) DO UPDATE SET
       ledgerIndex: serializeBigint(input.ledgerIndex),
       closeTimestamp: input.closeTimestamp ?? input.validatedAt,
       validatedAt: input.validatedAt,
+      destinationTag:
+        input.destinationTag === undefined || input.destinationTag === null
+          ? null
+          : serializeBigint(input.destinationTag),
       rawJson: input.rawJson ?? null,
       createdAt,
     });

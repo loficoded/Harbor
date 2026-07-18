@@ -9,7 +9,10 @@ import {
 } from "@harbor/shared";
 import type { Abi as ViemAbi, Address } from "viem";
 
-import type { ReferencedPaymentNonexistenceProofCalldata } from "../fdc/daLayer.js";
+import type {
+  ReferencedPaymentNonexistenceProofCalldata,
+  XrpPaymentNonexistenceProofCalldata,
+} from "../fdc/daLayer.js";
 import type {
   StoredFdcProofRecord,
   StoredRedemptionRequest,
@@ -176,26 +179,156 @@ export function parseStoredFdcProofCalldata(
   };
 }
 
+/**
+ * Parse a stored `XRPPaymentNonexistence` proof's calldata JSON into the tuple
+ * shape `HarborRedeemer.executeXrpDefault` consumes. Mirrors
+ * `parseStoredFdcProofCalldata` for the XRP request body (10 fields).
+ */
+export function parseStoredXrpFdcProofCalldata(
+  proof: StoredFdcProofRecord,
+): XrpPaymentNonexistenceProofCalldata {
+  if (proof.calldataJson === null) {
+    throw new Error(`FDC proof ${proof.fdcProofId} has no calldata JSON`);
+  }
+
+  const payload = requireRecord(
+    JSON.parse(proof.calldataJson) as unknown,
+    "proof calldata",
+  );
+  const data = requireRecord(payload.data, "proof calldata data");
+  const requestBody = requireRecord(
+    data.requestBody,
+    "proof calldata request body",
+  );
+  const responseBody = requireRecord(
+    data.responseBody,
+    "proof calldata response body",
+  );
+
+  return {
+    merkleProof: requireArray(payload.merkleProof, "merkleProof").map((entry) =>
+      normalizeBytes32(requireString(entry, "merkleProof entry")),
+    ),
+    data: {
+      attestationType: normalizeBytes32(
+        requireString(data.attestationType, "attestationType"),
+      ),
+      sourceId: normalizeBytes32(requireString(data.sourceId, "sourceId")),
+      votingRound: unsignedBigint(data.votingRound, "votingRound"),
+      lowestUsedTimestamp: unsignedBigint(
+        data.lowestUsedTimestamp,
+        "lowestUsedTimestamp",
+      ),
+      requestBody: {
+        minimalBlockNumber: unsignedBigint(
+          requestBody.minimalBlockNumber,
+          "minimalBlockNumber",
+        ),
+        deadlineBlockNumber: unsignedBigint(
+          requestBody.deadlineBlockNumber,
+          "deadlineBlockNumber",
+        ),
+        deadlineTimestamp: unsignedBigint(
+          requestBody.deadlineTimestamp,
+          "deadlineTimestamp",
+        ),
+        destinationAddressHash: normalizeBytes32(
+          requireString(
+            requestBody.destinationAddressHash,
+            "destinationAddressHash",
+          ),
+        ),
+        amount: unsignedBigint(requestBody.amount, "amount"),
+        checkFirstMemoData: requireBoolean(
+          requestBody.checkFirstMemoData,
+          "checkFirstMemoData",
+        ),
+        firstMemoDataHash: normalizeBytes32(
+          requireString(requestBody.firstMemoDataHash, "firstMemoDataHash"),
+        ),
+        checkDestinationTag: requireBoolean(
+          requestBody.checkDestinationTag,
+          "checkDestinationTag",
+        ),
+        destinationTag: unsignedBigint(
+          requestBody.destinationTag,
+          "destinationTag",
+        ),
+        proofOwner: normalizeEvmAddress(
+          requireString(requestBody.proofOwner, "proofOwner"),
+        ),
+      },
+      responseBody: {
+        minimalBlockTimestamp: unsignedBigint(
+          responseBody.minimalBlockTimestamp,
+          "minimalBlockTimestamp",
+        ),
+        firstOverflowBlockNumber: unsignedBigint(
+          responseBody.firstOverflowBlockNumber,
+          "firstOverflowBlockNumber",
+        ),
+        firstOverflowBlockTimestamp: unsignedBigint(
+          responseBody.firstOverflowBlockTimestamp,
+          "firstOverflowBlockTimestamp",
+        ),
+      },
+    },
+  };
+}
+
+export type ExecuteDefaultParameters =
+  | {
+      address: Address;
+      abi: ViemAbi;
+      functionName: "executeDefault";
+      args: readonly [ReferencedPaymentNonexistenceProofCalldata, bigint];
+      account?: Address;
+    }
+  | {
+      address: Address;
+      abi: ViemAbi;
+      functionName: "executeXrpDefault";
+      args: readonly [XrpPaymentNonexistenceProofCalldata, bigint];
+      account?: Address;
+    };
+
 export function buildExecuteDefaultParameters(input: {
   harborRedeemerAddress: EvmAddress;
   redemption: StoredRedemptionRequest;
   proof: StoredFdcProofRecord;
   account?: EvmAddress | undefined;
-}): {
-  address: Address;
-  abi: ViemAbi;
-  functionName: "executeDefault";
-  args: readonly [ReferencedPaymentNonexistenceProofCalldata, bigint];
-  account?: Address;
-} {
+}): ExecuteDefaultParameters {
+  const address = normalizeEvmAddress(input.harborRedeemerAddress) as Address;
+  const abi = harborRedeemerAbi as unknown as ViemAbi;
+  const redemptionRequestId = BigInt(input.redemption.requestId);
+
+  // A WITH_TAG redemption can only be defaulted via the XRP-native
+  // `executeXrpDefault` entrypoint (which forwards to
+  // `xrpRedemptionPaymentDefault`); the standard `executeDefault` proof type
+  // does not apply. This keeps the two lanes strictly isolated.
+  if (input.redemption.redemptionKind === "WITH_TAG") {
+    const parameters = {
+      address,
+      abi,
+      functionName: "executeXrpDefault",
+      args: [parseStoredXrpFdcProofCalldata(input.proof), redemptionRequestId],
+    } as const;
+
+    if (input.account === undefined) {
+      return parameters;
+    }
+
+    return {
+      ...parameters,
+      account: normalizeEvmAddress(input.account) as Address,
+    };
+  }
+
   const parameters = {
-    address: normalizeEvmAddress(input.harborRedeemerAddress) as Address,
-    abi: harborRedeemerAbi as unknown as ViemAbi,
+    address,
+    abi,
     functionName: "executeDefault",
-    args: [
-      parseStoredFdcProofCalldata(input.proof),
-      BigInt(input.redemption.requestId),
-    ],
+    args: [parseStoredFdcProofCalldata(input.proof), redemptionRequestId],
   } as const;
 
   if (input.account === undefined) {

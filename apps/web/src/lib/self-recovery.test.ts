@@ -2,7 +2,9 @@ import type { SerializedFdcProofRecord } from "@harbor/shared";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildDefaultExecutionArgs,
   buildExecuteDefaultArgs,
+  buildExecuteXrpDefaultArgs,
   decodeProofResponseBody,
   isBytes32,
   parseRedemptionRequestId,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/self-recovery";
 import {
   encodeSampleProofResponseBody,
+  makeXrpFdcProof,
   proofReadyResponse,
 } from "@/test/redemption-status-fixtures";
 
@@ -272,5 +275,75 @@ describe("resolveSelfRecoveryPhase", () => {
   it("stays actionable regardless of keeper health (no health input exists)", () => {
     // The input type has no keeper/health field; a ready proof is always ready.
     expect(phase({})).toBe("ready");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// redeem-by-tag: executeXrpDefault arg assembly + kind routing
+// ---------------------------------------------------------------------------
+
+describe("buildExecuteXrpDefaultArgs", () => {
+  it("builds executeXrpDefault args from a valid XRP proof", () => {
+    const proof = makeXrpFdcProof(REQUEST_ID, true);
+    const result = buildExecuteXrpDefaultArgs(proof, REQUEST_ID);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.args[1]).toBe(BigInt(REQUEST_ID));
+      expect(result.args[0].data.requestBody.destinationTag).toBe(12345n);
+      expect(result.args[0].data.requestBody.checkDestinationTag).toBe(true);
+    }
+  });
+
+  it("rejects an invalid XRP proof responseBody", () => {
+    const proof = makeXrpFdcProof(REQUEST_ID, false);
+    const result = buildExecuteXrpDefaultArgs(proof, REQUEST_ID);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("rejects a missing proof", () => {
+    const result = buildExecuteXrpDefaultArgs(null, REQUEST_ID);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("buildDefaultExecutionArgs (kind routing)", () => {
+  it("routes a WITH_TAG redemption to executeXrpDefault", () => {
+    const proof = makeXrpFdcProof(REQUEST_ID, true);
+    const target = buildDefaultExecutionArgs(proof, REQUEST_ID, "WITH_TAG");
+    expect(target.ok).toBe(true);
+    if (target.ok) {
+      expect(target.functionName).toBe("executeXrpDefault");
+    }
+  });
+
+  it("routes a STANDARD redemption to executeDefault", () => {
+    const target = buildDefaultExecutionArgs(
+      validProofRecord(),
+      REQUEST_ID,
+      "STANDARD",
+    );
+    expect(target.ok).toBe(true);
+    if (target.ok) {
+      expect(target.functionName).toBe("executeDefault");
+    }
+  });
+
+  it("a STANDARD redemption with an XRP-shaped proof is rejected (kind gates the lane, proof must match)", () => {
+    // The kind selects the entrypoint AND the proof decoder. An XRP proof
+    // against a STANDARD redemption cannot be decoded as an RPNE Response, so
+    // the UI rejects it (proof-invalid) rather than silently routing to the
+    // wrong default. A kind/proof mismatch is caught here, never on-chain.
+    const target = buildDefaultExecutionArgs(
+      makeXrpFdcProof(REQUEST_ID, true),
+      REQUEST_ID,
+      "STANDARD",
+    );
+    expect(target.ok).toBe(false);
+    if (!target.ok) {
+      expect(target.issues.length).toBeGreaterThan(0);
+    }
   });
 });

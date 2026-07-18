@@ -25,6 +25,7 @@ import {
   type ExecuteHarborDefaultResult,
   type KeeperDefaultExecutor,
 } from "./defaultExecutor.js";
+import { xrpPaymentNonexistenceAttestationType } from "../fdc/xrpPaymentNonexistence.js";
 import {
   processKeeperRedemption,
   runKeeperBatch,
@@ -46,6 +47,8 @@ const fdcSubmissionHash = `0x${"dd".repeat(32)}` as TransactionHash;
 const paymentReference = `0x${"ee".repeat(32)}` as Bytes32;
 const requestHash = `0x${"ab".repeat(32)}` as Bytes32;
 const attestationType = `0x${"01".repeat(32)}` as Bytes32;
+const attestationTypeBase = attestationType;
+const xrpAttestationType = xrpPaymentNonexistenceAttestationType;
 const sourceId = `0x${"02".repeat(32)}` as Bytes32;
 const proofNode = `0x${"03".repeat(32)}` as Bytes32;
 const zeroBytes32 = `0x${"00".repeat(32)}` as Bytes32;
@@ -200,6 +203,9 @@ class FakeFdcClient implements KeeperFdcClient {
   retrieveCalls = 0;
   retrieveResults: ("NOT_READY" | "PROOF_READY")[] = ["PROOF_READY"];
   refreshFinalizes = false;
+  lastBuildRedemptionKind: StoredRedemptionRequest["redemptionKind"] | null =
+    null;
+  lastBuildAttestationType: Bytes32 | null = null;
 
   constructor(private readonly repository: FakeRepository) {}
 
@@ -209,15 +215,23 @@ class FakeFdcClient implements KeeperFdcClient {
     updatedAt: IsoTimestamp;
   }): StoredFdcRequestRecord {
     this.buildCalls += 1;
+    this.lastBuildRedemptionKind = input.redemption.redemptionKind;
     const existing = this.repository.listFdcRequests(input.redemption)[0];
 
     if (existing !== undefined) {
       return existing;
     }
 
+    const attestationType =
+      input.redemption.redemptionKind === "WITH_TAG"
+        ? xrpAttestationType
+        : attestationTypeBase;
+    this.lastBuildAttestationType = attestationType;
+
     return this.repository.upsertFdcRequest(
       fdcRequestFixture(input.redemption, {
         status: "PENDING",
+        attestationType,
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
       }),
@@ -636,6 +650,106 @@ describe("keeper redemption state machine", () => {
     assert.notEqual(parameters.functionName, "setDefaultKeeperExecutor");
     assert.notEqual(parameters.functionName, "transferOwnership");
   });
+
+  test("WITH_TAG redemption selects executeXrpDefault with XRP proof calldata", () => {
+    const redemption = redemptionFixture({
+      status: "PROOF_READY",
+      redemptionKind: "WITH_TAG",
+      destinationTag: 777n,
+    });
+    const request = fdcRequestFixture(redemption, {
+      status: "PROOF_READY",
+      attestationType: xrpAttestationType,
+    });
+    const parameters = buildExecuteDefaultParameters({
+      harborRedeemerAddress,
+      redemption,
+      proof: xrpProofFixture(request),
+    });
+
+    assert.equal(parameters.functionName, "executeXrpDefault");
+    assert.notEqual(parameters.functionName, "executeDefault");
+    // The XRP request body (10 fields incl. destinationTag) is forwarded.
+    assert.equal(parameters.args[1], 42n);
+    assert.equal(parameters.args[0].data.requestBody.destinationTag, 777n);
+  });
+
+  test("STANDARD redemption with an XRP-shaped proof still routes to executeDefault (kind gates the lane)", () => {
+    // The redemptionKind — not the proof shape — selects the entrypoint, so a
+    // kind/proof mismatch is caught by the on-chain verifier rather than
+    // silently routing to the wrong default.
+    const redemption = redemptionFixture({
+      status: "PROOF_READY",
+      redemptionKind: "STANDARD",
+      destinationTag: null,
+    });
+    const request = fdcRequestFixture(redemption, { status: "PROOF_READY" });
+    const parameters = buildExecuteDefaultParameters({
+      harborRedeemerAddress,
+      redemption,
+      proof: proofFixture(request),
+    });
+
+    assert.equal(parameters.functionName, "executeDefault");
+  });
+
+  test("WITH_TAG redemption builds an XRP attestation request when the window expires", async () => {
+    const repository = new FakeRepository();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "WATCHING",
+        redemptionKind: "WITH_TAG",
+        destinationTag: 4242n,
+      }),
+    );
+    const fdcClient = new FakeFdcClient(repository);
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient,
+      defaultExecutor: new FakeDefaultExecutor(),
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "REQUEST_PROOF");
+    assert.equal(fdcClient.lastBuildRedemptionKind, "WITH_TAG");
+    assert.equal(fdcClient.lastBuildAttestationType, xrpAttestationType);
+  });
+
+  test("WITH_TAG redemption at PROOF_READY submits the default and reaches DEFAULT_SUBMITTED", async () => {
+    const repository = new FakeRepository();
+    const defaultExecutor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "PROOF_READY",
+        redemptionKind: "WITH_TAG",
+        destinationTag: 4242n,
+      }),
+    );
+    const request = repository.upsertFdcRequest(
+      fdcRequestFixture(redemption, {
+        status: "PROOF_READY",
+        attestationType: xrpAttestationType,
+      }),
+    );
+    repository.insertProof(xrpProofFixture(request));
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "DEFAULT_SUBMITTED");
+    assert.equal(defaultExecutor.executeCalls, 1);
+    assert.equal(
+      repository.getRedemption(redemption)?.defaultTransactionHash,
+      defaultTransactionHash,
+    );
+  });
 });
 
 function fakeClock(isoTimestamp: IsoTimestamp): KeeperClock {
@@ -673,6 +787,8 @@ function redemptionFixture(
     status: "REQUESTED",
     defaultTransactionHash: null,
     statusReason: null,
+    redemptionKind: "STANDARD",
+    destinationTag: null,
     createdAt: "2026-07-07T00:00:00.000Z",
     updatedAt: "2026-07-07T00:00:00.000Z",
     ...overrides,
@@ -696,6 +812,7 @@ function xrplObservationFixture(
     ledgerIndex: 150n,
     closeTimestamp: deadlineIso,
     validatedAt: deadlineIso,
+    destinationTag: null,
     rawJson: null,
     createdAt: deadlineIso,
     ...overrides,
@@ -761,6 +878,53 @@ function proofFixture(request: StoredFdcRequestRecord): StoredFdcProofRecord {
     assetManagerAddress: request.assetManagerAddress,
     requestHash: request.requestHash,
     responseBody: "0x5678",
+    merkleProof: [proofNode],
+    votingRoundId,
+    proofJson: JSON.stringify({ proof: [proofNode] }),
+    calldataJson: JSON.stringify(proofCalldata),
+    proofReadyAt: "2026-07-08T00:00:01.000Z",
+    createdAt: "2026-07-08T00:00:01.000Z",
+  };
+}
+
+function xrpProofFixture(
+  request: StoredFdcRequestRecord,
+): StoredFdcProofRecord {
+  const votingRoundId = request.votingRoundId ?? 7n;
+  const proofCalldata = {
+    merkleProof: [proofNode],
+    data: {
+      attestationType: xrpAttestationType,
+      sourceId,
+      votingRound: votingRoundId.toString(),
+      lowestUsedTimestamp: "1",
+      requestBody: {
+        minimalBlockNumber: "100",
+        deadlineBlockNumber: "200",
+        deadlineTimestamp: deadlineSeconds.toString(),
+        destinationAddressHash: `0x${"04".repeat(32)}`,
+        amount: "990000",
+        checkFirstMemoData: true,
+        firstMemoDataHash: paymentReference,
+        checkDestinationTag: true,
+        destinationTag: "777",
+        proofOwner: `0x${"00".repeat(20)}`,
+      },
+      responseBody: {
+        minimalBlockTimestamp: "1",
+        firstOverflowBlockNumber: "201",
+        firstOverflowBlockTimestamp: (deadlineSeconds + 1n).toString(),
+      },
+    },
+  };
+
+  return {
+    fdcProofId: `${request.fdcRequestId}:proof:${votingRoundId.toString()}`,
+    fdcRequestId: request.fdcRequestId,
+    redemptionRequestId: request.redemptionRequestId,
+    assetManagerAddress: request.assetManagerAddress,
+    requestHash: request.requestHash,
+    responseBody: "0x9abc",
     merkleProof: [proofNode],
     votingRoundId,
     proofJson: JSON.stringify({ proof: [proofNode] }),

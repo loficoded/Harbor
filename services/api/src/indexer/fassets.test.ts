@@ -202,7 +202,7 @@ describe("FAssets event indexer", () => {
     assert.equal(redemption?.status, "REQUESTED");
   });
 
-  test("stores unsupported with-tag, ticket, and Harbor events as metadata", (t) => {
+  test("stores with-tag redemption as a tracked WITH_TAG request, and ticket/Harbor events as metadata", (t) => {
     const database = createTestDatabase(t);
 
     indexFAssetEventLogs({
@@ -257,7 +257,8 @@ describe("FAssets event indexer", () => {
       ],
     });
 
-    assert.equal(countRows(database, "redemptions"), 0);
+    // The with-tag event now creates a tracked redemption row (WITH_TAG).
+    assert.equal(countRows(database, "redemptions"), 1);
     assert.deepEqual(
       listEventRows(database).map((row) => row.event_name),
       [
@@ -273,11 +274,16 @@ describe("FAssets event indexer", () => {
     const withTagPayload = JSON.parse(
       listEventRows(database)[0]?.payload_json ?? "{}",
     ) as Record<string, unknown>;
-    assert.equal(
-      withTagPayload.unsupportedReason,
-      "redemption-with-tag-not-supported-in-mvp",
-    );
+    assert.equal(withTagPayload.unsupportedReason, undefined);
     assert.equal(withTagPayload.destinationTag, "12345");
+
+    const redemption = getRedemption(database, {
+      assetManagerAddress,
+      requestId: "99",
+    });
+    assert.equal(redemption?.redemptionKind, "WITH_TAG");
+    assert.equal(redemption?.destinationTag, 12345n);
+    assert.equal(redemption?.status, "REQUESTED");
   });
 
   test("repeated indexing of the same logs does not duplicate rows", (t) => {

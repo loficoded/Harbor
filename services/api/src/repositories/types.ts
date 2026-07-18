@@ -12,6 +12,7 @@ import type {
   FdcRequestStatus,
   HexString,
   IsoTimestamp,
+  RedemptionKind,
   RedemptionRequest,
   RedemptionRequestId,
   RedemptionStatus,
@@ -54,6 +55,17 @@ export type UpsertRedemptionInput = RedemptionKey &
     lastUnderlyingTimestamp: bigint;
     executor?: EvmAddress | null;
     executorFeeNatWei: bigint;
+    /**
+     * Whether this is a standard or destination-tag redemption. Defaults to
+     * `STANDARD` when omitted (preserving the historical standard path).
+     */
+    redemptionKind?: RedemptionKind;
+    /**
+     * The required XRPL destination tag for a `WITH_TAG` redemption, or `null`
+     * for `STANDARD`. On conflict the stored value is preserved when the new
+     * event omits it.
+     */
+    destinationTag?: bigint | null;
     status?: RedemptionStatus;
     defaultTransactionHash?: TransactionHash | null;
     statusReason?: string | null;
@@ -189,6 +201,8 @@ export type UpsertXrplObservationInput = Readonly<{
   ledgerIndex: bigint;
   closeTimestamp?: IsoTimestamp;
   validatedAt: IsoTimestamp;
+  /** Observed XRPL DestinationTag, or `null` when the payment had none. */
+  destinationTag?: bigint | null;
   rawJson?: string | null;
   createdAt?: IsoTimestamp;
 }>;

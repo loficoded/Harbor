@@ -11,6 +11,9 @@ import {MockRegistry} from "./mocks/MockRegistry.sol";
 import {
     IReferencedPaymentNonexistence
 } from "@flarenetwork/flare-periphery-contracts/coston2/IReferencedPaymentNonexistence.sol";
+import {
+    IXRPPaymentNonexistence
+} from "@flarenetwork/flare-periphery-contracts/coston2/IXRPPaymentNonexistence.sol";
 
 contract HarborRedeemerTest is HarborRedeemerTestBase {
     event RedemptionDefaultForwarded(
@@ -311,6 +314,167 @@ contract HarborRedeemerTest is HarborRedeemerTestBase {
         assertEq(address(assetManager).balance, executorFee, "asset manager balance restored");
     }
 
+    // -----------------------------------------------------------------------
+    // executeXrpDefault (redeem-by-tag default lane)
+    // -----------------------------------------------------------------------
+
+    function testExecuteXrpDefaultIsPermissionlessAndForwardsXrpProof() public {
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, 0);
+        IXRPPaymentNonexistence.Proof memory proof = buildXrpProof(42, 7, true);
+
+        vm.expectEmit(true, true, false, true, address(harbor));
+        emit RedemptionDefaultForwarded(CALLER, requestId, 0);
+
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(proof, requestId);
+
+        assertEq(assetManager.lastXrpDefaultCaller(), address(harbor), "xrp default forwarded to asset manager");
+        assertEq(assetManager.lastXrpRedemptionRequestId(), requestId, "xrp request id forwarded");
+        assertEq(assetManager.xrpDefaultCallCount(), 1, "xrp default called once");
+        assertEq(assetManager.lastXrpProofHash(), xrpProofHash(proof), "xrp proof forwarded byte-for-byte");
+        assertTrue(assetManager.lastCheckDestinationTag(), "checkDestinationTag forwarded");
+        assertTrue(assetManager.lastCheckFirstMemoData(), "checkFirstMemoData forwarded");
+        assertEq(assetManager.lastDestinationTag(), 7, "destinationTag forwarded");
+        assertEq(assetManager.defaultCallCount(), 0, "standard default not called");
+    }
+
+    function testExecuteXrpDefaultDoesNotRequireOwnerKeeperOrRedeemerCaller() public {
+        assertCallerCanExecuteXrpDefault(OWNER);
+        assertCallerCanExecuteXrpDefault(DEFAULT_KEEPER);
+        assertCallerCanExecuteXrpDefault(REDEEMER);
+        assertCallerCanExecuteXrpDefault(CALLER);
+    }
+
+    function testExecuteXrpDefaultForwardsExecutorFeeToCaller() public {
+        uint256 executorFee = 1.25 ether;
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, executorFee);
+        uint256 callerBalanceBefore = CALLER.balance;
+
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(43, 0, true), requestId);
+
+        assertEq(CALLER.balance, callerBalanceBefore + executorFee, "caller received xrp executor fee");
+        assertEq(address(harbor).balance, 0, "harbor retained no native");
+        assertEq(address(assetManager).balance, 0, "asset manager drained");
+    }
+
+    function testExecuteXrpDefaultPaysUserRecoveryValueDirectlyToRedeemer() public {
+        uint256 redemptionValue = 5 ether;
+        uint256 executorFee = 0.2 ether;
+        uint256 requestId = openDefaultRequest(REDEEMER, redemptionValue, executorFee);
+        uint256 redeemerBalanceBefore = REDEEMER.balance;
+
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(44, 12345, true), requestId);
+
+        assertEq(REDEEMER.balance, redeemerBalanceBefore + redemptionValue, "redeemer recovered collateral");
+        assertEq(assetManager.defaultValuePaidTo(REDEEMER), redemptionValue, "redeemer paid directly");
+        assertEq(assetManager.executorFeePaidTo(address(harbor)), executorFee, "harbor paid fee");
+        assertEq(address(harbor).balance, 0, "harbor holds no native");
+        assertEq(fAsset.balanceOf(address(harbor)), 0, "harbor holds no fasset");
+    }
+
+    function testExecuteXrpDefaultLeavesNoHarborTokenOrNativeBalance() public {
+        uint256 redemptionValue = 3 ether;
+        uint256 executorFee = 0.5 ether;
+        uint256 requestId = openDefaultRequest(REDEEMER, redemptionValue, executorFee);
+
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(45, 4294967295, true), requestId);
+
+        assertEq(fAsset.balanceOf(address(harbor)), 0, "no fasset retained");
+        assertEq(address(harbor).balance, 0, "no native retained");
+        assertTrue(assetManager.requestDefaulted(requestId), "request defaulted");
+    }
+
+    function testExecuteXrpDefaultRejectsReentrancyFromAssetManager() public {
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, 0);
+        assetManager.setAttemptReentrancy(true);
+
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(46, 1, true), requestId);
+
+        assertFalse(assetManager.reentrantCallSucceeded(), "reentrant call succeeded");
+        assertTrue(assetManager.reentrantCallReverted(), "reentrant call reverted");
+        assertEq(assetManager.xrpDefaultCallCount(), 1, "only outer xrp default completed");
+    }
+
+    function testExecuteXrpDefaultRevertsWhenExecutorFeeForwardFails() public {
+        RejectingNativeReceiver rejectingCaller = new RejectingNativeReceiver();
+        uint256 executorFee = 1 ether;
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, executorFee);
+
+        vm.expectRevert(abi.encodeWithSelector(HarborRedeemer.NativeForwardFailed.selector));
+        rejectingCaller.executeXrpDefault(harbor, buildXrpProof(47, 9, true), requestId);
+
+        assertFalse(assetManager.requestDefaulted(requestId), "request not defaulted");
+        assertEq(address(harbor).balance, 0, "harbor retained native");
+        assertEq(address(assetManager).balance, executorFee, "asset manager balance restored");
+    }
+
+    function testExecuteXrpDefaultRevertsWhenAssetManagerReverts() public {
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, 0);
+        // Default the request once, so the second call reverts "already defaulted".
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(48, 0, true), requestId);
+
+        vm.expectRevert(bytes("request already defaulted"));
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(49, 0, true), requestId);
+    }
+
+    function testExecuteXrpDefaultAndExecuteDefaultAreIsolatedLanes() public {
+        // A standard default must not invoke the XRP path and vice-versa.
+        uint256 standardRequestId = openDefaultRequest(REDEEMER, 0, 0);
+        vm.prank(CALLER);
+        harbor.executeDefault(buildProof(50, false), standardRequestId);
+        assertEq(assetManager.defaultCallCount(), 1, "standard default called");
+        assertEq(assetManager.xrpDefaultCallCount(), 0, "xrp default not called");
+
+        uint256 xrpRequestId = openDefaultRequest(REDEEMER, 0, 0);
+        vm.prank(CALLER);
+        harbor.executeXrpDefault(buildXrpProof(51, 42, true), xrpRequestId);
+        assertEq(assetManager.defaultCallCount(), 1, "standard default unchanged");
+        assertEq(assetManager.xrpDefaultCallCount(), 1, "xrp default called");
+    }
+
+    function testFuzzExecuteXrpDefaultAnyCallerTagAndFee(
+        address caller,
+        uint96 fee,
+        uint64 votingRound,
+        uint32 destinationTag
+    ) public {
+        vm.assume(caller != address(0));
+        vm.assume(uint160(caller) > 0xffff);
+        vm.assume(caller.code.length == 0);
+
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, uint256(fee));
+        uint256 callerBalanceBefore = caller.balance;
+        if (fee != 0) {
+            fundAssetManager(uint256(fee));
+        }
+
+        vm.prank(caller);
+        harbor.executeXrpDefault(buildXrpProof(votingRound, uint256(destinationTag), true), requestId);
+
+        assertEq(caller.balance, callerBalanceBefore + uint256(fee), "caller received fee");
+        assertEq(address(harbor).balance, 0, "harbor retains no native");
+        assertEq(fAsset.balanceOf(address(harbor)), 0, "harbor retains no fasset");
+        assertTrue(assetManager.requestDefaulted(requestId), "defaulted");
+        assertEq(assetManager.lastDestinationTag(), uint256(destinationTag), "tag forwarded");
+    }
+
+    function assertCallerCanExecuteXrpDefault(address caller) private {
+        uint256 requestId = openDefaultRequest(REDEEMER, 0, 1 wei);
+        uint256 callerBalanceBefore = caller.balance;
+
+        vm.prank(caller);
+        harbor.executeXrpDefault(buildXrpProof(52, 0, true), requestId);
+
+        assertEq(caller.balance, callerBalanceBefore + 1 wei, "caller received xrp executor fee");
+        assertTrue(assetManager.requestDefaulted(requestId), "defaulted");
+    }
+
     function testMockFAssetConfigurableTransferBehavior() public {
         fAsset.mint(REDEEMER, 100);
 
@@ -415,5 +579,13 @@ contract RejectingNativeReceiver {
         uint256 redemptionRequestId
     ) external {
         harbor.executeDefault(proof, redemptionRequestId);
+    }
+
+    function executeXrpDefault(
+        HarborRedeemer harbor,
+        IXRPPaymentNonexistence.Proof calldata proof,
+        uint256 redemptionRequestId
+    ) external {
+        harbor.executeXrpDefault(proof, redemptionRequestId);
     }
 }

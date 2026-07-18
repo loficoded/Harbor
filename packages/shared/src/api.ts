@@ -6,6 +6,7 @@ import type {
   FdcProofRecord,
   FdcRequestRecord,
   IsoTimestamp,
+  RedemptionKind,
   RedemptionStatus,
   XrplAddress,
   XrplPaymentObservation,
@@ -111,6 +112,18 @@ export type RedemptionDetail = Readonly<{
    */
   agentDetails: AgentDetails;
   paymentAddress: XrplAddress;
+  /**
+   * Whether this is a standard (`redeemAmount`) or destination-tag
+   * (`redeemWithTag`) redemption. Additive field; `STANDARD` for all
+   * pre-existing redemptions. The UI routes `WITH_TAG` to the XRP default lane.
+   */
+  redemptionKind: RedemptionKind;
+  /**
+   * The required XRPL destination tag for a `WITH_TAG` redemption, or `null`
+   * for `STANDARD`. A `WITH_TAG` payment settles only if it carries this exact
+   * `DestinationTag` (including `0`).
+   */
+  destinationTag: bigint | null;
   valueUBA: bigint;
   feeUBA: bigint;
   paymentReference: Bytes32;

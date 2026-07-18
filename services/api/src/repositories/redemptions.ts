@@ -2,6 +2,7 @@ import {
   parseSerializedBigint,
   serializeBigint,
   type EvmAddress,
+  type RedemptionKind,
   type RedemptionRequestId,
   type TransactionHash,
 } from "@harbor/shared";
@@ -39,6 +40,8 @@ type RedemptionRow = Readonly<{
   status: StoredRedemptionRequest["status"];
   default_transaction_hash: string | null;
   status_reason: string | null;
+  destination_tag: string | null;
+  redemption_kind: string;
   created_at: string;
   updated_at: string;
 }>;
@@ -88,6 +91,11 @@ function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
     defaultTransactionHash:
       row.default_transaction_hash as TransactionHash | null,
     statusReason: row.status_reason,
+    redemptionKind: row.redemption_kind as RedemptionKind,
+    destinationTag:
+      row.destination_tag === null
+        ? null
+        : parseSerializedBigint(row.destination_tag),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -144,6 +152,8 @@ INSERT INTO redemptions (
   status,
   default_transaction_hash,
   status_reason,
+  destination_tag,
+  redemption_kind,
   created_at,
   updated_at
 ) VALUES (
@@ -168,6 +178,8 @@ INSERT INTO redemptions (
   @status,
   @defaultTransactionHash,
   @statusReason,
+  @destinationTag,
+  @redemptionKind,
   @createdAt,
   @updatedAt
 )
@@ -190,6 +202,8 @@ ON CONFLICT(asset_manager_address, request_id) DO UPDATE SET
   executor_fee_nat_wei = excluded.executor_fee_nat_wei,
   default_transaction_hash = COALESCE(excluded.default_transaction_hash, redemptions.default_transaction_hash),
   status_reason = COALESCE(excluded.status_reason, redemptions.status_reason),
+  destination_tag = COALESCE(excluded.destination_tag, redemptions.destination_tag),
+  redemption_kind = excluded.redemption_kind,
   updated_at = excluded.updated_at
 `,
     )
@@ -215,6 +229,11 @@ ON CONFLICT(asset_manager_address, request_id) DO UPDATE SET
       status: input.status ?? "REQUESTED",
       defaultTransactionHash: input.defaultTransactionHash ?? null,
       statusReason: input.statusReason ?? null,
+      destinationTag:
+        input.destinationTag === undefined || input.destinationTag === null
+          ? null
+          : serializeBigint(input.destinationTag),
+      redemptionKind: input.redemptionKind ?? "STANDARD",
       createdAt,
       updatedAt,
     });

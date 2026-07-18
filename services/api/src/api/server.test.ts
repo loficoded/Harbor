@@ -277,10 +277,10 @@ describe("GET /health", () => {
     assert.equal(report.status, "ok");
     assert.equal(report.api.status, "ok");
     assert.equal(report.database.status, "ok");
-    assert.equal(report.database.migrationsApplied, 6);
+    assert.equal(report.database.migrationsApplied, 7);
     assert.equal(
       report.database.latestMigrationId,
-      "0006_agent_details_fields",
+      "0007_redemption_tag_fields",
     );
     assert.equal(report.database.error, null);
     assert.equal(report.indexer.cursor?.blockNumber, "987654");

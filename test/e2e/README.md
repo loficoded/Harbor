@@ -25,41 +25,71 @@ RUN_FDC_PROOF=true npx tsx harbor-e2e.ts
 # Keeper sweep — scan for & execute real defaults (needs RUN_MUTATIONS):
 RUN_KEEPER_SWEEP=true RUN_MUTATIONS=true npx tsx harbor-e2e.ts
 
+# Redeem-by-tag lane (redeemWithTag → XRPPaymentNonexistence → executeXrpDefault):
+npx tsx harbor-tag-e2e.ts                      # read-only (BLOCKED gracefully)
+RUN_MUTATIONS=true npx tsx harbor-tag-e2e.ts   # approve + redeemWithTag + settle
+RUN_FDC_PROOF=true npx tsx harbor-tag-e2e.ts   # full XRP FDC proof pipeline
+
 npm run typecheck                # strict tsc, no emit
 ```
+
+The tag suite (`harbor-tag-e2e.ts`) is the redeem-by-tag mirror of the standard
+suite: it exercises the XRP-native FDC attestation types
+(`XRPPaymentNonexistence` for default, `XRPPayment` for confirm) and the
+`HarborRedeemer.executeXrpDefault` permissionless entrypoint. It gates on
+`AssetManager.redeemWithTagSupported()` and on the FDC verifier serving the XRP
+type, degrading to explicit `BLOCKED` when either is unavailable — never a fake
+pass. Set `TAG_DESTINATION_TAG` (default `12345`) to choose the tag.
 
 Config is env-driven with verified testnet defaults baked in — see
 [`.env.example`](./.env.example). Exit code `0` = no hard failures
 (`BLOCKED`/`SKIP` never fail the run); `1` = a `FAIL`.
 
+### Tag-lane latest results
+
+`tag-run.txt` captures a read-only run of `harbor-tag-e2e.ts`. The live
+verifications that run without funds confirm the protocol preconditions on
+Coston2: `AssetManager.redeemWithTagSupported() == true` and
+`HarborRedeemer.executeXrpDefault` reverting before the deadline (the new
+contract entrypoint is wired and reachable on-chain). The state-changing checks
+(approve + `redeemWithTag`, the full `XRPPaymentNonexistence` FDC proof, and
+`executeXrpDefault` → `RedemptionDefault`) report `BLOCKED` until the wallet is
+funded and the FDC verifier/XRPL egress is reachable — never a fake pass.
+
 ## Latest results
 
 ### Read-only run (no FXRP, no txs) — [`last-run.txt`](./last-run.txt)
+
 ```
 Totals: 25 passed, 0 failed, 2 blocked, 5 skipped  (of 32)
 ```
 
 ### Full FDC proof + keeper sweep (`RUN_FDC_PROOF=true RUN_KEEPER_SWEEP=true`) — [`fdc-proof-run.txt`](./fdc-proof-run.txt)
+
 ```
 Totals: 26 passed, 0 failed, 3 blocked, 3 skipped  (of 32)
 ```
+
 T5e (full FDC proof → on-chain verify) **passes live and repeatably**; T5f
 (keeper sweep, 50 000-block lookback) reports `0` Harbor-nominated, expired,
 unpaid candidates — there is simply no defaultable redemption to execute (see
 [T5c status](#t5c-status--the-only-thing-left) below).
 
 ### Live happy-path run (mutations ON, 10 FXRP funded) — [`mutation-run.txt`](./mutation-run.txt)
+
 ```
 Totals: 28 passed, 0 failed, 2 blocked, 0 skipped
 ```
 
 The happy path was verified end-to-end:
+
 - `approve` → `redeem(1 lot)` → `RedemptionRequested` (requestId 38242590)
 - Agent settled on XRPL → `RedemptionPerformed` → 10 FXRP burned
 - XRPL payment independently verified: tx `AC16B892…EEBC3F` (`tesSUCCESS`),
   9.95 XRP delivered, memo matching on-chain `paymentReference` byte-for-byte
 
 ### Full FDC proof pipeline (RUN_FDC_PROOF=true)
+
 ```
 FdcVerification.verifyReferencedPaymentNonexistence => TRUE
 ```
@@ -70,16 +100,16 @@ generated and verified against the FdcVerification contract — the exact input
 
 ## Test groups
 
-| Group | What it verifies (live) |
-|-------|------------------------|
-| **T0** | RPC up, chainId 114, head block, signer gas balance |
-| **T1** | Bytecode sizes; **proxy works / impl reverts** (Diamond); registry; executor wiring; FXRP identity |
-| **T2** | `getSettings` snapshot; per-agent `getAgentInfo`; executor owner/keeper; FdcHub + Relay |
-| **T3** | FXRP balance check; if short → `BLOCKED` with faucet steps + mint alternative |
-| **T4** | `approve` → `redeem` → `RedemptionRequested` → poll `RedemptionPerformed` → assert FXRP burned |
+| Group  | What it verifies (live)                                                                                                                                                                                                                                                           |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **T0** | RPC up, chainId 114, head block, signer gas balance                                                                                                                                                                                                                               |
+| **T1** | Bytecode sizes; **proxy works / impl reverts** (Diamond); registry; executor wiring; FXRP identity                                                                                                                                                                                |
+| **T2** | `getSettings` snapshot; per-agent `getAgentInfo`; executor owner/keeper; FdcHub + Relay                                                                                                                                                                                           |
+| **T3** | FXRP balance check; if short → `BLOCKED` with faucet steps + mint alternative                                                                                                                                                                                                     |
+| **T4** | `approve` → `redeem` → `RedemptionRequested` → poll `RedemptionPerformed` → assert FXRP burned                                                                                                                                                                                    |
 | **T5** | 5a encode RPNE request · 5b live verifier `prepareRequest` · 5c full default (FdcHub → finalize → DA proof → `executeDefault` → `RedemptionDefault`) · 5d premature-default revert · 5e **full FDC proof → on-chain verify == true** · 5f **keeper sweep → execute real default** |
-| **T6** | `executeDefault` delegates to `redemptionPaymentDefault`; `setDefaultKeeperExecutor` owner-only + zero-addr guard; owner dry-run |
-| **T7** | insufficient FXRP; zero lots; bad XRPL address (client + on-chain); nonexistent redemption; redeem-on-impl |
+| **T6** | `executeDefault` delegates to `redemptionPaymentDefault`; `setDefaultKeeperExecutor` owner-only + zero-addr guard; owner dry-run                                                                                                                                                  |
+| **T7** | insufficient FXRP; zero lots; bad XRPL address (client + on-chain); nonexistent redemption; redeem-on-impl                                                                                                                                                                        |
 
 ## Key findings
 
@@ -118,14 +148,14 @@ generated and verified against the FdcVerification contract — the exact input
 8. **The RPNE `amount` is GROSS `valueUBA`, not net.** Per the official FAssets
    redemption-default guide and Harbor's keeper, the non-existence proof uses
    `amount = valueUBA`. Agents pay the **net** amount (`valueUBA − feeUBA`; the
-   fee is retained), so the verifier attests non-existence of the *gross* amount
+   fee is retained), so the verifier attests non-existence of the _gross_ amount
    even for a fully-paid redemption — the on-chain **status** check, not the
    amount, is what prevents defaulting a paid redemption. Verified live against
    `requestId 38242590` (paid): `amount=valueUBA` → `VALID`; `amount=valueUBA-feeUBA`
    → `INVALID: REFERENCED TRANSACTION EXISTS`. `buildRPNEBody` keeps gross (correct).
 
 9. **`HARBOR_DEFAULTED_REQUEST_ID` now runs the real default (suite fix).**
-   Previously it built a *synthetic* body and then blocked on `synthetic`, so it
+   Previously it built a _synthetic_ body and then blocked on `synthetic`, so it
    never exercised the supplied id. `5a` now looks the redemption up by its
    indexed `requestId` and builds the **real** request body, and `5c` guards
    against already-settled ids (so it never spends an attestation on a redemption
@@ -142,8 +172,8 @@ agent bot always pays or proves a blocked/failed payment, so a redemption is nev
 left silently unpaid on mainnet-testnet.
 
 **The realistic, technically-sound answer is a local Anvil fork of Coston2.** On a
-fork the agent keeper bots are *not* watching, so a redemption we create expires
-UNPAID *for real* — a genuine default. Everything else runs against the real,
+fork the agent keeper bots are _not_ watching, so a redemption we create expires
+UNPAID _for real_ — a genuine default. Everything else runs against the real,
 forked FAssets contracts and real agent state. This is `T5g`, and it passes:
 
 ```bash
@@ -193,7 +223,7 @@ FAssets code and real agent state. The realness of the FDC proof itself is prove
 the on-chain `FdcVerification.verify == true`. **`T5e` (real proof, live) + `5g`
 (real executor + real payout, fork) together cover 100 % of `T5c`.**
 
-For a *fully* unmocked fork run, generate the real proof for the fork redemption’s
+For a _fully_ unmocked fork run, generate the real proof for the fork redemption’s
 exact `requestBody` (reference/dest/amount/window) once real XRPL passes the
 deadline block, and inject that round’s finalized Merkle root into the fork’s
 `Relay` storage — then `executeDefault` verifies against the real root with no

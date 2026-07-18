@@ -27,6 +27,11 @@ export type RedemptionFormViewProps = {
   onAddressChange: (value: string) => void;
   addressError: string | null;
 
+  // Optional XRPL destination tag (redeem-by-tag). Empty ⇒ standard redeem.
+  tagInput: string;
+  onTagInputChange: (value: string) => void;
+  tagError: string | null;
+
   // Executor
   executorFeeLabel: string;
   executorLabel: string;
@@ -81,6 +86,9 @@ export function RedemptionFormView(
     addressInput,
     onAddressChange,
     addressError,
+    tagInput,
+    onTagInputChange,
+    tagError,
     executorFeeLabel,
     executorLabel,
     harborManaged,
@@ -127,63 +135,94 @@ export function RedemptionFormView(
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-      {/* Amount to redeem */}
-      <div className="flex flex-col gap-2">
-        <label htmlFor="redeem-amount" className={fieldLabelClass()}>
-          Amount ({FXRP_LABEL})
-        </label>
-        <input
-          id="redeem-amount"
-          type="text"
-          inputMode="decimal"
-          value={amountInput}
-          onChange={(event) => onAmountInputChange(event.target.value)}
-          placeholder="e.g. 2.37"
-          aria-label={`Amount (${FXRP_LABEL})`}
-          aria-invalid={amountError !== null}
-          className={inputClass()}
-        />
-        {amountError !== null ? (
-          <p className="text-xs font-medium text-red-600 dark:text-red-400">
-            {amountError}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            FAssets supports redeeming any amount — enter a whole or decimal{" "}
-            {FXRP_LABEL} amount (up to {FXRP_DECIMALS} decimals).
-            {amountLabel !== null
-              ? ` Redeems ${amountLabel} ${FXRP_LABEL}.`
-              : ""}
-          </p>
-        )}
-      </div>
+        {/* Amount to redeem */}
+        <div className="flex flex-col gap-2">
+          <label htmlFor="redeem-amount" className={fieldLabelClass()}>
+            Amount ({FXRP_LABEL})
+          </label>
+          <input
+            id="redeem-amount"
+            type="text"
+            inputMode="decimal"
+            value={amountInput}
+            onChange={(event) => onAmountInputChange(event.target.value)}
+            placeholder="e.g. 2.37"
+            aria-label={`Amount (${FXRP_LABEL})`}
+            aria-invalid={amountError !== null}
+            className={inputClass()}
+          />
+          {amountError !== null ? (
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+              {amountError}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              FAssets supports redeeming any amount — enter a whole or decimal{" "}
+              {FXRP_LABEL} amount (up to {FXRP_DECIMALS} decimals).
+              {amountLabel !== null
+                ? ` Redeems ${amountLabel} ${FXRP_LABEL}.`
+                : ""}
+            </p>
+          )}
+        </div>
 
-      {/* XRPL destination */}
-      <div className="flex flex-col gap-2">
-        <label htmlFor="xrpl-address" className={fieldLabelClass()}>
-          XRPL destination address
-        </label>
-        <input
-          id="xrpl-address"
-          type="text"
-          value={addressInput}
-          onChange={(event) => onAddressChange(event.target.value)}
-          placeholder="r…"
-          aria-label="XRPL destination address"
-          aria-invalid={addressError !== null}
-          spellCheck={false}
-          className={`${inputClass()} font-mono`}
-        />
-        {addressError !== null ? (
-          <p className="text-xs font-medium text-red-600 dark:text-red-400">
-            {addressError}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            The XRP address that will receive the redeemed underlying XRP.
-          </p>
-        )}
-      </div>
+        {/* XRPL destination */}
+        <div className="flex flex-col gap-2">
+          <label htmlFor="xrpl-address" className={fieldLabelClass()}>
+            XRPL destination address
+          </label>
+          <input
+            id="xrpl-address"
+            type="text"
+            value={addressInput}
+            onChange={(event) => onAddressChange(event.target.value)}
+            placeholder="r…"
+            aria-label="XRPL destination address"
+            aria-invalid={addressError !== null}
+            spellCheck={false}
+            className={`${inputClass()} font-mono`}
+          />
+          {addressError !== null ? (
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+              {addressError}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              The XRP address that will receive the redeemed underlying XRP.
+            </p>
+          )}
+        </div>
+
+        {/* Optional XRPL destination tag (redeem-by-tag) */}
+        <div className="flex flex-col gap-2">
+          <label htmlFor="destination-tag" className={fieldLabelClass()}>
+            Destination tag{" "}
+            <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <input
+            id="destination-tag"
+            type="text"
+            inputMode="numeric"
+            value={tagInput}
+            onChange={(event) => onTagInputChange(event.target.value)}
+            placeholder="Leave empty for no tag"
+            aria-label="XRPL destination tag"
+            aria-invalid={tagError !== null}
+            spellCheck={false}
+            className={`${inputClass()} font-mono`}
+          />
+          {tagError !== null ? (
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+              {tagError}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Required by exchanges/custodials. Empty uses the standard redeem;
+              the agent&apos;s XRP payment must include this exact tag to
+              settle.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Executor fee */}

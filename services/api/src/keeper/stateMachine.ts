@@ -352,6 +352,16 @@ export function isValidXrplObservationForRedemption(
     return false;
   }
 
+  // A WITH_TAG redemption only settles on an observation whose destination tag
+  // matches exactly. Standard redemptions ignore the observed tag.
+  if (
+    redemption.redemptionKind === "WITH_TAG" &&
+    redemption.destinationTag !== null &&
+    observation.destinationTag !== redemption.destinationTag
+  ) {
+    return false;
+  }
+
   if (observation.deliveredAmountUBA < redemption.valueUBA) {
     return false;
   }

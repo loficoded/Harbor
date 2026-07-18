@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["harbor-e2e.ts"]
+  "include": ["harbor-e2e.ts", "harbor-tag-e2e.ts"]
 }

@@ -8,6 +8,9 @@ import {MockFAsset} from "./mocks/MockFAsset.sol";
 import {
     IReferencedPaymentNonexistence
 } from "@flarenetwork/flare-periphery-contracts/coston2/IReferencedPaymentNonexistence.sol";
+import {
+    IXRPPaymentNonexistence
+} from "@flarenetwork/flare-periphery-contracts/coston2/IXRPPaymentNonexistence.sol";
 
 contract HarborRedeemerInvariantTest is HarborRedeemerTestBase {
     HarborRedeemerInvariantHandler private handler;
@@ -32,6 +35,15 @@ contract HarborRedeemerInvariantTest is HarborRedeemerTestBase {
 
     function invariant_DefaultExecutionRemainsPermissionless() public view {
         assertEq(handler.permissionlessFailures(), 0, "permissionless default failure");
+    }
+
+    /// @dev After any XRP-tag default, Harbor still holds zero FXRP and zero
+    /// native (every fee was forwarded to the caller). This is the tag-lane
+    /// mirror of the non-custody property covered by
+    /// `invariant_AdminCannotTakeUserRecoveryValue`.
+    function invariant_XrpDefaultLeavesNoRetainedBalances() public view {
+        assertEq(fAsset.balanceOf(address(harbor)), 0, "harbor retained fasset after xrp default");
+        assertEq(address(harbor).balance, 0, "harbor retained native after xrp default");
     }
 }
 
@@ -75,6 +87,30 @@ contract HarborRedeemerInvariantHandler {
         }
     }
 
+    /// @dev Tag-default lane: fuzzes random callers, destination tags (including
+    /// 0 and 2**32-1), and fee/value seeds against `executeXrpDefault`.
+    function executeExistingXrpRequest(
+        uint256 callerSeed,
+        uint96 redemptionDefaultValueSeed,
+        uint96 executorFeeSeed,
+        uint32 destinationTag
+    ) external {
+        address selectedCaller = _actor(callerSeed);
+        uint256 redemptionDefaultValueNatWei = uint256(redemptionDefaultValueSeed);
+        uint256 executorFeeNatWei = uint256(executorFeeSeed);
+        uint256 redemptionRequestId = assetManager.createRedemptionRequest(
+            redeemer, payable(address(harbor)), agentOwner, redemptionDefaultValueNatWei, executorFeeNatWei
+        );
+
+        vm.deal(address(assetManager), address(assetManager).balance + redemptionDefaultValueNatWei + executorFeeNatWei);
+
+        vm.prank(selectedCaller);
+        try harbor.executeXrpDefault(_buildXrpProof(uint64(callerSeed), uint256(destinationTag), true), redemptionRequestId) {}
+        catch {
+            permissionlessFailures++;
+        }
+    }
+
     function updateKeeper(uint256 executorSeed) external {
         address executor = address(uint160(uint256(keccak256(abi.encode(executorSeed, "keeper")))));
         if (executor == address(0)) executor = address(1);
@@ -109,6 +145,26 @@ contract HarborRedeemerInvariantHandler {
         proof.data.requestBody.amount = 40;
         proof.data.requestBody.standardPaymentReference = bytes32(uint256(50));
         proof.data.requestBody.checkSourceAddresses = checkSourceAddresses;
+        proof.data.responseBody.firstOverflowBlockNumber = 21;
+        proof.data.responseBody.firstOverflowBlockTimestamp = 31;
+    }
+
+    function _buildXrpProof(uint64 votingRound, uint256 destinationTag, bool checkDestinationTag)
+        private
+        pure
+        returns (IXRPPaymentNonexistence.Proof memory proof)
+    {
+        proof.merkleProof = new bytes32[](1);
+        proof.merkleProof[0] = bytes32(uint256(1));
+        proof.data.votingRound = votingRound;
+        proof.data.requestBody.minimalBlockNumber = 10;
+        proof.data.requestBody.deadlineBlockNumber = 20;
+        proof.data.requestBody.deadlineTimestamp = 30;
+        proof.data.requestBody.amount = 40;
+        proof.data.requestBody.checkFirstMemoData = true;
+        proof.data.requestBody.firstMemoDataHash = bytes32(uint256(50));
+        proof.data.requestBody.checkDestinationTag = checkDestinationTag;
+        proof.data.requestBody.destinationTag = destinationTag;
         proof.data.responseBody.firstOverflowBlockNumber = 21;
         proof.data.responseBody.firstOverflowBlockTimestamp = 31;
     }

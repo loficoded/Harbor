@@ -13,8 +13,7 @@ import { SelfRecoveryPanelView } from "@/components/status/self-recovery-panel-v
 import { coston2 } from "@/lib/chain";
 import type { SelfRecoveryInfo } from "@/lib/redemption-status";
 import {
-  buildExecuteDefaultArgs,
-  EXECUTE_DEFAULT_FUNCTION_NAME,
+  buildDefaultExecutionArgs,
   resolveHarborRedeemerAddress,
   resolveSelfRecoveryPhase,
   type LocalTxState,
@@ -53,6 +52,12 @@ export type SelfRecoveryPanelProps = Readonly<{
   requestId: string;
   selfRecovery: SelfRecoveryInfo;
   /**
+   * Whether this is a `WITH_TAG` redemption (routes to `executeXrpDefault`) or
+   * `STANDARD` (routes to `executeDefault`). Mirrors the backend keeper's
+   * kind-based entrypoint selection.
+   */
+  redemptionKind: "STANDARD" | "WITH_TAG";
+  /**
    * Configured HarborRedeemer address (NEXT_PUBLIC_HARBOR_CONTRACT_ADDRESS).
    * `null` when unset — the panel then reports the contract as unconfigured
    * rather than attempting a transaction.
@@ -65,6 +70,7 @@ export type SelfRecoveryPanelProps = Readonly<{
 export function SelfRecoveryPanel({
   requestId,
   selfRecovery,
+  redemptionKind,
   harborRedeemerAddress,
   onRecoveryRefresh,
 }: SelfRecoveryPanelProps) {
@@ -74,12 +80,14 @@ export function SelfRecoveryPanel({
 
   const redeemer = resolveHarborRedeemerAddress(harborRedeemerAddress);
 
-  // Build (and validate) the executeDefault calldata from the backend proof.
-  // Kept in a memo so the same validated args back both the phase gate and the
-  // actual write — the UI never encodes a proof it has not validated.
+  // Build (and validate) the default-execution calldata from the backend proof.
+  // The `redemptionKind` selects `executeDefault` vs `executeXrpDefault`, so the
+  // UI never encodes a proof against the wrong on-chain entrypoint. Kept in a
+  // memo so the same validated args back both the phase gate and the write.
   const proofResult = useMemo(
-    () => buildExecuteDefaultArgs(selfRecovery.proof, requestId),
-    [selfRecovery.proof, requestId],
+    () =>
+      buildDefaultExecutionArgs(selfRecovery.proof, requestId, redemptionKind),
+    [selfRecovery.proof, requestId, redemptionKind],
   );
 
   const defaultTx = useWriteContract();
@@ -121,7 +129,7 @@ export function SelfRecoveryPanel({
     defaultTx.writeContract({
       address: redeemer,
       abi: HARBOR_REDEEMER_ABI,
-      functionName: EXECUTE_DEFAULT_FUNCTION_NAME,
+      functionName: proofResult.functionName,
       args: proofResult.args,
     });
   }

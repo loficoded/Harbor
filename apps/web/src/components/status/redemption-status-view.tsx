@@ -278,10 +278,7 @@ function ReadyPhase({
         )}
       >
         <div
-          className={cn(
-            "flex flex-col gap-6",
-            hasSidebar && "lg:col-span-8",
-          )}
+          className={cn("flex flex-col gap-6", hasSidebar && "lg:col-span-8")}
         >
           <TimelineCard steps={viewModel.timeline} />
 
@@ -589,6 +586,11 @@ function SettlementReceiptCard({ receipt }: { receipt: SettlementReceipt }) {
         <DetailRow label="Payment reference">
           <PlainHash value={receipt.paymentReference} />
         </DetailRow>
+        {receipt.destinationTag !== null ? (
+          <DetailRow label="Destination tag">
+            <span className="font-mono text-xs">{receipt.destinationTag}</span>
+          </DetailRow>
+        ) : null}
       </dl>
       <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
         XRPL observation is recorded for visibility only. Settlement and default

@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "tsx harbor-e2e.ts",
+    "test:tag": "tsx harbor-tag-e2e.ts",
     "test:mutations": "RUN_MUTATIONS=true tsx harbor-e2e.ts",
+    "test:tag:mutations": "RUN_MUTATIONS=true tsx harbor-tag-e2e.ts",
     "test:fork-t5c": "bash scripts/run-fork-t5c.sh",
     "test:sandbox": "node run.mjs",
     "typecheck": "tsc -p tsconfig.json",

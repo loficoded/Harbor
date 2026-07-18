@@ -252,6 +252,366 @@
       ]
     }
   ],
+  "xrpPaymentNonexistenceRequestBodyAbi": [
+    {
+      "name": "minimalBlockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "deadlineBlockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "deadlineTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "destinationAddressHash",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "amount",
+      "internalType": "uint256",
+      "type": "uint256"
+    },
+    {
+      "name": "checkFirstMemoData",
+      "internalType": "bool",
+      "type": "bool"
+    },
+    {
+      "name": "firstMemoDataHash",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "checkDestinationTag",
+      "internalType": "bool",
+      "type": "bool"
+    },
+    {
+      "name": "destinationTag",
+      "internalType": "uint256",
+      "type": "uint256"
+    },
+    {
+      "name": "proofOwner",
+      "internalType": "address",
+      "type": "address"
+    }
+  ],
+  "xrpPaymentNonexistenceResponseBodyAbi": [
+    {
+      "name": "minimalBlockTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "firstOverflowBlockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "firstOverflowBlockTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    }
+  ],
+  "xrpPaymentNonexistenceResponseAbi": [
+    {
+      "name": "attestationType",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "sourceId",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "votingRound",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "lowestUsedTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "requestBody",
+      "internalType": "struct IXRPPaymentNonexistence.RequestBody",
+      "type": "tuple",
+      "components": [
+        {
+          "name": "minimalBlockNumber",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "deadlineBlockNumber",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "deadlineTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "destinationAddressHash",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "amount",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "checkFirstMemoData",
+          "internalType": "bool",
+          "type": "bool"
+        },
+        {
+          "name": "firstMemoDataHash",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "checkDestinationTag",
+          "internalType": "bool",
+          "type": "bool"
+        },
+        {
+          "name": "destinationTag",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "proofOwner",
+          "internalType": "address",
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "name": "responseBody",
+      "internalType": "struct IXRPPaymentNonexistence.ResponseBody",
+      "type": "tuple",
+      "components": [
+        {
+          "name": "minimalBlockTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "firstOverflowBlockNumber",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "firstOverflowBlockTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        }
+      ]
+    }
+  ],
+  "xrpPaymentNonexistenceProofAbi": [
+    {
+      "name": "merkleProof",
+      "internalType": "bytes32[]",
+      "type": "bytes32[]"
+    },
+    {
+      "name": "data",
+      "internalType": "struct IXRPPaymentNonexistence.Response",
+      "type": "tuple",
+      "components": [
+        {
+          "name": "attestationType",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "sourceId",
+          "internalType": "bytes32",
+          "type": "bytes32"
+        },
+        {
+          "name": "votingRound",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "lowestUsedTimestamp",
+          "internalType": "uint64",
+          "type": "uint64"
+        },
+        {
+          "name": "requestBody",
+          "internalType": "struct IXRPPaymentNonexistence.RequestBody",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "minimalBlockNumber",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "deadlineBlockNumber",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "deadlineTimestamp",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "destinationAddressHash",
+              "internalType": "bytes32",
+              "type": "bytes32"
+            },
+            {
+              "name": "amount",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "checkFirstMemoData",
+              "internalType": "bool",
+              "type": "bool"
+            },
+            {
+              "name": "firstMemoDataHash",
+              "internalType": "bytes32",
+              "type": "bytes32"
+            },
+            {
+              "name": "checkDestinationTag",
+              "internalType": "bool",
+              "type": "bool"
+            },
+            {
+              "name": "destinationTag",
+              "internalType": "uint256",
+              "type": "uint256"
+            },
+            {
+              "name": "proofOwner",
+              "internalType": "address",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "name": "responseBody",
+          "internalType": "struct IXRPPaymentNonexistence.ResponseBody",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "minimalBlockTimestamp",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "firstOverflowBlockNumber",
+              "internalType": "uint64",
+              "type": "uint64"
+            },
+            {
+              "name": "firstOverflowBlockTimestamp",
+              "internalType": "uint64",
+              "type": "uint64"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "xrpPaymentResponseBodyAbi": [
+    {
+      "name": "blockNumber",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "blockTimestamp",
+      "internalType": "uint64",
+      "type": "uint64"
+    },
+    {
+      "name": "sourceAddress",
+      "internalType": "string",
+      "type": "string"
+    },
+    {
+      "name": "sourceAddressHash",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "receivingAddressHash",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "intendedReceivingAddressHash",
+      "internalType": "bytes32",
+      "type": "bytes32"
+    },
+    {
+      "name": "spentAmount",
+      "internalType": "int256",
+      "type": "int256"
+    },
+    {
+      "name": "intendedSpentAmount",
+      "internalType": "int256",
+      "type": "int256"
+    },
+    {
+      "name": "receivedAmount",
+      "internalType": "int256",
+      "type": "int256"
+    },
+    {
+      "name": "intendedReceivedAmount",
+      "internalType": "int256",
+      "type": "int256"
+    },
+    {
+      "name": "hasMemoData",
+      "internalType": "bool",
+      "type": "bool"
+    },
+    {
+      "name": "firstMemoData",
+      "internalType": "bytes",
+      "type": "bytes"
+    },
+    {
+      "name": "hasDestinationTag",
+      "internalType": "bool",
+      "type": "bool"
+    },
+    {
+      "name": "destinationTag",
+      "internalType": "uint256",
+      "type": "uint256"
+    },
+    {
+      "name": "status",
+      "internalType": "uint8",
+      "type": "uint8"
+    }
+  ],
   "assetManagerEventsAbi": [
     {
       "type": "event",
@@ -461,6 +821,25 @@
         },
         {
           "name": "remainingLots",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionAmountIncomplete",
+      "inputs": [
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "remainingAmountUBA",
           "internalType": "uint256",
           "type": "uint256",
           "indexed": false
@@ -1663,6 +2042,335 @@
       "stateMutability": "nonpayable"
     },
     {
+      "type": "function",
+      "name": "redeemWithTag",
+      "inputs": [
+        {
+          "name": "_amountUBA",
+          "internalType": "uint256",
+          "type": "uint256"
+        },
+        {
+          "name": "_redeemerUnderlyingAddressString",
+          "internalType": "string",
+          "type": "string"
+        },
+        {
+          "name": "_executor",
+          "internalType": "address payable",
+          "type": "address"
+        },
+        {
+          "name": "_destinationTag",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "_redeemedAmountUBA",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "confirmXRPRedemptionPayment",
+      "inputs": [
+        {
+          "name": "_payment",
+          "type": "tuple",
+          "internalType": "struct IXRPPayment.Proof",
+          "components": [
+            {
+              "name": "merkleProof",
+              "internalType": "bytes32[]",
+              "type": "bytes32[]"
+            },
+            {
+              "name": "data",
+              "internalType": "struct IXRPPayment.Response",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "attestationType",
+                  "internalType": "bytes32",
+                  "type": "bytes32"
+                },
+                {
+                  "name": "sourceId",
+                  "internalType": "bytes32",
+                  "type": "bytes32"
+                },
+                {
+                  "name": "votingRound",
+                  "internalType": "uint64",
+                  "type": "uint64"
+                },
+                {
+                  "name": "lowestUsedTimestamp",
+                  "internalType": "uint64",
+                  "type": "uint64"
+                },
+                {
+                  "name": "requestBody",
+                  "internalType": "struct IXRPPayment.RequestBody",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "transactionId",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "proofOwner",
+                      "internalType": "address",
+                      "type": "address"
+                    }
+                  ]
+                },
+                {
+                  "name": "responseBody",
+                  "internalType": "struct IXRPPayment.ResponseBody",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "blockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "blockTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "sourceAddress",
+                      "internalType": "string",
+                      "type": "string"
+                    },
+                    {
+                      "name": "sourceAddressHash",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "receivingAddressHash",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "intendedReceivingAddressHash",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "spentAmount",
+                      "internalType": "int256",
+                      "type": "int256"
+                    },
+                    {
+                      "name": "intendedSpentAmount",
+                      "internalType": "int256",
+                      "type": "int256"
+                    },
+                    {
+                      "name": "receivedAmount",
+                      "internalType": "int256",
+                      "type": "int256"
+                    },
+                    {
+                      "name": "intendedReceivedAmount",
+                      "internalType": "int256",
+                      "type": "int256"
+                    },
+                    {
+                      "name": "hasMemoData",
+                      "internalType": "bool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "firstMemoData",
+                      "internalType": "bytes",
+                      "type": "bytes"
+                    },
+                    {
+                      "name": "hasDestinationTag",
+                      "internalType": "bool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "destinationTag",
+                      "internalType": "uint256",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "status",
+                      "internalType": "uint8",
+                      "type": "uint8"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "_redemptionRequestId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "xrpRedemptionPaymentDefault",
+      "inputs": [
+        {
+          "name": "_proof",
+          "internalType": "struct IXRPPaymentNonexistence.Proof",
+          "type": "tuple",
+          "components": [
+            {
+              "name": "merkleProof",
+              "internalType": "bytes32[]",
+              "type": "bytes32[]"
+            },
+            {
+              "name": "data",
+              "internalType": "struct IXRPPaymentNonexistence.Response",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "attestationType",
+                  "internalType": "bytes32",
+                  "type": "bytes32"
+                },
+                {
+                  "name": "sourceId",
+                  "internalType": "bytes32",
+                  "type": "bytes32"
+                },
+                {
+                  "name": "votingRound",
+                  "internalType": "uint64",
+                  "type": "uint64"
+                },
+                {
+                  "name": "lowestUsedTimestamp",
+                  "internalType": "uint64",
+                  "type": "uint64"
+                },
+                {
+                  "name": "requestBody",
+                  "internalType": "struct IXRPPaymentNonexistence.RequestBody",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "minimalBlockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "deadlineBlockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "deadlineTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "destinationAddressHash",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "amount",
+                      "internalType": "uint256",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "checkFirstMemoData",
+                      "internalType": "bool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "firstMemoDataHash",
+                      "internalType": "bytes32",
+                      "type": "bytes32"
+                    },
+                    {
+                      "name": "checkDestinationTag",
+                      "internalType": "bool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "destinationTag",
+                      "internalType": "uint256",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "proofOwner",
+                      "internalType": "address",
+                      "type": "address"
+                    }
+                  ]
+                },
+                {
+                  "name": "responseBody",
+                  "internalType": "struct IXRPPaymentNonexistence.ResponseBody",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "minimalBlockTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockNumber",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockTimestamp",
+                      "internalType": "uint64",
+                      "type": "uint64"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "_redemptionRequestId",
+          "internalType": "uint256",
+          "type": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "redeemWithTagSupported",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "internalType": "bool",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
       "type": "event",
       "anonymous": false,
       "name": "RedemptionRequested",
@@ -1870,6 +2578,25 @@
         },
         {
           "name": "remainingLots",
+          "internalType": "uint256",
+          "type": "uint256",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "RedemptionAmountIncomplete",
+      "inputs": [
+        {
+          "name": "redeemer",
+          "internalType": "address",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "remainingAmountUBA",
           "internalType": "uint256",
           "type": "uint256",
           "indexed": false
@@ -2740,6 +3467,137 @@
     },
     {
       "type": "function",
+      "name": "executeXrpDefault",
+      "inputs": [
+        {
+          "name": "proof",
+          "type": "tuple",
+          "internalType": "struct IXRPPaymentNonexistence.Proof",
+          "components": [
+            {
+              "name": "merkleProof",
+              "type": "bytes32[]",
+              "internalType": "bytes32[]"
+            },
+            {
+              "name": "data",
+              "type": "tuple",
+              "internalType": "struct IXRPPaymentNonexistence.Response",
+              "components": [
+                {
+                  "name": "attestationType",
+                  "type": "bytes32",
+                  "internalType": "bytes32"
+                },
+                {
+                  "name": "sourceId",
+                  "type": "bytes32",
+                  "internalType": "bytes32"
+                },
+                {
+                  "name": "votingRound",
+                  "type": "uint64",
+                  "internalType": "uint64"
+                },
+                {
+                  "name": "lowestUsedTimestamp",
+                  "type": "uint64",
+                  "internalType": "uint64"
+                },
+                {
+                  "name": "requestBody",
+                  "type": "tuple",
+                  "internalType": "struct IXRPPaymentNonexistence.RequestBody",
+                  "components": [
+                    {
+                      "name": "minimalBlockNumber",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "deadlineBlockNumber",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "deadlineTimestamp",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "destinationAddressHash",
+                      "type": "bytes32",
+                      "internalType": "bytes32"
+                    },
+                    {
+                      "name": "amount",
+                      "type": "uint256",
+                      "internalType": "uint256"
+                    },
+                    {
+                      "name": "checkFirstMemoData",
+                      "type": "bool",
+                      "internalType": "bool"
+                    },
+                    {
+                      "name": "firstMemoDataHash",
+                      "type": "bytes32",
+                      "internalType": "bytes32"
+                    },
+                    {
+                      "name": "checkDestinationTag",
+                      "type": "bool",
+                      "internalType": "bool"
+                    },
+                    {
+                      "name": "destinationTag",
+                      "type": "uint256",
+                      "internalType": "uint256"
+                    },
+                    {
+                      "name": "proofOwner",
+                      "type": "address",
+                      "internalType": "address"
+                    }
+                  ]
+                },
+                {
+                  "name": "responseBody",
+                  "type": "tuple",
+                  "internalType": "struct IXRPPaymentNonexistence.ResponseBody",
+                  "components": [
+                    {
+                      "name": "minimalBlockTimestamp",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockNumber",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    },
+                    {
+                      "name": "firstOverflowBlockTimestamp",
+                      "type": "uint64",
+                      "internalType": "uint64"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "redemptionRequestId",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "fAssetTokenAddress",
       "inputs": [],
       "outputs": [
@@ -2944,12 +3802,8 @@
     },
     "rpcUrls": {
       "default": {
-        "http": [
-          "https://coston2-api.flare.network/ext/C/rpc"
-        ],
-        "webSocket": [
-          "wss://coston2-api.flare.network/ext/C/ws"
-        ]
+        "http": ["https://coston2-api.flare.network/ext/C/rpc"],
+        "webSocket": ["wss://coston2-api.flare.network/ext/C/ws"]
       }
     },
     "blockExplorers": {

@@ -109,6 +109,95 @@ export function parseRedeemAmount(
 }
 
 // ---------------------------------------------------------------------------
+// Destination tag (redeem-by-tag)
+//
+// FAssets exposes `redeemWithTag(amountUBA, address, executor, destinationTag)`
+// for XRP redemptions that require a destination tag (exchanges/custodians). An
+// empty tag input means "no tag" → the standard `redeemAmount` path. A
+// user-supplied tag (including `0`) means the tag path. The tag must fit a
+// uint32 (the on-chain `DestinationTagTooBig` revert bound).
+// ---------------------------------------------------------------------------
+
+/** Maximum XRPL destination tag (2**32 - 1), per FAssets. */
+export const DESTINATION_TAG_MAX = 4294967295n;
+
+export type DestinationTagParseResult = Readonly<{
+  /** Parsed uint32 tag, or `null` when the input is empty (→ standard redeem). */
+  tag: bigint | null;
+  /** User-facing error, or `null` for empty (quiet) and valid inputs. */
+  error: string | null;
+}>;
+
+/**
+ * Parse a raw destination-tag input into an exact uint32 bigint. Empty input is
+ * not an error (it means "no tag" → standard `redeemAmount`); `0` is a valid
+ * tag and selects `redeemWithTag`. Anything non-numeric or ≥ 2**32 is an error.
+ */
+export function parseDestinationTag(raw: string): DestinationTagParseResult {
+  const trimmed = raw.trim();
+
+  if (trimmed === "") {
+    return { tag: null, error: null };
+  }
+
+  if (!/^(0|[1-9]\d*)$/.test(trimmed)) {
+    return { tag: null, error: "Destination tag must be a whole number." };
+  }
+
+  const tag = BigInt(trimmed);
+  if (tag > DESTINATION_TAG_MAX) {
+    return {
+      tag: null,
+      error: "Destination tag must fit in 32 bits (at most 4294967295).",
+    };
+  }
+
+  return { tag, error: null };
+}
+
+/** The redeem function + args derived from the (optional) destination tag. */
+export type RedeemCallArgs =
+  | Readonly<{
+      functionName: "redeemAmount";
+      args: readonly [bigint, string, EvmAddress];
+    }>
+  | Readonly<{
+      functionName: "redeemWithTag";
+      args: readonly [bigint, string, EvmAddress, bigint];
+    }>;
+
+/**
+ * Build the AssetManager redeem call from the parsed amount, validated XRPL
+ * address, resolved executor, and optional destination tag. Empty tag ⇒
+ * `redeemAmount`; present tag ⇒ `redeemWithTag(amount, address, executor, tag)`.
+ */
+export function buildRedeemCallArgs(
+  input: Readonly<{
+    amountUba: bigint;
+    xrplAddress: string;
+    executor: EvmAddress;
+    destinationTag: bigint | null;
+  }>,
+): RedeemCallArgs {
+  if (input.destinationTag === null) {
+    return {
+      functionName: "redeemAmount",
+      args: [input.amountUba, input.xrplAddress, input.executor],
+    };
+  }
+
+  return {
+    functionName: "redeemWithTag",
+    args: [
+      input.amountUba,
+      input.xrplAddress,
+      input.executor,
+      input.destinationTag,
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Amount formatting
 // ---------------------------------------------------------------------------
 
@@ -204,11 +293,14 @@ export type RedemptionLogInput = Readonly<{
 }>;
 
 /**
- * Extract the `RedemptionRequested` request ids from a transaction receipt's
- * logs. A single redeem can be filled from multiple agents' tickets (the
- * protocol assigns them FIFO), emitting several `RedemptionRequested` events,
- * so this returns every distinct id in emission order. Logs that are not this
- * event (or cannot be decoded against the AssetManager events ABI) are skipped.
+ * Extract the redemption request ids from a transaction receipt's logs. A
+ * single redeem can be filled from multiple agents' tickets (the protocol
+ * assigns them FIFO), emitting several `RedemptionRequested` (standard path)
+ * or `RedemptionWithTagRequested` (tag path) events, so this returns every
+ * distinct id in emission order. A tag redemption emits
+ * `RedemptionWithTagRequested` — NOT `RedemptionRequested` — so both event
+ * names are accepted. Logs that are neither (or cannot be decoded against the
+ * AssetManager events ABI) are skipped.
  */
 export function parseRedemptionRequestIds(
   logs: readonly RedemptionLogInput[],
@@ -232,7 +324,14 @@ export function parseRedemptionRequestIds(
       decoded = null;
     }
 
-    if (decoded === null || decoded.eventName !== "RedemptionRequested") {
+    if (decoded === null) {
+      continue;
+    }
+
+    if (
+      decoded.eventName !== "RedemptionRequested" &&
+      decoded.eventName !== "RedemptionWithTagRequested"
+    ) {
       continue;
     }
 
@@ -307,6 +406,8 @@ export type RedemptionReadiness = Readonly<{
   /** Validation error for the amount input, or `null`. */
   inputError: string | null;
   addressValid: boolean;
+  /** Validation error for the destination-tag input, or `null`. */
+  tagError: string | null;
   /** Whether the on-chain balance has been read yet. */
   balanceKnown: boolean;
   sufficientBalance: boolean;
@@ -335,6 +436,9 @@ export function redemptionBlockedReason(
   }
   if (!state.addressValid) {
     return "Enter a valid XRPL destination address.";
+  }
+  if (state.tagError !== null) {
+    return state.tagError;
   }
   if (state.balanceKnown && !state.sufficientBalance) {
     return "Insufficient FXRP balance for this amount.";

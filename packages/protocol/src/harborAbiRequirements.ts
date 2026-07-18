@@ -14,6 +14,7 @@ export const requiredHarborRedeemerFunctions = [
   "assetManagerAddress",
   "defaultKeeperExecutor",
   "executeDefault",
+  "executeXrpDefault",
   "fAssetTokenAddress",
   "lotSizeUBA",
   "owner",

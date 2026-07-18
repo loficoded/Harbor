@@ -1,5 +1,8 @@
-import { referencedPaymentNonexistenceResponseAbi } from "@harbor/protocol";
-import type { SerializedFdcProofRecord } from "@harbor/shared";
+import {
+  referencedPaymentNonexistenceResponseAbi,
+  xrpPaymentNonexistenceResponseAbi,
+} from "@harbor/protocol";
+import type { RedemptionKind, SerializedFdcProofRecord } from "@harbor/shared";
 import { decodeAbiParameters, getAddress, isAddress, type Hex } from "viem";
 
 /**
@@ -23,12 +26,18 @@ import { decodeAbiParameters, getAddress, isAddress, type Hex } from "viem";
  */
 
 const EXECUTE_DEFAULT_FUNCTION_NAME = "executeDefault" as const;
+const EXECUTE_XRP_DEFAULT_FUNCTION_NAME = "executeXrpDefault" as const;
 
-export { EXECUTE_DEFAULT_FUNCTION_NAME };
+export { EXECUTE_DEFAULT_FUNCTION_NAME, EXECUTE_XRP_DEFAULT_FUNCTION_NAME };
 
 /** viem parameter descriptor for the encoded `Response` tuple. */
 const RESPONSE_TUPLE_ABI = [
   { type: "tuple", components: referencedPaymentNonexistenceResponseAbi },
+] as const;
+
+/** viem parameter descriptor for the encoded XRP `Response` tuple. */
+const XRP_RESPONSE_TUPLE_ABI = [
+  { type: "tuple", components: xrpPaymentNonexistenceResponseAbi },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -70,8 +79,8 @@ export type ExecuteDefaultProofArg = Readonly<{
 /** Positional args for `executeDefault(proof, redemptionRequestId)`. */
 export type ExecuteDefaultArgs = readonly [ExecuteDefaultProofArg, bigint];
 
-export type BuildProofResult =
-  | Readonly<{ ok: true; args: ExecuteDefaultArgs }>
+export type BuildProofResult<TArgs = ExecuteDefaultArgs> =
+  | Readonly<{ ok: true; args: TArgs }>
   | Readonly<{ ok: false; issues: readonly string[] }>;
 
 // ---------------------------------------------------------------------------
@@ -270,6 +279,232 @@ export function buildExecuteDefaultArgs(
   ];
 
   return { ok: true, args };
+}
+
+// ---------------------------------------------------------------------------
+// executeXrpDefault (redeem-by-tag default lane)
+// ---------------------------------------------------------------------------
+
+export type XrpExecuteRequestBody = Readonly<{
+  minimalBlockNumber: bigint;
+  deadlineBlockNumber: bigint;
+  deadlineTimestamp: bigint;
+  destinationAddressHash: Hex;
+  amount: bigint;
+  checkFirstMemoData: boolean;
+  firstMemoDataHash: Hex;
+  checkDestinationTag: boolean;
+  destinationTag: bigint;
+  proofOwner: Hex;
+}>;
+
+export type XrpExecuteResponseData = Readonly<{
+  attestationType: Hex;
+  sourceId: Hex;
+  votingRound: bigint;
+  lowestUsedTimestamp: bigint;
+  requestBody: XrpExecuteRequestBody;
+  responseBody: ExecuteDefaultResponseBody;
+}>;
+
+/** The `proof` (first) argument to `HarborRedeemer.executeXrpDefault`. */
+export type ExecuteXrpDefaultProofArg = Readonly<{
+  merkleProof: readonly Hex[];
+  data: XrpExecuteResponseData;
+}>;
+
+/** Positional args for `executeXrpDefault(proof, redemptionRequestId)`. */
+export type ExecuteXrpDefaultArgs = readonly [
+  ExecuteXrpDefaultProofArg,
+  bigint,
+];
+
+type XrpDecodeResult =
+  | Readonly<{ ok: true; data: XrpExecuteResponseData }>
+  | Readonly<{ ok: false; issue: string }>;
+
+/** Decode the ABI-encoded XRP `responseBody` hex into structured data. */
+export function decodeXrpProofResponseBody(
+  responseBody: unknown,
+): XrpDecodeResult {
+  if (
+    typeof responseBody !== "string" ||
+    !/^0x[0-9a-fA-F]*$/.test(responseBody)
+  ) {
+    return { ok: false, issue: "responseBody is not a hex string" };
+  }
+
+  let decoded: unknown;
+  try {
+    decoded = decodeAbiParameters(
+      XRP_RESPONSE_TUPLE_ABI,
+      responseBody as Hex,
+    )[0];
+  } catch {
+    return {
+      ok: false,
+      issue: "responseBody is not a valid encoded XRP FDC Response tuple",
+    };
+  }
+
+  const issues = validateXrpResponseData(decoded);
+  if (issues.length > 0) {
+    return { ok: false, issue: issues[0] ?? "responseBody is malformed" };
+  }
+
+  return { ok: true, data: decoded as XrpExecuteResponseData };
+}
+
+/** Validate the decoded XRP Response tuple field-by-field. */
+export function validateXrpResponseData(value: unknown): readonly string[] {
+  const issues: string[] = [];
+  if (typeof value !== "object" || value === null) {
+    return ["XRP Response data is not an object"];
+  }
+  const data = value as Record<string, unknown>;
+
+  if (!isBytes32(data["attestationType"])) {
+    issues.push("attestationType must be bytes32");
+  }
+  if (!isBytes32(data["sourceId"])) {
+    issues.push("sourceId must be bytes32");
+  }
+  if (!isUnsignedBigint(data["votingRound"])) {
+    issues.push("votingRound must be a non-negative integer");
+  }
+  if (!isUnsignedBigint(data["lowestUsedTimestamp"])) {
+    issues.push("lowestUsedTimestamp must be a non-negative integer");
+  }
+
+  const requestBody = data["requestBody"];
+  if (typeof requestBody !== "object" || requestBody === null) {
+    issues.push("requestBody is missing");
+  } else {
+    const rb = requestBody as Record<string, unknown>;
+    for (const field of [
+      "minimalBlockNumber",
+      "deadlineBlockNumber",
+      "deadlineTimestamp",
+      "amount",
+      "destinationTag",
+    ] as const) {
+      if (!isUnsignedBigint(rb[field])) {
+        issues.push(`requestBody.${field} must be a non-negative integer`);
+      }
+    }
+    if (!isBytes32(rb["destinationAddressHash"])) {
+      issues.push("requestBody.destinationAddressHash must be bytes32");
+    }
+    if (!isBytes32(rb["firstMemoDataHash"])) {
+      issues.push("requestBody.firstMemoDataHash must be bytes32");
+    }
+    if (typeof rb["checkFirstMemoData"] !== "boolean") {
+      issues.push("requestBody.checkFirstMemoData must be a boolean");
+    }
+    if (typeof rb["checkDestinationTag"] !== "boolean") {
+      issues.push("requestBody.checkDestinationTag must be a boolean");
+    }
+    if (typeof rb["proofOwner"] !== "string" || !isAddress(rb["proofOwner"])) {
+      issues.push("requestBody.proofOwner must be an address");
+    }
+  }
+
+  const responseBody = data["responseBody"];
+  if (typeof responseBody !== "object" || responseBody === null) {
+    issues.push("responseBody sub-struct is missing");
+  } else {
+    const rsb = responseBody as Record<string, unknown>;
+    for (const field of [
+      "minimalBlockTimestamp",
+      "firstOverflowBlockNumber",
+      "firstOverflowBlockTimestamp",
+    ] as const) {
+      if (!isUnsignedBigint(rsb[field])) {
+        issues.push(`responseBody.${field} must be a non-negative integer`);
+      }
+    }
+  }
+
+  return issues;
+}
+
+/** Build validated `executeXrpDefault(proof, redemptionRequestId)` arguments. */
+export function buildExecuteXrpDefaultArgs(
+  proof: SerializedFdcProofRecord | null | undefined,
+  requestId: string,
+): BuildProofResult<ExecuteXrpDefaultArgs> {
+  const issues: string[] = [];
+
+  const parsedRequestId = parseRedemptionRequestId(requestId);
+  if (parsedRequestId === null) {
+    issues.push("redemptionRequestId must be a non-negative integer");
+  }
+
+  if (proof === null || proof === undefined) {
+    issues.push("no FDC proof is available yet");
+    return { ok: false, issues };
+  }
+
+  const merkleIssues = validateMerkleProof(proof.merkleProof);
+  issues.push(...merkleIssues);
+
+  const decoded = decodeXrpProofResponseBody(proof.responseBody);
+  if (!decoded.ok) {
+    issues.push(decoded.issue);
+  }
+
+  if (issues.length > 0 || !decoded.ok || parsedRequestId === null) {
+    return { ok: false, issues };
+  }
+
+  const args: ExecuteXrpDefaultArgs = [
+    {
+      merkleProof: proof.merkleProof as readonly Hex[],
+      data: decoded.data,
+    },
+    parsedRequestId,
+  ];
+
+  return { ok: true, args };
+}
+
+/**
+ * The default-execution target for a redemption, selected by `redemptionKind`.
+ * A `WITH_TAG` redemption routes to `executeXrpDefault` (the XRP-native default
+ * lane); a `STANDARD` redemption routes to `executeDefault`. Mirrors how the
+ * backend keeper picks the entrypoint, so the UI never fabricates calldata.
+ */
+export type DefaultExecutionTarget =
+  | Readonly<{
+      ok: true;
+      functionName: "executeDefault";
+      args: ExecuteDefaultArgs;
+    }>
+  | Readonly<{
+      ok: true;
+      functionName: "executeXrpDefault";
+      args: ExecuteXrpDefaultArgs;
+    }>
+  | Readonly<{ ok: false; issues: readonly string[] }>;
+
+export function buildDefaultExecutionArgs(
+  proof: SerializedFdcProofRecord | null | undefined,
+  requestId: string,
+  redemptionKind: RedemptionKind,
+): DefaultExecutionTarget {
+  if (redemptionKind === "WITH_TAG") {
+    const result = buildExecuteXrpDefaultArgs(proof, requestId);
+    if (!result.ok) {
+      return { ok: false, issues: result.issues };
+    }
+    return { ok: true, functionName: "executeXrpDefault", args: result.args };
+  }
+
+  const result = buildExecuteDefaultArgs(proof, requestId);
+  if (!result.ok) {
+    return { ok: false, issues: result.issues };
+  }
+  return { ok: true, functionName: "executeDefault", args: result.args };
 }
 
 /**

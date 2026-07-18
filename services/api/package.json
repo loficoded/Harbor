@@ -28,6 +28,7 @@
     "xrpl": "^2.14.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
+    "@types/better-sqlite3": "^7.6.13",
+    "fast-check": "^4.9.0"
   }
 }

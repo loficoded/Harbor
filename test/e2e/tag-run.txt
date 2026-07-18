@@ -1,0 +1,39 @@
+┌─ Harbor Redeem-by-Tag E2E (Coston2) ───────────────────────────────
+│ rpc:        https://coston2-api.flare.network/ext/C/rpc
+│ wallet:     0xcE77eB5b0AFECED65eA70118B96cE3d813112F88
+│ mutations:  false
+│ fdcProof:   false
+│ tag:        12345
+└──────────────────────────────────────────────────────────────────────
+  · T0-tag Environment › RPC reachable + Coston2 chainId …  · T0-tag Environment › redeemWithTagSupported() is true on FXRP AssetManager …  · T0-tag Environment › FDC verifier serves the XRPPaymentNonexistence type …  · T4-tag Happy path › approve + redeemWithTag → RedemptionWithTagRequested (with exact tag) …  · T4-tag Happy path › Agent settles → RedemptionPerformed + FXRP burned + XRPL payment carried the tag …  · T5-tag Edge (XRP default) › Build + encode XRPPaymentNonexistence request body …  · T5-tag Edge (XRP default) › FDC verifier prepareRequest (live) for XRPPaymentNonexistence …  · T5-tag Edge (XRP default) › Full FDC proof → on-chain FdcVerification.verifyXRPPaymentNonexistence == true (live) …  · T5-tag Edge (XRP default) › executeXrpDefault before the deadline reverts (live wiring) …                                                                                  PASS  T0-tag Environment › RPC reachable + Coston2 chainId (1ms)
+      chainId=114
+                                                                                  PASS  T0-tag Environment › redeemWithTagSupported() is true on FXRP AssetManager (199ms)
+      supported=true
+                                                                                  BLOCKED  T0-tag Environment › FDC verifier serves the XRPPaymentNonexistence type (23ms)
+      XRPL testnet unreachable (fetch failed). Cannot build a synthetic window for the verifier probe; retry on a network with XRPL egress.
+                                                                                  BLOCKED  T4-tag Happy path › approve + redeemWithTag → RedemptionWithTagRequested (with exact tag) (84ms)
+      Wallet holds 0 FXRP UBA; needs 10000000 (1 lot(s)). Fund the wallet via the Coston2 FXRP faucet (reCAPTCHA-gated) or set HARBOR_FORK_T5C=true, then RUN_MUTATIONS=true.
+                                                                                  SKIP  T4-tag Happy path › Agent settles → RedemptionPerformed + FXRP burned + XRPL payment carried the tag (0ms)
+      no tag redemption was submitted
+                                                                                  BLOCKED  T5-tag Edge (XRP default) › Build + encode XRPPaymentNonexistence request body (16ms)
+      XRPL testnet unreachable (fetch failed); cannot build a synthetic window. Retry with XRPL egress.
+                                                                                  BLOCKED  T5-tag Edge (XRP default) › FDC verifier prepareRequest (live) for XRPPaymentNonexistence (13ms)
+      XRPL testnet unreachable (fetch failed); cannot build a synthetic window for prepareRequest.
+                                                                                  SKIP  T5-tag Edge (XRP default) › Full FDC proof → on-chain FdcVerification.verifyXRPPaymentNonexistence == true (live) (1ms)
+      slow (~3-6 min, ~1000 wei fee); set RUN_FDC_PROOF=true
+                                                                                  PASS  T5-tag Edge (XRP default) › executeXrpDefault before the deadline reverts (live wiring) (88ms)
+      reverted as expected (InvalidRequestId / window open)
+──────── SUMMARY ─────────
+  PASS  T0-tag Environment › RPC reachable + Coston2 chainId
+  PASS  T0-tag Environment › redeemWithTagSupported() is true on FXRP AssetManager
+  BLOCKED  T0-tag Environment › FDC verifier serves the XRPPaymentNonexistence type
+  BLOCKED  T4-tag Happy path › approve + redeemWithTag → RedemptionWithTagRequested (with exact tag)
+  SKIP  T4-tag Happy path › Agent settles → RedemptionPerformed + FXRP burned + XRPL payment carried the tag
+  BLOCKED  T5-tag Edge (XRP default) › Build + encode XRPPaymentNonexistence request body
+  BLOCKED  T5-tag Edge (XRP default) › FDC verifier prepareRequest (live) for XRPPaymentNonexistence
+  SKIP  T5-tag Edge (XRP default) › Full FDC proof → on-chain FdcVerification.verifyXRPPaymentNonexistence == true (live)
+  PASS  T5-tag Edge (XRP default) › executeXrpDefault before the deadline reverts (live wiring)
+
+Totals: 3 passed, 0 failed, 4 blocked, 2 skipped (of 9)
+
+BLOCKED = a real prerequisite is missing (FXRP faucet, redeemWithTagSupported()==false, or the XRP FDC type not yet served). See the detail lines above for the exact next step.

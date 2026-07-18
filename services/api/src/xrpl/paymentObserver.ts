@@ -21,7 +21,10 @@ import type {
   StoredXrplPaymentObservation,
 } from "../repositories/types.js";
 import type { XrplObservationClient } from "./client.js";
-import { decodeXrplPaymentReferences } from "./paymentReference.js";
+import {
+  decodeXrplDestinationTag,
+  decodeXrplPaymentReferences,
+} from "./paymentReference.js";
 
 export type XrplPaymentRejectionReason =
   | "not-payment"
@@ -32,6 +35,7 @@ export type XrplPaymentRejectionReason =
   | "failed-transaction"
   | "wrong-destination"
   | "wrong-payment-reference"
+  | "wrong-destination-tag"
   | "unsupported-delivered-amount"
   | "insufficient-delivered-amount"
   | "out-of-window";
@@ -43,6 +47,8 @@ export type NormalizedXrplPayment = Readonly<{
   deliveredAmountUBA: bigint | null;
   feeDrops: bigint;
   paymentReferences: readonly Bytes32[];
+  /** XRPL `DestinationTag`, or `null` when the payment carried none. */
+  destinationTag: bigint | null;
   ledgerIndex: bigint;
   closeTimestamp: string | null;
   closeTimestampSeconds: bigint | null;
@@ -117,6 +123,7 @@ type XrplPaymentTransactionLike = Readonly<{
   Fee?: unknown;
   InvoiceID?: unknown;
   Memos?: readonly Readonly<{ Memo?: Readonly<{ MemoData?: unknown }> }>[];
+  DestinationTag?: unknown;
   date?: unknown;
   hash?: unknown;
   ledger_index?: unknown;
@@ -301,6 +308,7 @@ export function normalizeXrplPayment(
       deliveredAmountUBA: null,
       feeDrops: 0n,
       paymentReferences: [],
+      destinationTag: decodeXrplDestinationTag(transaction),
       ledgerIndex: ledgerIndex ?? 0n,
       closeTimestamp: null,
       closeTimestampSeconds: null,
@@ -340,6 +348,7 @@ export function normalizeXrplPayment(
     paymentReferences: normalizeReferenceList(
       decodeXrplPaymentReferences(transaction),
     ),
+    destinationTag: decodeXrplDestinationTag(transaction),
     ledgerIndex: ledgerIndex ?? 0n,
     closeTimestamp,
     closeTimestampSeconds,
@@ -388,6 +397,18 @@ export function matchXrplPaymentToRedemption(
 
   if (!payment.paymentReferences.includes(redemption.paymentReference)) {
     return { matched: false, reason: "wrong-payment-reference", payment };
+  }
+
+  // A redeem-by-tag (WITH_TAG) redemption settles only when the agent's XRPL
+  // payment carries the exact required DestinationTag. Tag `0` is a valid tag:
+  // it must match a payment whose DestinationTag is `0`. Standard redemptions
+  // ignore the tag entirely (backward-compatible).
+  if (
+    redemption.redemptionKind === "WITH_TAG" &&
+    redemption.destinationTag !== null &&
+    payment.destinationTag !== redemption.destinationTag
+  ) {
+    return { matched: false, reason: "wrong-destination-tag", payment };
   }
 
   if (payment.deliveredAmountUBA === null) {
@@ -447,6 +468,7 @@ function buildRawNormalizedReceipt(payment: NormalizedXrplPayment): string {
       deliveredAmountUBA: payment.deliveredAmountUBA,
       feeDrops: payment.feeDrops,
       paymentReferences: payment.paymentReferences,
+      destinationTag: payment.destinationTag,
       ledgerIndex: payment.ledgerIndex,
       closeTimestamp: payment.closeTimestamp,
       transactionResult: payment.transactionResult,
@@ -494,6 +516,7 @@ export function persistMatchedXrplPaymentObservation(
       ledgerIndex: match.payment.ledgerIndex,
       closeTimestamp: match.payment.closeTimestamp,
       validatedAt: match.payment.closeTimestamp,
+      destinationTag: match.payment.destinationTag,
       rawJson: buildRawNormalizedReceipt(match.payment),
     });
     const updatedRedemption = updateRedemptionStatus(database, {

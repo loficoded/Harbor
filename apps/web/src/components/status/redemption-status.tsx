@@ -168,6 +168,7 @@ export function RedemptionStatus({
       <SelfRecoveryPanel
         requestId={requestId}
         selfRecovery={viewModel.selfRecovery}
+        redemptionKind={viewModel.redemptionKind}
         harborRedeemerAddress={env.contractAddress}
         onRecoveryRefresh={() => {
           void query.refetch();

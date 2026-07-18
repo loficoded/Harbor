@@ -1,4 +1,9 @@
-import type { EvmAddress, IsoTimestamp } from "@harbor/shared";
+import type {
+  Bytes32,
+  EvmAddress,
+  HexString,
+  IsoTimestamp,
+} from "@harbor/shared";
 
 import type { SqliteDatabase } from "../db/index.js";
 import {
@@ -12,6 +17,7 @@ import type {
 } from "../repositories/types.js";
 import {
   requestReferencedPaymentNonexistenceProof,
+  requestXrpPaymentNonexistenceProof,
   type DaLayerFetch,
   type DaLayerRetryOptions,
 } from "./daLayer.js";
@@ -147,6 +153,45 @@ export async function refreshFdcRequestFinalization(
 export async function retrieveAndPersistReferencedPaymentNonexistenceProof(
   input: RetrieveAndPersistFdcProofInput,
 ): Promise<RetrieveAndPersistFdcProofResult> {
+  return retrieveAndPersistFdcProof(input, (requestParams) =>
+    requestReferencedPaymentNonexistenceProof(requestParams),
+  );
+}
+
+/**
+ * Retrieve + persist an `XRPPaymentNonexistence` proof for a redeem-by-tag
+ * default. Mirrors `retrieveAndPersistReferencedPaymentNonexistenceProof` but
+ * requests the XRP-native attestation type from the DA layer.
+ */
+export async function retrieveAndPersistXrpPaymentNonexistenceProof(
+  input: RetrieveAndPersistFdcProofInput,
+): Promise<RetrieveAndPersistFdcProofResult> {
+  return retrieveAndPersistFdcProof(input, (requestParams) =>
+    requestXrpPaymentNonexistenceProof(requestParams),
+  );
+}
+
+async function retrieveAndPersistFdcProof(
+  input: RetrieveAndPersistFdcProofInput,
+  requestProof: (requestParams: {
+    votingRoundId: bigint;
+    requestBytes: HexString;
+    baseUrl?: string;
+    proofPath?: string;
+    apiKey?: string;
+    fetch?: DaLayerFetch;
+    retry?: DaLayerRetryOptions;
+  }) => Promise<
+    | {
+        status: "PROOF_READY";
+        encodedResponse: HexString;
+        proofCalldata: { merkleProof: readonly Bytes32[] };
+        proofJson: string;
+        calldataJson: string;
+      }
+    | { status: "NOT_READY"; lastError: string; retryAfterMs: number | null }
+  >,
+): Promise<RetrieveAndPersistFdcProofResult> {
   const request = requireFdcRequest(input.database, input.fdcRequestId);
 
   if (request.votingRoundId === null) {
@@ -156,7 +201,7 @@ export async function retrieveAndPersistReferencedPaymentNonexistenceProof(
   }
 
   try {
-    const proofResult = await requestReferencedPaymentNonexistenceProof({
+    const proofResult = await requestProof({
       votingRoundId: request.votingRoundId,
       requestBytes: request.requestBody,
       ...(input.daLayerBaseUrl === undefined
