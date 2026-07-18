@@ -79,7 +79,43 @@ function parseRedemptionKind(value: string, requestId: string): RedemptionKind {
   );
 }
 
+/**
+ * Enforce the `WITH_TAG` ⟺ non-null `destinationTag` invariant. A `WITH_TAG`
+ * redemption only ever settles on a payment carrying its exact required tag, and
+ * its on-chain default is built from that tag, so a `WITH_TAG` row without a tag
+ * — or a `STANDARD` row that carries one — is a data-integrity violation that
+ * would misroute settlement matching and the default. Fail loudly with the
+ * offending value and request id (the same posture as {@link parseRedemptionKind}
+ * for a corrupt lane) instead of silently settling on an arbitrary tag.
+ */
+function assertRedemptionTagConsistency(
+  redemptionKind: RedemptionKind,
+  destinationTag: bigint | null,
+  requestId: string,
+): void {
+  if (redemptionKind === "WITH_TAG" && destinationTag === null) {
+    throw new Error(
+      `WITH_TAG redemption request ${requestId} is missing its destination tag`,
+    );
+  }
+  if (redemptionKind === "STANDARD" && destinationTag !== null) {
+    throw new Error(
+      `STANDARD redemption request ${requestId} must not carry a destination tag (found ${destinationTag})`,
+    );
+  }
+}
+
 function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
+  const redemptionKind = parseRedemptionKind(
+    row.redemption_kind,
+    row.request_id,
+  );
+  const destinationTag =
+    row.destination_tag === null
+      ? null
+      : parseSerializedBigint(row.destination_tag);
+  assertRedemptionTagConsistency(redemptionKind, destinationTag, row.request_id);
+
   return {
     assetManagerAddress: row.asset_manager_address as EvmAddress,
     requestId: row.request_id,
@@ -107,11 +143,8 @@ function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
     defaultTransactionHash:
       row.default_transaction_hash as TransactionHash | null,
     statusReason: row.status_reason,
-    redemptionKind: parseRedemptionKind(row.redemption_kind, row.request_id),
-    destinationTag:
-      row.destination_tag === null
-        ? null
-        : parseSerializedBigint(row.destination_tag),
+    redemptionKind,
+    destinationTag,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
