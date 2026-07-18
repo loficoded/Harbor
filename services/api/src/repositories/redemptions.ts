@@ -1,4 +1,5 @@
 import {
+  isRedemptionKind,
   parseSerializedBigint,
   serializeBigint,
   type EvmAddress,
@@ -63,6 +64,21 @@ type RedemptionEventRow = Readonly<{
   created_at: string;
 }>;
 
+/**
+ * Validate a persisted `redemption_kind` against the domain enum. A corrupt or
+ * unknown value is a data-integrity violation that could misroute an on-chain
+ * default (e.g. a WITH_TAG row settled via the standard lane), so we fail loudly
+ * with the offending value and request id rather than silently coercing it.
+ */
+function parseRedemptionKind(value: string, requestId: string): RedemptionKind {
+  if (isRedemptionKind(value)) {
+    return value;
+  }
+  throw new Error(
+    `Corrupt redemption_kind ${JSON.stringify(value)} for redemption request ${requestId}`,
+  );
+}
+
 function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
   return {
     assetManagerAddress: row.asset_manager_address as EvmAddress,
@@ -91,7 +107,7 @@ function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
     defaultTransactionHash:
       row.default_transaction_hash as TransactionHash | null,
     statusReason: row.status_reason,
-    redemptionKind: row.redemption_kind as RedemptionKind,
+    redemptionKind: parseRedemptionKind(row.redemption_kind, row.request_id),
     destinationTag:
       row.destination_tag === null
         ? null
@@ -203,7 +219,14 @@ ON CONFLICT(asset_manager_address, request_id) DO UPDATE SET
   default_transaction_hash = COALESCE(excluded.default_transaction_hash, redemptions.default_transaction_hash),
   status_reason = COALESCE(excluded.status_reason, redemptions.status_reason),
   destination_tag = COALESCE(excluded.destination_tag, redemptions.destination_tag),
-  redemption_kind = excluded.redemption_kind,
+  -- Preserve the lane monotonically: WITH_TAG is intrinsic to the request and
+  -- must never be downgraded to STANDARD by a later status-carrying upsert that
+  -- omits the kind (which defaults to STANDARD). Downgrading would misroute the
+  -- on-chain default to the standard ReferencedPaymentNonexistence lane.
+  redemption_kind = CASE
+    WHEN redemptions.redemption_kind = 'WITH_TAG' THEN 'WITH_TAG'
+    ELSE excluded.redemption_kind
+  END,
   updated_at = excluded.updated_at
 `,
     )

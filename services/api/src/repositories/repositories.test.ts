@@ -15,6 +15,7 @@ import {
 import {
   getFdcProofByRequestAndRound,
   getAgent,
+  getRedemptionByRequestId,
   insertFdcProof,
   insertRedemptionEvent,
   listAgents,
@@ -261,6 +262,105 @@ WHERE request_id = '42'
         (redemption) => redemption.requestId,
       ),
       ["42"],
+    );
+  });
+
+  test("never downgrades a WITH_TAG redemption to STANDARD on a later upsert (regression: item 3)", (t) => {
+    const database = createTestDatabase(t);
+
+    const base = {
+      assetManagerAddress,
+      requestId: "77",
+      sourceChainId: "114",
+      redeemer,
+      agentVault,
+      paymentAddress: "rDestinationAddress",
+      valueUBA: 10_000_000n,
+      feeUBA: 0n,
+      paymentReference,
+      firstUnderlyingBlock: 100n,
+      lastUnderlyingBlock: 200n,
+      lastUnderlyingTimestamp: 1893456000n,
+      executor,
+      executorFeeNatWei: 0n,
+    };
+
+    // Created as a tag-lane (WITH_TAG) redemption with tag 12345.
+    const created = upsertRedemption(database, {
+      ...base,
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+      createdAt: "2026-07-08T00:00:00.000Z",
+      updatedAt: "2026-07-08T00:00:00.000Z",
+    });
+    assert.equal(created.redemptionKind, "WITH_TAG");
+    assert.equal(created.destinationTag, 12345n);
+
+    // A later status-carrying upsert omits redemptionKind (which defaults to
+    // STANDARD) and destinationTag. Before the fix this downgraded the row and
+    // would misroute the on-chain default to the standard lane.
+    const updated = upsertRedemption(database, {
+      ...base,
+      status: "WATCHING",
+      updatedAt: "2026-07-08T01:00:00.000Z",
+    });
+    assert.equal(updated.redemptionKind, "WITH_TAG");
+    assert.equal(updated.destinationTag, 12345n);
+  });
+
+  test("keeps STANDARD when omitted and allows a STANDARD→WITH_TAG upgrade (regression: item 3)", (t) => {
+    const database = createTestDatabase(t);
+
+    const base = {
+      assetManagerAddress,
+      requestId: "78",
+      sourceChainId: "114",
+      redeemer,
+      agentVault,
+      paymentAddress: "rDestinationAddress",
+      valueUBA: 10_000_000n,
+      feeUBA: 0n,
+      paymentReference,
+      firstUnderlyingBlock: 100n,
+      lastUnderlyingBlock: 200n,
+      lastUnderlyingTimestamp: 1893456000n,
+      executor,
+      executorFeeNatWei: 0n,
+    };
+
+    // Standard row; a later upsert that omits the kind must stay STANDARD.
+    upsertRedemption(database, { ...base });
+    const stillStandard = upsertRedemption(database, {
+      ...base,
+      status: "WATCHING",
+    });
+    assert.equal(stillStandard.redemptionKind, "STANDARD");
+
+    // An explicit WITH_TAG value upgrades the lane (the intrinsic kind is
+    // corrected forward, never backward).
+    const upgraded = upsertRedemption(database, {
+      ...base,
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+    });
+    assert.equal(upgraded.redemptionKind, "WITH_TAG");
+    assert.equal(upgraded.destinationTag, 0n);
+  });
+
+  test("fails loudly when a persisted redemption_kind is corrupt (regression: item 4)", (t) => {
+    const database = createTestDatabase(t);
+    insertRedemptionFixture(database); // request_id "42", kind STANDARD
+
+    // Corrupt the persisted lane directly (bad migration / manual edit).
+    database
+      .prepare(
+        `UPDATE redemptions SET redemption_kind = 'BOGUS' WHERE request_id = '42'`,
+      )
+      .run();
+
+    assert.throws(
+      () => getRedemptionByRequestId(database, "42"),
+      /Corrupt redemption_kind "BOGUS" for redemption request 42/,
     );
   });
 });
