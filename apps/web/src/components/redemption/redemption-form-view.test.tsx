@@ -201,3 +201,39 @@ describe("RedemptionFormView — wallet, approval, and transaction states", () =
     expect(onRedeem).toHaveBeenCalledOnce();
   });
 });
+
+describe("RedemptionFormView — destination tag (redeem-by-tag)", () => {
+  it("renders an enabled tag input with the standard helper by default", () => {
+    renderView();
+    const tag = screen.getByLabelText("XRPL destination tag");
+    expect(tag).toBeEnabled();
+    expect(
+      screen.getByText(/Required by exchanges\/custodials/i),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the tag input enabled while capability is unknown (undefined)", () => {
+    renderView({ tagSupported: undefined });
+    expect(screen.getByLabelText("XRPL destination tag")).toBeEnabled();
+  });
+
+  it("gracefully disables the tag input when redeemWithTagSupported() is false", () => {
+    renderView({ tagSupported: false });
+    const tag = screen.getByLabelText("XRPL destination tag");
+    expect(tag).toBeDisabled();
+    expect(
+      screen.getByText(/does not support destination-tag redemptions/i),
+    ).toBeInTheDocument();
+    // The normal helper copy is replaced by the graceful notice.
+    expect(
+      screen.queryByText(/Required by exchanges\/custodials/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("forwards tag input changes to the handler", async () => {
+    const onTagInputChange = vi.fn();
+    renderView({ onTagInputChange });
+    await userEvent.type(screen.getByLabelText("XRPL destination tag"), "9");
+    expect(onTagInputChange).toHaveBeenCalledWith("9");
+  });
+});

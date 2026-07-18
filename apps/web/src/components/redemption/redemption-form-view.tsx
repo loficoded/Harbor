@@ -31,6 +31,12 @@ export type RedemptionFormViewProps = {
   tagInput: string;
   onTagInputChange: (value: string) => void;
   tagError: string | null;
+  /**
+   * On-chain `redeemWithTagSupported()` capability. `false` disables the tag
+   * input and shows a graceful notice; `true`/`undefined` render it normally so
+   * a transient (unread) capability never blocks the standard lane.
+   */
+  tagSupported?: boolean | undefined;
 
   // Executor
   executorFeeLabel: string;
@@ -89,6 +95,7 @@ export function RedemptionFormView(
     tagInput,
     onTagInputChange,
     tagError,
+    tagSupported,
     executorFeeLabel,
     executorLabel,
     harborManaged,
@@ -205,13 +212,23 @@ export function RedemptionFormView(
             inputMode="numeric"
             value={tagInput}
             onChange={(event) => onTagInputChange(event.target.value)}
-            placeholder="Leave empty for no tag"
+            placeholder={
+              tagSupported === false
+                ? "Not supported on this network"
+                : "Leave empty for no tag"
+            }
             aria-label="XRPL destination tag"
             aria-invalid={tagError !== null}
+            disabled={tagSupported === false}
             spellCheck={false}
             className={`${inputClass()} font-mono`}
           />
-          {tagError !== null ? (
+          {tagSupported === false ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              This AssetManager does not support destination-tag redemptions, so
+              this field is disabled. Leave it empty to redeem normally.
+            </p>
+          ) : tagError !== null ? (
             <p className="text-xs font-medium text-red-600 dark:text-red-400">
               {tagError}
             </p>

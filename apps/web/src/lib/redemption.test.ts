@@ -378,6 +378,8 @@ const readyState: RedemptionReadiness = {
   inputError: null,
   addressValid: true,
   tagError: null,
+  tagRequested: false,
+  tagSupported: true,
   balanceKnown: true,
   sufficientBalance: true,
 };
@@ -426,6 +428,35 @@ describe("redemptionBlockedReason", () => {
     ).toMatch(/32 bits/);
   });
 
+  it("blocks a requested tag only when redeemWithTagSupported() is explicitly false", () => {
+    // A tag was entered but the AssetManager advertises no tag support.
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: true,
+        tagSupported: false,
+      }),
+    ).toMatch(/does not support destination-tag/i);
+
+    // A transient/unknown capability (undefined) never blocks the tag lane.
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: true,
+        tagSupported: undefined,
+      }),
+    ).toBeNull();
+
+    // No tag requested ⇒ capability is irrelevant to the standard lane.
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: false,
+        tagSupported: false,
+      }),
+    ).toBeNull();
+  });
+
   it("blocks insufficient balance only when the balance is known", () => {
     expect(
       redemptionBlockedReason({
@@ -451,6 +482,8 @@ describe("redemptionBlockedReason", () => {
       inputError: "FXRP supports up to 6 decimal places.",
       addressValid: false,
       tagError: null,
+      tagRequested: false,
+      tagSupported: undefined,
       balanceKnown: true,
       sufficientBalance: false,
     };

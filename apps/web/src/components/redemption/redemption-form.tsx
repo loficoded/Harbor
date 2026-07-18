@@ -112,6 +112,20 @@ export function RedemptionForm() {
   const allowance =
     typeof allowanceRead.data === "bigint" ? allowanceRead.data : undefined;
 
+  // Gate the destination-tag lane on the AssetManager's advertised capability
+  // (`redeemWithTagSupported()`). `undefined` while the read is loading or
+  // unavailable so the standard lane is never blocked by a transient value.
+  const tagSupportedRead = useReadContract({
+    address: FXRP_ASSET_MANAGER_ADDRESS,
+    abi: ASSET_MANAGER_ABI,
+    functionName: "redeemWithTagSupported",
+    query: { enabled: connected },
+  });
+  const tagSupported =
+    typeof tagSupportedRead.data === "boolean"
+      ? tagSupportedRead.data
+      : undefined;
+
   const approvalRequired = isApprovalRequired(allowance, requiredUba);
   const sufficientBalance = hasSufficientBalance(balance, requiredUba);
 
@@ -171,6 +185,8 @@ export function RedemptionForm() {
     inputError: amountError,
     addressValid: addressValidation.valid,
     tagError,
+    tagRequested: tagInput.trim() !== "",
+    tagSupported,
     balanceKnown: balance !== undefined,
     sufficientBalance,
   });
@@ -257,6 +273,7 @@ export function RedemptionForm() {
         resetSubmission();
       }}
       tagError={tagError}
+      tagSupported={tagSupported}
       executorFeeLabel={executorFeeLabel}
       executorLabel={executorLabel}
       harborManaged={executor.harborManaged}

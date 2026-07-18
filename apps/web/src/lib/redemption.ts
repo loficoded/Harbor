@@ -408,6 +408,19 @@ export type RedemptionReadiness = Readonly<{
   addressValid: boolean;
   /** Validation error for the destination-tag input, or `null`. */
   tagError: string | null;
+  /**
+   * Whether the user supplied a destination tag (i.e. requested the
+   * `redeemWithTag` lane). A present tag — including `0` — is `true`; an empty
+   * input is `false`.
+   */
+  tagRequested: boolean;
+  /**
+   * On-chain `redeemWithTagSupported()` capability. `true`/`false` once the read
+   * resolves, or `undefined` while unknown/loading. A requested tag is only
+   * blocked when this is explicitly `false`, so a transient `undefined` never
+   * flickers the gate.
+   */
+  tagSupported: boolean | undefined;
   /** Whether the on-chain balance has been read yet. */
   balanceKnown: boolean;
   sufficientBalance: boolean;
@@ -439,6 +452,9 @@ export function redemptionBlockedReason(
   }
   if (state.tagError !== null) {
     return state.tagError;
+  }
+  if (state.tagRequested && state.tagSupported === false) {
+    return "This AssetManager does not support destination-tag redemptions.";
   }
   if (state.balanceKnown && !state.sufficientBalance) {
     return "Insufficient FXRP balance for this amount.";
