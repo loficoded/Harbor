@@ -34,7 +34,7 @@ const CFG = {
   addr: {
     assetManagerProxy: "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA",
     fxrp: "0x0b6A3645c240605887a5532109323A3E12273dc7",
-    harborExecutor: "0xD2180a8A091A1B4652B48F33767A0d0483da5D50",
+    harborExecutor: env("HARBOR_EXECUTOR_ADDRESS", "0xD2180a8A091A1B4652B48F33767A0d0483da5D50"),
     fdcHub: "0x48aC463d7975828989331F4De43341627b9c5f1D",
     fdcVerification: "0x906507E0B64bcD494Db73bd0459d1C667e14B933",
     relay: "0xa10B672D1c62e5457b17af63d4302add6A99d7dE",
@@ -781,7 +781,7 @@ async function T5_tag_default_pipeline() {
 /* -------------------------- XRPL ledger probe ---------------------------- */
 
 async function xrplValidatedLedgerIndex(): Promise<number> {
-  const res = await fetch("https://s.altnet.ripplettest.net:51234/", {
+  const res = await fetch("https://s.altnet.rippletest.net:51234/", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
