@@ -71,7 +71,7 @@ defaultedRequestId=(none — T5c will be BLOCKED)
           valueUBA=10.0 FXRP (10000000 UBA) feeUBA=50000
           payTo=rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G ref=0x464250526641000200000000000000000000000000000000000000000247891e
           window: blocks 18946649→18947227, tsDeadline=1783685269
-          executor=0xD2180a8A091A1B4652B48F33767A0d0483da5D50 fee=0.1 C2FLR
+          executor=0x82f39361FFb1a438e4EBF8025efa06e4511b02b5 fee=0.1 C2FLR
           gas: approve≈51609, redeem≈449584, redeemTx=0x2d3bf7e8851287e465f609b80efce3f115bc424bc7529c43a44dff93e946d2bc
 · T4 Happy path › Agent settles → RedemptionPerformed + balance burned …
   PASS    T4 Happy path › Agent settles → RedemptionPerformed + balance burned (201521ms)

@@ -510,7 +510,7 @@ Flare **Coston2** testnet (`chainId 114`), native currency `C2FLR`, RPC
 
 | Contract                 | Address                                                                                                                                   |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| HarborRedeemer           | [`0xD2180a8A091A1B4652B48F33767A0d0483da5D50`](https://coston2-explorer.flare.network/address/0xD2180a8A091A1B4652B48F33767A0d0483da5D50) |
+| HarborRedeemer           | [`0x82f39361FFb1a438e4EBF8025efa06e4511b02b5`](https://coston2-explorer.flare.network/address/0x82f39361FFb1a438e4EBF8025efa06e4511b02b5) |
 | FXRP AssetManager        | [`0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`](https://coston2-explorer.flare.network/address/0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA) |
 | FXRP FAsset (`FTestXRP`) | [`0x0b6A3645c240605887a5532109323A3E12273dc7`](https://coston2-explorer.flare.network/address/0x0b6A3645c240605887a5532109323A3E12273dc7) |
 | FDC Hub                  | [`0x48aC463d7975828989331F4De43341627b9c5f1D`](https://coston2-explorer.flare.network/address/0x48aC463d7975828989331F4De43341627b9c5f1D) |

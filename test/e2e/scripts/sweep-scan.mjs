@@ -9,7 +9,7 @@ const ABIS = require("../src/harbor-abis.json");
 
 const RPC = "https://coston2-api.flare.network/ext/C/rpc";
 const AM = "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA";
-const HARBOR = "0xD2180a8A091A1B4652B48F33767A0d0483da5D50";
+const HARBOR = "0x82f39361FFb1a438e4EBF8025efa06e4511b02b5";
 const LOOKBACK = Number(process.env.LOOKBACK || "150000");
 const WIN = 30;            // RPC max block span per getLogs
 const CONCURRENCY = 16;

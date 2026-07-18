@@ -53,7 +53,7 @@ const EXECUTOR_FEE_WEI = BigInt(process.env.HARBOR_EXECUTOR_FEE_WEI || "10000000
 const ADDR = {
   assetManager: "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA",
   fxrp: "0x0b6A3645c240605887a5532109323A3E12273dc7",
-  harbor: "0xD2180a8A091A1B4652B48F33767A0d0483da5D50",
+  harbor: "0x82f39361FFb1a438e4EBF8025efa06e4511b02b5",
   fdcVerification: "0x906507E0B64bcD494Db73bd0459d1C667e14B933",
 };
 // Known Coston2 FXRP holders (fallback source of backed FXRP to impersonate on
