@@ -7,6 +7,7 @@ import {
   type AgentDetails,
   type FdcRequestStatus,
   type GetRedemptionResponse,
+  type RedemptionKind,
   type RedemptionStatus,
   type RedemptionTimelineEntry,
   type SerializedFdcProofRecord,
@@ -73,11 +74,27 @@ export type RedemptionScenarioOptions = Readonly<{
    * test opts into official metadata.
    */
   agentDetails?: AgentDetails;
+  /**
+   * Redemption lane. Defaults to `STANDARD`. Set to `WITH_TAG` (together with a
+   * `destinationTag`) to exercise the redeem-by-tag status view.
+   */
+  redemptionKind?: RedemptionKind;
+  /**
+   * Required destination tag on the redemption detail (serialized as a decimal
+   * string), or `null`. Defaults to `null` (standard lane).
+   */
+  destinationTag?: `${bigint}` | null;
+  /**
+   * Destination tag stamped on the synthesized XRPL settlement receipt(s), or
+   * `null`. Defaults to `null` so standard receipts render no tag row.
+   */
+  receiptDestinationTag?: `${bigint}` | null;
 }>;
 
 function makeReceipt(
   requestId: string,
   index: number,
+  destinationTag: `${bigint}` | null = null,
 ): SerializedXrplPaymentObservation {
   return {
     observationId: `obs-${requestId}-${index}`,
@@ -91,7 +108,7 @@ function makeReceipt(
     ledgerIndex: "48213377",
     closeTimestamp: fixtureTime(6),
     validatedAt: fixtureTime(6),
-    destinationTag: null,
+    destinationTag,
     createdAt: fixtureTime(6),
   };
 }
@@ -318,7 +335,8 @@ export function makeRedemptionResponse(
     : 0;
   const receipts: SerializedXrplPaymentObservation[] = Array.from(
     { length: settlementCount },
-    (_unused, index) => makeReceipt(requestId, index),
+    (_unused, index) =>
+      makeReceipt(requestId, index, options.receiptDestinationTag ?? null),
   );
 
   const fdcRequests: SerializedFdcRequestRecord[] =
@@ -339,8 +357,8 @@ export function makeRedemptionResponse(
     agentVault: DEFAULT_AGENT_VAULT,
     agentDetails: options.agentDetails ?? emptyAgentDetails,
     paymentAddress: DEFAULT_XRPL_ADDRESS,
-    redemptionKind: "STANDARD",
-    destinationTag: null,
+    redemptionKind: options.redemptionKind ?? "STANDARD",
+    destinationTag: options.destinationTag ?? null,
     valueUBA: "10000000",
     feeUBA: "0",
     paymentReference: DEFAULT_PAYMENT_REFERENCE,

@@ -45,6 +45,36 @@ contract HarborRedeemerInvariantTest is HarborRedeemerTestBase {
         assertEq(fAsset.balanceOf(address(harbor)), 0, "harbor retained fasset after xrp default");
         assertEq(address(harbor).balance, 0, "harbor retained native after xrp default");
     }
+
+    /// @dev The standard and XRP default lanes are isolated: every successful
+    /// `executeDefault` hits only the standard AssetManager entrypoint and every
+    /// successful `executeXrpDefault` hits only the XRP entrypoint, so the two
+    /// per-lane call counters never bleed into each other regardless of the
+    /// interleaving of standard and tag defaults the handler drives.
+    function invariant_StandardAndXrpLanesAreIsolated() public view {
+        assertEq(
+            assetManager.defaultCallCount(),
+            handler.successfulStandardDefaults(),
+            "standard lane count includes a cross-lane call"
+        );
+        assertEq(
+            assetManager.xrpDefaultCallCount(),
+            handler.successfulXrpDefaults(),
+            "xrp lane count includes a cross-lane call"
+        );
+    }
+
+    /// @dev Every executor fee the AssetManager returned to Harbor (across both
+    /// lanes) was forwarded onward to the caller: the tracked total matches what
+    /// the AssetManager paid Harbor, and Harbor retains zero native.
+    function invariant_ExecutorFeeAlwaysForwarded() public view {
+        assertEq(
+            assetManager.executorFeePaidTo(address(harbor)),
+            handler.expectedExecutorFeesForwarded(),
+            "executor fees not fully accounted"
+        );
+        assertEq(address(harbor).balance, 0, "harbor retained a forwarded fee");
+    }
 }
 
 contract HarborRedeemerInvariantHandler {
@@ -61,6 +91,12 @@ contract HarborRedeemerInvariantHandler {
     address private constant caller = address(0xC0FFEE);
 
     uint256 public permissionlessFailures;
+
+    // Per-lane success accounting, used to prove lane isolation and that every
+    // executor fee the AssetManager returned to Harbor was forwarded onward.
+    uint256 public successfulStandardDefaults;
+    uint256 public successfulXrpDefaults;
+    uint256 public expectedExecutorFeesForwarded;
 
     constructor(HarborRedeemer harbor_, MockAssetManager assetManager_, MockFAsset fAsset_) {
         harbor = harbor_;
@@ -81,8 +117,10 @@ contract HarborRedeemerInvariantHandler {
         vm.deal(address(assetManager), address(assetManager).balance + redemptionDefaultValueNatWei + executorFeeNatWei);
 
         vm.prank(selectedCaller);
-        try harbor.executeDefault(_buildProof(uint64(callerSeed), false), redemptionRequestId) {}
-        catch {
+        try harbor.executeDefault(_buildProof(uint64(callerSeed), false), redemptionRequestId) {
+            successfulStandardDefaults++;
+            expectedExecutorFeesForwarded += executorFeeNatWei;
+        } catch {
             permissionlessFailures++;
         }
     }
@@ -105,8 +143,10 @@ contract HarborRedeemerInvariantHandler {
         vm.deal(address(assetManager), address(assetManager).balance + redemptionDefaultValueNatWei + executorFeeNatWei);
 
         vm.prank(selectedCaller);
-        try harbor.executeXrpDefault(_buildXrpProof(uint64(callerSeed), uint256(destinationTag), true), redemptionRequestId) {}
-        catch {
+        try harbor.executeXrpDefault(_buildXrpProof(uint64(callerSeed), uint256(destinationTag), true), redemptionRequestId) {
+            successfulXrpDefaults++;
+            expectedExecutorFeesForwarded += executorFeeNatWei;
+        } catch {
             permissionlessFailures++;
         }
     }
