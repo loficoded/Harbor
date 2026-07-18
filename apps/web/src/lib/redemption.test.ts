@@ -1,7 +1,7 @@
+import { destinationTagMax } from "@harbor/shared";
 import {
   buildRedeemCallArgs,
   buildStatusPath,
-  DESTINATION_TAG_MAX,
   FXRP_DECIMALS,
   formatFxrpAmount,
   hasSufficientBalance,
@@ -281,7 +281,7 @@ describe("parseDestinationTag", () => {
   it("accepts the full uint32 range inclusive", () => {
     expect(parseDestinationTag("1")).toEqual({ tag: 1n, error: null });
     expect(parseDestinationTag("4294967295")).toEqual({
-      tag: DESTINATION_TAG_MAX,
+      tag: destinationTagMax,
       error: null,
     });
   });

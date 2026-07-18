@@ -5,6 +5,7 @@ import {
   iAssetManagerEventsAbi,
   type EvmAddress,
 } from "@harbor/protocol";
+import { destinationTagMax, normalizeDestinationTag } from "@harbor/shared";
 import {
   decodeEventLog,
   formatUnits,
@@ -118,9 +119,6 @@ export function parseRedeemAmount(
 // uint32 (the on-chain `DestinationTagTooBig` revert bound).
 // ---------------------------------------------------------------------------
 
-/** Maximum XRPL destination tag (2**32 - 1), per FAssets. */
-export const DESTINATION_TAG_MAX = 4294967295n;
-
 export type DestinationTagParseResult = Readonly<{
   /** Parsed uint32 tag, or `null` when the input is empty (→ standard redeem). */
   tag: bigint | null;
@@ -132,6 +130,10 @@ export type DestinationTagParseResult = Readonly<{
  * Parse a raw destination-tag input into an exact uint32 bigint. Empty input is
  * not an error (it means "no tag" → standard `redeemAmount`); `0` is a valid
  * tag and selects `redeemWithTag`. Anything non-numeric or ≥ 2**32 is an error.
+ *
+ * Delegates the uint32 bound check to the shared `normalizeDestinationTag`
+ * primitive (one source of truth for tag parsing across the app), keeping only
+ * the user-facing error-message wrapper here.
  */
 export function parseDestinationTag(raw: string): DestinationTagParseResult {
   const trimmed = raw.trim();
@@ -144,11 +146,11 @@ export function parseDestinationTag(raw: string): DestinationTagParseResult {
     return { tag: null, error: "Destination tag must be a whole number." };
   }
 
-  const tag = BigInt(trimmed);
-  if (tag > DESTINATION_TAG_MAX) {
+  const tag = normalizeDestinationTag(trimmed);
+  if (tag === null) {
     return {
       tag: null,
-      error: "Destination tag must fit in 32 bits (at most 4294967295).",
+      error: `Destination tag must fit in 32 bits (at most ${destinationTagMax}).`,
     };
   }
 

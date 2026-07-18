@@ -1,6 +1,7 @@
 import { xrpPaymentNonexistenceRequestBodyAbi } from "@harbor/protocol";
 import {
   normalizeBytes32,
+  normalizeDestinationTag,
   type Bytes32,
   type EvmAddress,
   type FdcRequestStatus,
@@ -19,14 +20,21 @@ import {
   standardXrplAddressHash,
   zeroBytes32,
 } from "./referencedPaymentNonexistence.js";
+import {
+  assertDeadlinePassed,
+  concatHex,
+  fdcRequestId,
+  requireBigint,
+  requireString,
+  uint256,
+  uint64,
+} from "./encoding.js";
 import type {
   RedemptionKey,
   StoredFdcRequestRecord,
   StoredRedemptionRequest,
 } from "../repositories/types.js";
 
-const uint64Max = (1n << 64n) - 1n;
-const destinationTagMax = 0xffffffffn;
 const zeroAddress = "0x0000000000000000000000000000000000000000" as EvmAddress;
 
 export const xrpPaymentNonexistenceAttestationTypeName =
@@ -110,7 +118,10 @@ export function createXrpPaymentNonexistenceRequestBody(
     );
   }
 
-  if (redemption.destinationTag > destinationTagMax) {
+  // Validate the uint32 bound via the shared normalizer (one source of truth
+  // for tag parsing/bounds across the app), not an inline comparison.
+  const destinationTag = normalizeDestinationTag(redemption.destinationTag);
+  if (destinationTag === null) {
     throw new Error(
       `Redemption ${redemption.assetManagerAddress}/${redemption.requestId} destination tag exceeds uint32`,
     );
@@ -155,7 +166,7 @@ export function createXrpPaymentNonexistenceRequestBody(
     checkFirstMemoData: true,
     firstMemoDataHash: standardFirstMemoDataHash(paymentReference),
     checkDestinationTag: true,
-    destinationTag: uint256(redemption.destinationTag, "destinationTag"),
+    destinationTag: uint256(destinationTag, "destinationTag"),
     proofOwner: zeroAddress,
   };
 }
@@ -282,7 +293,10 @@ export function buildAndPersistXrpPaymentNonexistenceRequest(
   }
 
   const upsertInput = {
-    fdcRequestId: fdcRequestId(encodedRequest.requestHash),
+    fdcRequestId: fdcRequestId(
+      "xrp-payment-nonexistence",
+      encodedRequest.requestHash,
+    ),
     redemptionRequestId: redemption.requestId,
     assetManagerAddress: redemption.assetManagerAddress,
     attestationType: encodedRequest.attestationType,
@@ -305,68 +319,9 @@ export function buildAndPersistXrpPaymentNonexistenceRequest(
   };
 }
 
-function assertDeadlinePassed(
-  redemption: StoredRedemptionRequest,
-  options: Pick<
-    XrpPaymentNonexistenceBuildOptions,
-    "currentUnixTimestamp" | "dryRun"
-  >,
-): void {
-  if (options.dryRun === true) {
-    return;
-  }
-
-  const currentUnixTimestamp =
-    options.currentUnixTimestamp ?? BigInt(Math.floor(Date.now() / 1000));
-
-  if (currentUnixTimestamp <= redemption.lastUnderlyingTimestamp) {
-    throw new Error(
-      `Redemption ${redemption.assetManagerAddress}/${redemption.requestId} payment deadline has not passed`,
-    );
-  }
-}
-
-function concatHex(values: readonly HexString[]): HexString {
-  return `0x${values.map((value) => value.slice(2)).join("")}` as HexString;
-}
-
-function fdcRequestId(requestHash: Bytes32): string {
-  return `xrp-payment-nonexistence:${requestHash}`;
-}
-
-function requireString(value: unknown, fieldName: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${fieldName} is required`);
-  }
-
-  return value;
-}
-
-function requireBigint(value: unknown, fieldName: string): bigint {
-  if (typeof value !== "bigint") {
-    throw new Error(`${fieldName} is required`);
-  }
-
-  return value;
-}
-
-function uint64(value: bigint, fieldName: string): bigint {
-  const unsignedValue = uint256(value, fieldName);
-
-  if (unsignedValue > uint64Max) {
-    throw new Error(`${fieldName} exceeds uint64`);
-  }
-
-  return unsignedValue;
-}
-
-function uint256(value: bigint, fieldName: string): bigint {
-  if (value < 0n) {
-    throw new Error(`${fieldName} cannot be negative`);
-  }
-
-  return value;
-}
+// Encoding primitives (assertDeadlinePassed, concatHex, fdcRequestId,
+// requireString, requireBigint, uint64, uint256, uint64Max) now live in
+// ./encoding.ts, shared byte-for-byte with the standard nonexistence lane.
 
 // Re-exported so the XRPL address hash helper is reachable from this module's
 // public surface without consumers importing the standard-path module.
