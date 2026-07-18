@@ -1,5 +1,6 @@
 import { xrpPaymentNonexistenceRequestBodyAbi } from "@harbor/protocol";
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   normalizeDestinationTag,
   type Bytes32,
@@ -7,10 +8,8 @@ import {
   type FdcRequestStatus,
   type HexString,
   type IsoTimestamp,
-  type XrplAddress,
 } from "@harbor/shared";
 import { encodeAbiParameters, keccak256 } from "viem";
-import { isValidClassicAddress } from "xrpl/dist/npm/utils/index.js";
 
 import type { SqliteDatabase } from "../db/index.js";
 import { upsertFdcRequest } from "../repositories/fdc.js";
@@ -136,12 +135,15 @@ export function createXrpPaymentNonexistenceRequestBody(
   }
 
   // `xrpRedemptionPaymentDefault` asserts the proof's amount equals the net
-  // redemption value (valueUBA - feeUBA), matching the delivered amount the
-  // agent must pay. The standard RPNE builder uses gross valueUBA; the XRP
-  // default path uses net (verified against the on-chain check).
-  const netAmount =
-    requireBigint(redemption.valueUBA, "valueUBA") -
-    requireBigint(redemption.feeUBA, "feeUBA");
+  // redemption value (`valueUBA - feeUBA`) — the amount the agent had to deliver
+  // to the redeemer (the agent keeps the fee). This is the same net amount the
+  // standard `redemptionPaymentDefault` requires, the XRPL observer matches a
+  // delivered payment against, and the keeper settlement check uses: all four
+  // sites go through the shared `netUnderlyingUBA` helper so they cannot drift.
+  const netAmount = netUnderlyingUBA(
+    requireBigint(redemption.valueUBA, "valueUBA"),
+    requireBigint(redemption.feeUBA, "feeUBA"),
+  );
 
   return {
     minimalBlockNumber: uint64(
@@ -322,7 +324,3 @@ export function buildAndPersistXrpPaymentNonexistenceRequest(
 // Encoding primitives (assertDeadlinePassed, concatHex, fdcRequestId,
 // requireString, requireBigint, uint64, uint256, uint64Max) now live in
 // ./encoding.ts, shared byte-for-byte with the standard nonexistence lane.
-
-// Re-exported so the XRPL address hash helper is reachable from this module's
-// public surface without consumers importing the standard-path module.
-export { isValidClassicAddress };

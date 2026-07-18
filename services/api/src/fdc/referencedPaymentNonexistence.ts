@@ -1,5 +1,6 @@
 import { referencedPaymentNonexistenceRequestBodyAbi } from "@harbor/protocol";
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   type Bytes32,
   type FdcRequestStatus,
@@ -136,7 +137,20 @@ export function createReferencedPaymentNonexistenceRequestBody(
     destinationAddressHash: standardXrplAddressHash(
       requireString(redemption.paymentAddress, "paymentAddress"),
     ),
-    amount: uint256(requireBigint(redemption.valueUBA, "valueUBA"), "valueUBA"),
+    // The on-chain `redemptionPaymentDefault` asserts the proof amount equals the
+    // NET underlying value the agent had to deliver (`valueUBA - feeUBA`), not the
+    // gross `valueUBA` — the redeemer only ever receives the net (the agent keeps
+    // the redemption fee), so a nonexistence proof built for the gross value is
+    // rejected on-chain (`RedemptionNonPaymentMismatch`). Shared with the XRPL
+    // observer and the keeper settlement check via `netUnderlyingUBA` so all four
+    // amount sites (both proof builders, observer, keeper) stay in lockstep.
+    amount: uint256(
+      netUnderlyingUBA(
+        requireBigint(redemption.valueUBA, "valueUBA"),
+        requireBigint(redemption.feeUBA, "feeUBA"),
+      ),
+      "valueUBA - feeUBA",
+    ),
     standardPaymentReference: paymentReference,
     checkSourceAddresses: false,
     sourceAddressesRoot: zeroBytes32,

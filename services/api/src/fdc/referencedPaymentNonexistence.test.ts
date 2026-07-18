@@ -130,7 +130,10 @@ describe("ReferencedPaymentNonexistence FDC request builder", () => {
       deadlineBlockNumber: 200n,
       deadlineTimestamp: 300n,
       destinationAddressHash: xrplAddressHash,
-      amount: 123456n,
+      // Net underlying amount the agent had to deliver: valueUBA (123456) minus
+      // feeUBA (10). `redemptionPaymentDefault` asserts the proof amount equals
+      // this net value on-chain, so the builder must not encode the gross value.
+      amount: 123446n,
       standardPaymentReference: paymentReference,
       checkSourceAddresses: false,
       sourceAddressesRoot: zeroBytes32,
