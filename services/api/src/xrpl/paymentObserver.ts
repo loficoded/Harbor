@@ -170,7 +170,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function decimalBigint(value: unknown, fieldName: string): bigint | null {
+/**
+ * Parse an XRPL numeric field (drops/ledger index/ripple time) into a
+ * non-negative `bigint`, or `null` when it is absent or not a non-negative
+ * decimal integer. XRPL surfaces these as strings, JS numbers, or bigints
+ * depending on the client, so all three are accepted; anything else (negative,
+ * fractional, non-numeric) normalizes to `null` so a malformed field can never
+ * be silently coerced into a match.
+ */
+function decimalBigint(value: unknown): bigint | null {
   if (typeof value === "bigint" && value >= 0n) {
     return value;
   }
@@ -181,10 +189,6 @@ function decimalBigint(value: unknown, fieldName: string): bigint | null {
 
   if (typeof value === "string" && /^\d+$/u.test(value)) {
     return BigInt(value);
-  }
-
-  if (fieldName.length > 0) {
-    return null;
   }
 
   return null;
@@ -235,9 +239,9 @@ function getTransactionAndMetadata(raw: unknown): {
       ? ((container.meta ?? container.metaData) as XrplMetadataLike)
       : null;
   const ledgerIndex =
-    decimalBigint(container.ledger_index, "ledger_index") ??
-    decimalBigint(transaction.ledger_index, "transaction.ledger_index") ??
-    decimalBigint(transaction.inLedger, "transaction.inLedger");
+    decimalBigint(container.ledger_index) ??
+    decimalBigint(transaction.ledger_index) ??
+    decimalBigint(transaction.inLedger);
   const engineResult =
     typeof container.engine_result === "string"
       ? container.engine_result
@@ -265,11 +269,11 @@ function deliveredAmountFrom(
     return null;
   }
 
-  return decimalBigint(deliveredAmount, "delivered_amount");
+  return decimalBigint(deliveredAmount);
 }
 
 function feeDropsFrom(transaction: XrplPaymentTransactionLike): bigint {
-  return decimalBigint(transaction.Fee, "Fee") ?? 0n;
+  return decimalBigint(transaction.Fee) ?? 0n;
 }
 
 function transactionResultFrom(
@@ -319,7 +323,7 @@ export function normalizeXrplPayment(
     };
   }
 
-  const rippleCloseTimestampSeconds = decimalBigint(transaction.date, "date");
+  const rippleCloseTimestampSeconds = decimalBigint(transaction.date);
   const closeTimestampSeconds =
     rippleCloseTimestampSeconds === null
       ? null
