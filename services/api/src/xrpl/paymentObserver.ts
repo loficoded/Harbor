@@ -1,4 +1,5 @@
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   normalizeTransactionHash,
   serializeBigints,
@@ -21,7 +22,10 @@ import type {
   StoredXrplPaymentObservation,
 } from "../repositories/types.js";
 import type { XrplObservationClient } from "./client.js";
-import { decodeXrplPaymentReferences } from "./paymentReference.js";
+import {
+  decodeXrplDestinationTag,
+  decodeXrplPaymentReferences,
+} from "./paymentReference.js";
 
 export type XrplPaymentRejectionReason =
   | "not-payment"
@@ -32,6 +36,7 @@ export type XrplPaymentRejectionReason =
   | "failed-transaction"
   | "wrong-destination"
   | "wrong-payment-reference"
+  | "wrong-destination-tag"
   | "unsupported-delivered-amount"
   | "insufficient-delivered-amount"
   | "out-of-window";
@@ -43,6 +48,8 @@ export type NormalizedXrplPayment = Readonly<{
   deliveredAmountUBA: bigint | null;
   feeDrops: bigint;
   paymentReferences: readonly Bytes32[];
+  /** XRPL `DestinationTag`, or `null` when the payment carried none. */
+  destinationTag: bigint | null;
   ledgerIndex: bigint;
   closeTimestamp: string | null;
   closeTimestampSeconds: bigint | null;
@@ -117,6 +124,7 @@ type XrplPaymentTransactionLike = Readonly<{
   Fee?: unknown;
   InvoiceID?: unknown;
   Memos?: readonly Readonly<{ Memo?: Readonly<{ MemoData?: unknown }> }>[];
+  DestinationTag?: unknown;
   date?: unknown;
   hash?: unknown;
   ledger_index?: unknown;
@@ -141,6 +149,15 @@ type XrplRawPaymentContainer = Readonly<{
 
 const rippleEpochOffsetSeconds = 946_684_800n;
 
+/**
+ * The maximum absolute Unix-seconds value that `new Date(...)` can represent
+ * (ECMAScript caps the time value at ±100,000,000 days = ±8.64e15 ms from the
+ * epoch). A ripple `date` that maps outside this range would make
+ * `Date#toISOString` throw `RangeError: Invalid time value`; the observer must
+ * never throw on a malformed field, so such a timestamp is treated as absent.
+ */
+const maxRepresentableUnixSeconds = 8_640_000_000_000n;
+
 function createEmptySummary(): MutableObserveXrplPaymentsSummary {
   return {
     transactionsScanned: 0,
@@ -162,7 +179,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function decimalBigint(value: unknown, fieldName: string): bigint | null {
+/**
+ * Parse an XRPL numeric field (drops/ledger index/ripple time) into a
+ * non-negative `bigint`, or `null` when it is absent or not a non-negative
+ * decimal integer. XRPL surfaces these as strings, JS numbers, or bigints
+ * depending on the client, so all three are accepted; anything else (negative,
+ * fractional, non-numeric) normalizes to `null` so a malformed field can never
+ * be silently coerced into a match.
+ */
+function decimalBigint(value: unknown): bigint | null {
   if (typeof value === "bigint" && value >= 0n) {
     return value;
   }
@@ -173,10 +198,6 @@ function decimalBigint(value: unknown, fieldName: string): bigint | null {
 
   if (typeof value === "string" && /^\d+$/u.test(value)) {
     return BigInt(value);
-  }
-
-  if (fieldName.length > 0) {
-    return null;
   }
 
   return null;
@@ -190,10 +211,17 @@ function decimalNumber(value: bigint, fieldName: string): number {
   return Number(value);
 }
 
-function rippleTimeToIsoTimestamp(rippleTime: bigint): string {
-  return new Date(
-    Number(rippleTime + rippleEpochOffsetSeconds) * 1_000,
-  ).toISOString();
+function rippleTimeToIsoTimestamp(rippleTime: bigint): string | null {
+  const unixSeconds = rippleTime + rippleEpochOffsetSeconds;
+
+  if (
+    unixSeconds < -maxRepresentableUnixSeconds ||
+    unixSeconds > maxRepresentableUnixSeconds
+  ) {
+    return null;
+  }
+
+  return new Date(Number(unixSeconds) * 1_000).toISOString();
 }
 
 function rippleTimeToUnixSeconds(rippleTime: bigint): bigint {
@@ -227,9 +255,9 @@ function getTransactionAndMetadata(raw: unknown): {
       ? ((container.meta ?? container.metaData) as XrplMetadataLike)
       : null;
   const ledgerIndex =
-    decimalBigint(container.ledger_index, "ledger_index") ??
-    decimalBigint(transaction.ledger_index, "transaction.ledger_index") ??
-    decimalBigint(transaction.inLedger, "transaction.inLedger");
+    decimalBigint(container.ledger_index) ??
+    decimalBigint(transaction.ledger_index) ??
+    decimalBigint(transaction.inLedger);
   const engineResult =
     typeof container.engine_result === "string"
       ? container.engine_result
@@ -257,11 +285,11 @@ function deliveredAmountFrom(
     return null;
   }
 
-  return decimalBigint(deliveredAmount, "delivered_amount");
+  return decimalBigint(deliveredAmount);
 }
 
 function feeDropsFrom(transaction: XrplPaymentTransactionLike): bigint {
-  return decimalBigint(transaction.Fee, "Fee") ?? 0n;
+  return decimalBigint(transaction.Fee) ?? 0n;
 }
 
 function transactionResultFrom(
@@ -301,6 +329,7 @@ export function normalizeXrplPayment(
       deliveredAmountUBA: null,
       feeDrops: 0n,
       paymentReferences: [],
+      destinationTag: decodeXrplDestinationTag(transaction),
       ledgerIndex: ledgerIndex ?? 0n,
       closeTimestamp: null,
       closeTimestampSeconds: null,
@@ -310,15 +339,18 @@ export function normalizeXrplPayment(
     };
   }
 
-  const rippleCloseTimestampSeconds = decimalBigint(transaction.date, "date");
-  const closeTimestampSeconds =
-    rippleCloseTimestampSeconds === null
-      ? null
-      : rippleTimeToUnixSeconds(rippleCloseTimestampSeconds);
+  const rippleCloseTimestampSeconds = decimalBigint(transaction.date);
+  // Derive the ISO string first: an out-of-range ripple `date` yields `null`
+  // here (rather than throwing), and both close-timestamp fields are then held
+  // absent together so a malformed timestamp is rejected, never crashes.
   const closeTimestamp =
     rippleCloseTimestampSeconds === null
       ? null
       : rippleTimeToIsoTimestamp(rippleCloseTimestampSeconds);
+  const closeTimestampSeconds =
+    rippleCloseTimestampSeconds === null || closeTimestamp === null
+      ? null
+      : rippleTimeToUnixSeconds(rippleCloseTimestampSeconds);
 
   let transactionHash: TransactionHash;
   try {
@@ -340,6 +372,7 @@ export function normalizeXrplPayment(
     paymentReferences: normalizeReferenceList(
       decodeXrplPaymentReferences(transaction),
     ),
+    destinationTag: decodeXrplDestinationTag(transaction),
     ledgerIndex: ledgerIndex ?? 0n,
     closeTimestamp,
     closeTimestampSeconds,
@@ -390,6 +423,18 @@ export function matchXrplPaymentToRedemption(
     return { matched: false, reason: "wrong-payment-reference", payment };
   }
 
+  // A redeem-by-tag (WITH_TAG) redemption settles only when the agent's XRPL
+  // payment carries the exact required DestinationTag. Tag `0` is a valid tag:
+  // it must match a payment whose DestinationTag is `0`. Standard redemptions
+  // ignore the tag entirely (backward-compatible).
+  if (
+    redemption.redemptionKind === "WITH_TAG" &&
+    redemption.destinationTag !== null &&
+    payment.destinationTag !== redemption.destinationTag
+  ) {
+    return { matched: false, reason: "wrong-destination-tag", payment };
+  }
+
   if (payment.deliveredAmountUBA === null) {
     return { matched: false, reason: "unsupported-delivered-amount", payment };
   }
@@ -397,11 +442,15 @@ export function matchXrplPaymentToRedemption(
   const deliveredAmountUBA = payment.deliveredAmountUBA;
 
   // FAssets agents deliver the redemption value minus the redemption fee they
-  // keep, so the redeemer's underlying address legitimately receives
-  // (valueUBA - feeUBA). Comparing against the gross valueUBA rejected every
-  // valid payment (the on-chain RedemptionPerformed settles on this same net
-  // amount).
-  const requiredDeliveredUBA = redemption.valueUBA - redemption.feeUBA;
+  // keep, so the redeemer's underlying address legitimately receives the net
+  // amount (valueUBA - feeUBA). Comparing against the gross valueUBA rejected
+  // every valid payment (the on-chain RedemptionPerformed settles on this same
+  // net amount). Shared with the keeper state machine via netUnderlyingUBA so
+  // the two settlement checks can never drift.
+  const requiredDeliveredUBA = netUnderlyingUBA(
+    redemption.valueUBA,
+    redemption.feeUBA,
+  );
 
   if (deliveredAmountUBA < requiredDeliveredUBA) {
     return {
@@ -447,6 +496,7 @@ function buildRawNormalizedReceipt(payment: NormalizedXrplPayment): string {
       deliveredAmountUBA: payment.deliveredAmountUBA,
       feeDrops: payment.feeDrops,
       paymentReferences: payment.paymentReferences,
+      destinationTag: payment.destinationTag,
       ledgerIndex: payment.ledgerIndex,
       closeTimestamp: payment.closeTimestamp,
       transactionResult: payment.transactionResult,
@@ -494,6 +544,7 @@ export function persistMatchedXrplPaymentObservation(
       ledgerIndex: match.payment.ledgerIndex,
       closeTimestamp: match.payment.closeTimestamp,
       validatedAt: match.payment.closeTimestamp,
+      destinationTag: match.payment.destinationTag,
       rawJson: buildRawNormalizedReceipt(match.payment),
     });
     const updatedRedemption = updateRedemptionStatus(database, {

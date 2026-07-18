@@ -5,12 +5,14 @@ import { coston2 } from "@/lib/chain";
 import { getClientEnv } from "@/lib/env";
 import { formatAddress } from "@/lib/format";
 import {
+  buildRedeemCallArgs,
   buildStatusPath,
   formatFxrpAmount,
   FXRP_ASSET_MANAGER_ADDRESS,
   FXRP_TOKEN_ADDRESS,
   hasSufficientBalance,
   isApprovalRequired,
+  parseDestinationTag,
   parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
@@ -71,12 +73,15 @@ export function RedemptionForm() {
 
   const [amountInput, setAmountInput] = useState("");
   const [addressInput, setAddressInput] = useState("");
+  const [tagInput, setTagInput] = useState("");
   const [submittedIds, setSubmittedIds] = useState<readonly string[] | null>(
     null,
   );
 
   const { amountUba, error: amountError } = parseRedeemAmount(amountInput);
   const addressValidation = validateXrplDestination(addressInput);
+  const { tag: destinationTag, error: tagError } =
+    parseDestinationTag(tagInput);
 
   // `requiredUba` is 0n whenever the amount is empty or invalid so
   // approval/balance gating stays inert until a real amount exists.
@@ -106,6 +111,20 @@ export function RedemptionForm() {
   });
   const allowance =
     typeof allowanceRead.data === "bigint" ? allowanceRead.data : undefined;
+
+  // Gate the destination-tag lane on the AssetManager's advertised capability
+  // (`redeemWithTagSupported()`). `undefined` while the read is loading or
+  // unavailable so the standard lane is never blocked by a transient value.
+  const tagSupportedRead = useReadContract({
+    address: FXRP_ASSET_MANAGER_ADDRESS,
+    abi: ASSET_MANAGER_ABI,
+    functionName: "redeemWithTagSupported",
+    query: { enabled: connected },
+  });
+  const tagSupported =
+    typeof tagSupportedRead.data === "boolean"
+      ? tagSupportedRead.data
+      : undefined;
 
   const approvalRequired = isApprovalRequired(allowance, requiredUba);
   const sufficientBalance = hasSufficientBalance(balance, requiredUba);
@@ -165,6 +184,9 @@ export function RedemptionForm() {
     requiredUba: inputProvided ? requiredUba : null,
     inputError: amountError,
     addressValid: addressValidation.valid,
+    tagError,
+    tagRequested: tagInput.trim() !== "",
+    tagSupported,
     balanceKnown: balance !== undefined,
     sufficientBalance,
   });
@@ -202,12 +224,19 @@ export function RedemptionForm() {
       return;
     }
 
-    // redeemAmount(amountUBA, xrplAddress, executor) redeems an arbitrary amount.
+    // Empty tag ⇒ `redeemAmount`; present tag ⇒ `redeemWithTag(amount, address,
+    // executor, tag)`. The protocol assigns agents FIFO in both paths.
+    const call = buildRedeemCallArgs({
+      amountUba,
+      xrplAddress: addressValidation.address,
+      executor: executor.executor,
+      destinationTag,
+    });
     redeemTx.writeContract({
       address: FXRP_ASSET_MANAGER_ADDRESS,
       abi: ASSET_MANAGER_ABI,
-      functionName: "redeemAmount",
-      args: [amountUba, addressValidation.address, executor.executor],
+      functionName: call.functionName,
+      args: [...call.args] as readonly unknown[],
       value: executor.executorFeeWei,
     });
   }
@@ -238,6 +267,13 @@ export function RedemptionForm() {
         resetSubmission();
       }}
       addressError={addressValidation.reason}
+      tagInput={tagInput}
+      onTagInputChange={(value) => {
+        setTagInput(value);
+        resetSubmission();
+      }}
+      tagError={tagError}
+      tagSupported={tagSupported}
       executorFeeLabel={executorFeeLabel}
       executorLabel={executorLabel}
       harborManaged={executor.harborManaged}

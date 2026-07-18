@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { describe, test, type TestContext } from "node:test";
+import fc from "fast-check";
 
 import type { Bytes32, EvmAddress, TransactionHash } from "@harbor/shared";
 import type {
@@ -29,6 +30,7 @@ import {
 import {
   backfillRedemptionXrplPayments,
   matchXrplPaymentToRedemption,
+  normalizeXrplPayment,
   persistMatchedXrplPaymentObservation,
 } from "./paymentObserver.js";
 import {
@@ -64,6 +66,8 @@ type XrplFixtureOverrides = Partial<{
   rippleDate: number;
   transactionResult: string;
   validated: boolean;
+  destinationTag: number | string;
+  memos: readonly Readonly<{ Memo?: Readonly<{ MemoData?: string }> }>[];
 }>;
 
 class MockXrplTransport extends EventEmitter {
@@ -142,6 +146,8 @@ function insertRedemptionFixture(
     lastUnderlyingBlock: bigint;
     lastUnderlyingTimestamp: bigint;
     status: StoredRedemptionRequest["status"];
+    redemptionKind: StoredRedemptionRequest["redemptionKind"];
+    destinationTag: bigint | null;
   }> = {},
 ): StoredRedemptionRequest {
   return upsertRedemption(database, {
@@ -164,6 +170,8 @@ function insertRedemptionFixture(
     executor: null,
     executorFeeNatWei: 0n,
     status: overrides.status ?? "WATCHING",
+    redemptionKind: overrides.redemptionKind ?? "STANDARD",
+    destinationTag: overrides.destinationTag ?? null,
     createdAt: "2026-07-08T00:00:00.000Z",
     updatedAt: "2026-07-08T00:00:00.000Z",
   });
@@ -187,6 +195,10 @@ function xrplPaymentFixture(overrides: XrplFixtureOverrides = {}) {
       InvoiceID: overrides.invoiceId ?? paymentReference.slice(2).toUpperCase(),
       date: overrides.rippleDate ?? Number(rippleCloseTimestampSeconds),
       hash: overrides.hash ?? xrplHash,
+      ...(overrides.destinationTag === undefined
+        ? {}
+        : { DestinationTag: overrides.destinationTag }),
+      ...(overrides.memos === undefined ? {} : { Memos: overrides.memos }),
     },
     meta: {
       TransactionResult: overrides.transactionResult ?? "tesSUCCESS",
@@ -361,6 +373,110 @@ describe("XRPL payment matching", () => {
 
     assert.equal(match.matched, false);
     assert.equal(match.matched ? null : match.reason, "failed-transaction");
+  });
+
+  test("STANDARD redemption ignores the destination tag (backward-compatible)", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "STANDARD",
+      destinationTag: null,
+    });
+    // A payment carrying an unrelated tag still settles a STANDARD redemption.
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ destinationTag: 999 }),
+    );
+    assert.equal(match.matched, true);
+  });
+});
+
+describe("XRPL payment matching — redeem-by-tag (WITH_TAG)", () => {
+  test("matches a WITH_TAG payment carrying the exact required destination tag", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+    });
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ destinationTag: 12345 }),
+    );
+
+    assert.equal(match.matched, true);
+    assert.equal(match.matched ? match.payment.destinationTag : null, 12345n);
+  });
+
+  test("rejects a WITH_TAG payment with the wrong destination tag", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+    });
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ destinationTag: 99999 }),
+    );
+
+    assert.equal(match.matched, false);
+    assert.equal(match.matched ? null : match.reason, "wrong-destination-tag");
+  });
+
+  test("rejects a WITH_TAG payment with no destination tag", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+    });
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture(),
+    );
+
+    assert.equal(match.matched, false);
+    assert.equal(match.matched ? null : match.reason, "wrong-destination-tag");
+  });
+
+  test("tag 0 is a valid WITH_TAG tag and matches only a payment with tag 0", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+    });
+
+    const matched = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ destinationTag: 0 }),
+    );
+    const mismatched = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ destinationTag: 1 }),
+    );
+
+    assert.equal(matched.matched, true);
+    assert.equal(matched.matched ? matched.payment.destinationTag : null, 0n);
+    assert.equal(mismatched.matched, false);
+    assert.equal(
+      mismatched.matched ? null : mismatched.reason,
+      "wrong-destination-tag",
+    );
+  });
+
+  test("persisted observation carries the destination tag", async (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 4242n,
+    });
+    const result = persistMatchedXrplPaymentObservation(
+      database,
+      redemption,
+      xrplPaymentFixture({ destinationTag: 4242 }),
+    );
+
+    assert.equal(result.persisted, true);
+    if (result.persisted) {
+      assert.equal(result.observation.destinationTag, 4242n);
+    }
   });
 });
 
@@ -546,4 +662,489 @@ describe("retrying XRPL client", () => {
       assert.equal(typeof response, "object");
     },
   );
+});
+
+
+function paymentWithRawTag(tag: unknown) {
+  const fixture = xrplPaymentFixture();
+  return { ...fixture, tx: { ...fixture.tx, DestinationTag: tag } };
+}
+
+function paymentWithRawDate(date: unknown) {
+  const fixture = xrplPaymentFixture();
+  return { ...fixture, tx: { ...fixture.tx, date } };
+}
+
+describe("XRPL payment matching — tag matrix (property-based)", () => {
+  test("WITH_TAG settles only on the exact required tag; off-by-one and absent tags are rejected", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+    });
+
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: 0xffffffffn }), (required) => {
+        const redemption = { ...base, destinationTag: required };
+
+        const exact = matchXrplPaymentToRedemption(
+          redemption,
+          xrplPaymentFixture({ destinationTag: Number(required) }),
+        );
+        assert.equal(exact.matched, true);
+        assert.equal(
+          exact.matched ? exact.payment.destinationTag : null,
+          required,
+        );
+
+        const other = required === 0xffffffffn ? 0n : required + 1n;
+        const offByOne = matchXrplPaymentToRedemption(
+          redemption,
+          xrplPaymentFixture({ destinationTag: Number(other) }),
+        );
+        assert.equal(offByOne.matched, false);
+        assert.equal(
+          offByOne.matched ? null : offByOne.reason,
+          "wrong-destination-tag",
+        );
+
+        const absent = matchXrplPaymentToRedemption(
+          redemption,
+          xrplPaymentFixture(),
+        );
+        assert.equal(absent.matched, false);
+        assert.equal(
+          absent.matched ? null : absent.reason,
+          "wrong-destination-tag",
+        );
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  test("STANDARD ignores the tag for any tag value or absent tag (property)", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertRedemptionFixture(database, {
+      redemptionKind: "STANDARD",
+      destinationTag: null,
+    });
+
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.constant<undefined>(undefined),
+          fc.bigInt({ min: 0n, max: 0xffffffffn }),
+        ),
+        (tag) => {
+          const raw =
+            tag === undefined
+              ? xrplPaymentFixture()
+              : xrplPaymentFixture({ destinationTag: Number(tag) });
+          assert.equal(
+            matchXrplPaymentToRedemption(base, raw).matched,
+            true,
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  test("payment DestinationTag as number, string, and bigint normalize identically", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 777n,
+    });
+
+    const asNumber = matchXrplPaymentToRedemption(
+      base,
+      xrplPaymentFixture({ destinationTag: 777 }),
+    );
+    const asString = matchXrplPaymentToRedemption(
+      base,
+      xrplPaymentFixture({ destinationTag: "777" }),
+    );
+    const asBigint = matchXrplPaymentToRedemption(base, paymentWithRawTag(777n));
+
+    for (const result of [asNumber, asString, asBigint]) {
+      assert.equal(result.matched, true);
+      assert.equal(result.matched ? result.payment.destinationTag : null, 777n);
+    }
+  });
+
+  test("a payment tag above uint32 normalizes to null and never matches a WITH_TAG redemption", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 5n,
+    });
+
+    const overflowPayment = xrplPaymentFixture({ destinationTag: "4294967296" });
+    const normalized = normalizeXrplPayment(overflowPayment);
+    assert.notEqual(normalized, null);
+    assert.equal(normalized?.destinationTag, null);
+
+    const match = matchXrplPaymentToRedemption(base, overflowPayment);
+    assert.equal(match.matched, false);
+    assert.equal(match.matched ? null : match.reason, "wrong-destination-tag");
+  });
+});
+
+describe("XRPL payment matching — net amount and window boundaries", () => {
+  test("net amount boundary: net+1 and gross both settle, zero is insufficient", (t) => {
+    const database = createTestDatabase(t);
+    // valueUBA 1_000_000, feeUBA 1_000 => net 999_000.
+    const redemption = insertRedemptionFixture(database);
+
+    const netPlusOne = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ deliveredAmount: "999001" }),
+    );
+    const gross = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ deliveredAmount: "1000000" }),
+    );
+    const zero = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ deliveredAmount: "0" }),
+    );
+
+    assert.equal(netPlusOne.matched, true);
+    assert.equal(gross.matched, true); // agent overpaying (delivering gross) still settles
+    assert.equal(zero.matched, false);
+    assert.equal(
+      zero.matched ? null : zero.reason,
+      "insufficient-delivered-amount",
+    );
+  });
+
+  test("window boundary: first and last ledger inclusive, one before is out-of-window", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database); // window [490, 510]
+
+    assert.equal(
+      matchXrplPaymentToRedemption(
+        redemption,
+        xrplPaymentFixture({ ledgerIndex: 490 }),
+      ).matched,
+      true,
+    );
+    assert.equal(
+      matchXrplPaymentToRedemption(
+        redemption,
+        xrplPaymentFixture({ ledgerIndex: 510 }),
+      ).matched,
+      true,
+    );
+    const beforeWindow = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ ledgerIndex: 489 }),
+    );
+    assert.equal(beforeWindow.matched, false);
+    assert.equal(
+      beforeWindow.matched ? null : beforeWindow.reason,
+      "out-of-window",
+    );
+  });
+
+  test("close timestamp equal to the deadline settles; one second later is out-of-window", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    // lastUnderlyingTimestamp = closeTimestampUnixSeconds + 60.
+    const onDeadline = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({
+        rippleDate: Number(closeTimestampUnixSeconds + 60n - 946_684_800n),
+      }),
+    );
+    const afterDeadline = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({
+        rippleDate: Number(closeTimestampUnixSeconds + 61n - 946_684_800n),
+      }),
+    );
+
+    assert.equal(onDeadline.matched, true);
+    assert.equal(afterDeadline.matched, false);
+    assert.equal(
+      afterDeadline.matched ? null : afterDeadline.reason,
+      "out-of-window",
+    );
+  });
+});
+
+describe("XRPL payment matching — malformed payments", () => {
+  const validTx = {
+    TransactionType: "Payment",
+    hash: xrplHash,
+    Account: sourceAddress,
+    Destination: paymentAddress,
+    Amount: "1000000",
+    Fee: "12",
+    InvoiceID: paymentReference.slice(2).toUpperCase(),
+    date: Number(rippleCloseTimestampSeconds),
+  };
+  const validMeta = {
+    TransactionResult: "tesSUCCESS",
+    delivered_amount: "1000000",
+  };
+
+  test("a non-Payment transaction is rejected as not-payment", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const match = matchXrplPaymentToRedemption(redemption, {
+      tx: { ...validTx, TransactionType: "OfferCreate" },
+      meta: validMeta,
+      ledger_index: 500,
+      validated: true,
+    });
+    assert.equal(match.matched, false);
+    assert.equal(match.matched ? null : match.reason, "not-payment");
+  });
+
+  test("a payment without a hash is rejected as missing-transaction-hash", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const { hash: _hash, ...txWithoutHash } = validTx;
+    void _hash;
+    const match = matchXrplPaymentToRedemption(redemption, {
+      tx: txWithoutHash,
+      meta: validMeta,
+      ledger_index: 500,
+      validated: true,
+    });
+    assert.equal(match.matched, false);
+    assert.equal(
+      match.matched ? null : match.reason,
+      "missing-transaction-hash",
+    );
+  });
+
+  test("a payment without a ledger index is rejected as missing-ledger-index", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const match = matchXrplPaymentToRedemption(redemption, {
+      tx: validTx,
+      meta: validMeta,
+      validated: true,
+    });
+    assert.equal(match.matched, false);
+    assert.equal(match.matched ? null : match.reason, "missing-ledger-index");
+  });
+
+  test("a payment without a close date is rejected as missing-close-timestamp", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const { date: _date, ...txWithoutDate } = validTx;
+    void _date;
+    const match = matchXrplPaymentToRedemption(redemption, {
+      tx: txWithoutDate,
+      meta: validMeta,
+      ledger_index: 500,
+      validated: true,
+    });
+    assert.equal(match.matched, false);
+    assert.equal(
+      match.matched ? null : match.reason,
+      "missing-close-timestamp",
+    );
+  });
+
+  test("an unvalidated transaction is rejected as unvalidated-transaction", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({ validated: false }),
+    );
+    assert.equal(match.matched, false);
+    assert.equal(
+      match.matched ? null : match.reason,
+      "unvalidated-transaction",
+    );
+  });
+
+  test("an out-of-range ripple date is treated as a missing close timestamp, not a crash", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const raw = paymentWithRawDate("999999999999999999999");
+
+    // Regression guard: normalizing must not throw RangeError on an
+    // unrepresentable Date; the timestamp is simply held absent.
+    assert.doesNotThrow(() => normalizeXrplPayment(raw));
+    const normalized = normalizeXrplPayment(raw);
+    assert.notEqual(normalized, null);
+    assert.equal(normalized?.closeTimestamp, null);
+    assert.equal(normalized?.closeTimestampSeconds, null);
+
+    const match = matchXrplPaymentToRedemption(redemption, raw);
+    assert.equal(match.matched, false);
+    assert.equal(
+      match.matched ? null : match.reason,
+      "missing-close-timestamp",
+    );
+  });
+});
+
+describe("XRPL payment matching — memo/reference parsing", () => {
+  test("finds the payment reference in a memo as hex even when the InvoiceID is unrelated", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({
+        invoiceId: wrongPaymentReference.slice(2).toUpperCase(),
+        memos: [
+          { Memo: { MemoData: paymentReference.slice(2).toUpperCase() } },
+        ],
+      }),
+    );
+    assert.equal(match.matched, true);
+  });
+
+  test("finds the payment reference in a memo encoded as UTF-8 text", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+    const match = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({
+        invoiceId: wrongPaymentReference.slice(2).toUpperCase(),
+        memos: [{ Memo: { MemoData: encodeMemoData(paymentReference) } }],
+      }),
+    );
+    assert.equal(match.matched, true);
+  });
+
+  test("empty memos and memos without MemoData do not crash matching", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+
+    const emptyMemos = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({
+        invoiceId: wrongPaymentReference.slice(2).toUpperCase(),
+        memos: [],
+      }),
+    );
+    const memoWithoutData = matchXrplPaymentToRedemption(
+      redemption,
+      xrplPaymentFixture({
+        invoiceId: wrongPaymentReference.slice(2).toUpperCase(),
+        memos: [{ Memo: {} }],
+      }),
+    );
+
+    assert.equal(emptyMemos.matched, false);
+    assert.equal(
+      emptyMemos.matched ? null : emptyMemos.reason,
+      "wrong-payment-reference",
+    );
+    assert.equal(memoWithoutData.matched, false);
+    assert.equal(
+      memoWithoutData.matched ? null : memoWithoutData.reason,
+      "wrong-payment-reference",
+    );
+  });
+});
+
+describe("XRPL payment matching — fuzz (never throws)", () => {
+  test("normalizeXrplPayment and matchXrplPaymentToRedemption tolerate arbitrary JSON", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 123n,
+    });
+
+    fc.assert(
+      fc.property(fc.anything(), (raw) => {
+        let payment: ReturnType<typeof normalizeXrplPayment> = null;
+        assert.doesNotThrow(() => {
+          payment = normalizeXrplPayment(raw);
+        });
+        assert.ok(payment === null || typeof payment === "object");
+        assert.doesNotThrow(() => {
+          matchXrplPaymentToRedemption(redemption, raw);
+        });
+      }),
+      { numRuns: 1000 },
+    );
+  });
+
+  test("arbitrary Payment-shaped records (incl. huge dates/amounts/tags) never throw", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database, {
+      redemptionKind: "WITH_TAG",
+      destinationTag: 42n,
+    });
+
+    const bigDigits = fc.bigInt({ min: 0n, max: 10n ** 30n }).map(String);
+    const arbitraryField = fc.oneof(
+      fc.constant<undefined>(undefined),
+      fc.integer(),
+      fc.string(),
+      bigDigits,
+    );
+
+    fc.assert(
+      fc.property(
+        fc.record(
+          {
+            hash: fc.oneof(fc.constant<undefined>(undefined), fc.string()),
+            account: fc.string(),
+            destination: fc.string(),
+            amount: arbitraryField,
+            date: arbitraryField,
+            tag: arbitraryField,
+            ledger: arbitraryField,
+            validated: fc.boolean(),
+            result: fc.oneof(fc.constant("tesSUCCESS"), fc.string()),
+          },
+          { requiredKeys: [] },
+        ),
+        (parts) => {
+          const tx: Record<string, unknown> = {
+            TransactionType: "Payment",
+            Account: parts.account ?? "",
+            Destination: parts.destination ?? "",
+            Fee: "12",
+          };
+          if (parts.hash !== undefined) tx.hash = parts.hash;
+          if (parts.amount !== undefined) tx.Amount = parts.amount;
+          if (parts.date !== undefined) tx.date = parts.date;
+          if (parts.tag !== undefined) tx.DestinationTag = parts.tag;
+          const raw = {
+            tx,
+            meta: {
+              TransactionResult: parts.result ?? "tesSUCCESS",
+              delivered_amount: parts.amount,
+            },
+            ...(parts.ledger === undefined ? {} : { ledger_index: parts.ledger }),
+            validated: parts.validated ?? false,
+          };
+
+          assert.doesNotThrow(() => {
+            normalizeXrplPayment(raw);
+            matchXrplPaymentToRedemption(redemption, raw);
+          });
+        },
+      ),
+      { numRuns: 1000 },
+    );
+  });
+
+  test("stress: 5000 arbitrary payment shapes produce no uncaught exception", (t) => {
+    const database = createTestDatabase(t);
+    const redemption = insertRedemptionFixture(database);
+
+    fc.assert(
+      fc.property(fc.anything(), (raw) => {
+        assert.doesNotThrow(() => {
+          normalizeXrplPayment(raw);
+          matchXrplPaymentToRedemption(redemption, raw);
+        });
+      }),
+      { numRuns: 5000 },
+    );
+  });
 });

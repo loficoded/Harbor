@@ -137,6 +137,8 @@ function toRedemptionDetail(
     agentVault: record.agentVault,
     agentDetails,
     paymentAddress: record.paymentAddress,
+    redemptionKind: record.redemptionKind,
+    destinationTag: record.destinationTag,
     valueUBA: record.valueUBA,
     feeUBA: record.feeUBA,
     paymentReference: record.paymentReference,
@@ -169,6 +171,7 @@ function toXrplReceipt(
     ledgerIndex: record.ledgerIndex,
     closeTimestamp: record.closeTimestamp,
     validatedAt: record.validatedAt,
+    destinationTag: record.destinationTag,
     createdAt: record.createdAt,
   };
 }

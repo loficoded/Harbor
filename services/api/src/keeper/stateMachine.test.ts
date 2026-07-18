@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import fc from "fast-check";
 
+import { netUnderlyingUBA } from "@harbor/shared";
 import type {
   Bytes32,
   EvmAddress,
@@ -25,7 +27,9 @@ import {
   type ExecuteHarborDefaultResult,
   type KeeperDefaultExecutor,
 } from "./defaultExecutor.js";
+import { xrpPaymentNonexistenceAttestationType } from "../fdc/xrpPaymentNonexistence.js";
 import {
+  isValidXrplObservationForRedemption,
   processKeeperRedemption,
   runKeeperBatch,
   type KeeperClock,
@@ -46,6 +50,8 @@ const fdcSubmissionHash = `0x${"dd".repeat(32)}` as TransactionHash;
 const paymentReference = `0x${"ee".repeat(32)}` as Bytes32;
 const requestHash = `0x${"ab".repeat(32)}` as Bytes32;
 const attestationType = `0x${"01".repeat(32)}` as Bytes32;
+const attestationTypeBase = attestationType;
+const xrpAttestationType = xrpPaymentNonexistenceAttestationType;
 const sourceId = `0x${"02".repeat(32)}` as Bytes32;
 const proofNode = `0x${"03".repeat(32)}` as Bytes32;
 const zeroBytes32 = `0x${"00".repeat(32)}` as Bytes32;
@@ -200,6 +206,9 @@ class FakeFdcClient implements KeeperFdcClient {
   retrieveCalls = 0;
   retrieveResults: ("NOT_READY" | "PROOF_READY")[] = ["PROOF_READY"];
   refreshFinalizes = false;
+  lastBuildRedemptionKind: StoredRedemptionRequest["redemptionKind"] | null =
+    null;
+  lastBuildAttestationType: Bytes32 | null = null;
 
   constructor(private readonly repository: FakeRepository) {}
 
@@ -209,15 +218,23 @@ class FakeFdcClient implements KeeperFdcClient {
     updatedAt: IsoTimestamp;
   }): StoredFdcRequestRecord {
     this.buildCalls += 1;
+    this.lastBuildRedemptionKind = input.redemption.redemptionKind;
     const existing = this.repository.listFdcRequests(input.redemption)[0];
 
     if (existing !== undefined) {
       return existing;
     }
 
+    const attestationType =
+      input.redemption.redemptionKind === "WITH_TAG"
+        ? xrpAttestationType
+        : attestationTypeBase;
+    this.lastBuildAttestationType = attestationType;
+
     return this.repository.upsertFdcRequest(
       fdcRequestFixture(input.redemption, {
         status: "PENDING",
+        attestationType,
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
       }),
@@ -636,6 +653,106 @@ describe("keeper redemption state machine", () => {
     assert.notEqual(parameters.functionName, "setDefaultKeeperExecutor");
     assert.notEqual(parameters.functionName, "transferOwnership");
   });
+
+  test("WITH_TAG redemption selects executeXrpDefault with XRP proof calldata", () => {
+    const redemption = redemptionFixture({
+      status: "PROOF_READY",
+      redemptionKind: "WITH_TAG",
+      destinationTag: 777n,
+    });
+    const request = fdcRequestFixture(redemption, {
+      status: "PROOF_READY",
+      attestationType: xrpAttestationType,
+    });
+    const parameters = buildExecuteDefaultParameters({
+      harborRedeemerAddress,
+      redemption,
+      proof: xrpProofFixture(request),
+    });
+
+    assert.equal(parameters.functionName, "executeXrpDefault");
+    assert.notEqual(parameters.functionName, "executeDefault");
+    // The XRP request body (10 fields incl. destinationTag) is forwarded.
+    assert.equal(parameters.args[1], 42n);
+    assert.equal(parameters.args[0].data.requestBody.destinationTag, 777n);
+  });
+
+  test("STANDARD redemption with an XRP-shaped proof still routes to executeDefault (kind gates the lane)", () => {
+    // The redemptionKind — not the proof shape — selects the entrypoint, so a
+    // kind/proof mismatch is caught by the on-chain verifier rather than
+    // silently routing to the wrong default.
+    const redemption = redemptionFixture({
+      status: "PROOF_READY",
+      redemptionKind: "STANDARD",
+      destinationTag: null,
+    });
+    const request = fdcRequestFixture(redemption, { status: "PROOF_READY" });
+    const parameters = buildExecuteDefaultParameters({
+      harborRedeemerAddress,
+      redemption,
+      proof: proofFixture(request),
+    });
+
+    assert.equal(parameters.functionName, "executeDefault");
+  });
+
+  test("WITH_TAG redemption builds an XRP attestation request when the window expires", async () => {
+    const repository = new FakeRepository();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "WATCHING",
+        redemptionKind: "WITH_TAG",
+        destinationTag: 4242n,
+      }),
+    );
+    const fdcClient = new FakeFdcClient(repository);
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient,
+      defaultExecutor: new FakeDefaultExecutor(),
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "REQUEST_PROOF");
+    assert.equal(fdcClient.lastBuildRedemptionKind, "WITH_TAG");
+    assert.equal(fdcClient.lastBuildAttestationType, xrpAttestationType);
+  });
+
+  test("WITH_TAG redemption at PROOF_READY submits the default and reaches DEFAULT_SUBMITTED", async () => {
+    const repository = new FakeRepository();
+    const defaultExecutor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "PROOF_READY",
+        redemptionKind: "WITH_TAG",
+        destinationTag: 4242n,
+      }),
+    );
+    const request = repository.upsertFdcRequest(
+      fdcRequestFixture(redemption, {
+        status: "PROOF_READY",
+        attestationType: xrpAttestationType,
+      }),
+    );
+    repository.insertProof(xrpProofFixture(request));
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "DEFAULT_SUBMITTED");
+    assert.equal(defaultExecutor.executeCalls, 1);
+    assert.equal(
+      repository.getRedemption(redemption)?.defaultTransactionHash,
+      defaultTransactionHash,
+    );
+  });
 });
 
 function fakeClock(isoTimestamp: IsoTimestamp): KeeperClock {
@@ -673,6 +790,8 @@ function redemptionFixture(
     status: "REQUESTED",
     defaultTransactionHash: null,
     statusReason: null,
+    redemptionKind: "STANDARD",
+    destinationTag: null,
     createdAt: "2026-07-07T00:00:00.000Z",
     updatedAt: "2026-07-07T00:00:00.000Z",
     ...overrides,
@@ -696,6 +815,7 @@ function xrplObservationFixture(
     ledgerIndex: 150n,
     closeTimestamp: deadlineIso,
     validatedAt: deadlineIso,
+    destinationTag: null,
     rawJson: null,
     createdAt: deadlineIso,
     ...overrides,
@@ -769,3 +889,379 @@ function proofFixture(request: StoredFdcRequestRecord): StoredFdcProofRecord {
     createdAt: "2026-07-08T00:00:01.000Z",
   };
 }
+
+function xrpProofFixture(
+  request: StoredFdcRequestRecord,
+): StoredFdcProofRecord {
+  const votingRoundId = request.votingRoundId ?? 7n;
+  const proofCalldata = {
+    merkleProof: [proofNode],
+    data: {
+      attestationType: xrpAttestationType,
+      sourceId,
+      votingRound: votingRoundId.toString(),
+      lowestUsedTimestamp: "1",
+      requestBody: {
+        minimalBlockNumber: "100",
+        deadlineBlockNumber: "200",
+        deadlineTimestamp: deadlineSeconds.toString(),
+        destinationAddressHash: `0x${"04".repeat(32)}`,
+        amount: "990000",
+        checkFirstMemoData: true,
+        firstMemoDataHash: paymentReference,
+        checkDestinationTag: true,
+        destinationTag: "777",
+        proofOwner: `0x${"00".repeat(20)}`,
+      },
+      responseBody: {
+        minimalBlockTimestamp: "1",
+        firstOverflowBlockNumber: "201",
+        firstOverflowBlockTimestamp: (deadlineSeconds + 1n).toString(),
+      },
+    },
+  };
+
+  return {
+    fdcProofId: `${request.fdcRequestId}:proof:${votingRoundId.toString()}`,
+    fdcRequestId: request.fdcRequestId,
+    redemptionRequestId: request.redemptionRequestId,
+    assetManagerAddress: request.assetManagerAddress,
+    requestHash: request.requestHash,
+    responseBody: "0x9abc",
+    merkleProof: [proofNode],
+    votingRoundId,
+    proofJson: JSON.stringify({ proof: [proofNode] }),
+    calldataJson: JSON.stringify(proofCalldata),
+    proofReadyAt: "2026-07-08T00:00:01.000Z",
+    createdAt: "2026-07-08T00:00:01.000Z",
+  };
+}
+
+describe("isValidXrplObservationForRedemption — net settlement boundary (item 13)", () => {
+  test("accepts a payment delivering exactly the net amount (valueUBA - feeUBA)", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 10n });
+    const observation = xrplObservationFixture(redemption, {
+      deliveredAmountUBA: 999_990n, // net = 1_000_000 - 10
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(redemption, observation),
+      true,
+    );
+  });
+
+  test("rejects a payment one UBA below the net amount", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 10n });
+    const observation = xrplObservationFixture(redemption, {
+      deliveredAmountUBA: 999_989n, // net - 1
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(redemption, observation),
+      false,
+    );
+  });
+
+  test("regression: a non-zero-fee redemption settles on the net amount (gross would reject)", () => {
+    // Before the fix the keeper compared the delivered amount against the gross
+    // valueUBA, so a correct net payment (every real payment) was misclassified
+    // as non-payment — reconciled here to match the observer and FAssets.
+    const redemption = redemptionFixture({
+      valueUBA: 5_000_000n,
+      feeUBA: 250_000n,
+    });
+    const net = 4_750_000n;
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: net }),
+      ),
+      true,
+    );
+    // An over-delivery (up to and beyond the gross value) is still acceptable.
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, {
+          deliveredAmountUBA: redemption.valueUBA,
+        }),
+      ),
+      true,
+    );
+  });
+
+  test("a zero-fee redemption still requires the full value", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 0n });
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: 1_000_000n }),
+      ),
+      true,
+    );
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: 999_999n }),
+      ),
+      false,
+    );
+  });
+
+  test("a WITH_TAG redemption only settles on an exact destination-tag match (incl. tag 0)", () => {
+    const net = 999_990n;
+    const tagged = redemptionFixture({
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+      valueUBA: 1_000_000n,
+      feeUBA: 10n,
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        tagged,
+        xrplObservationFixture(tagged, {
+          deliveredAmountUBA: net,
+          destinationTag: 12345n,
+        }),
+      ),
+      true,
+    );
+    // A wrong tag never settles, even with a sufficient amount.
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        tagged,
+        xrplObservationFixture(tagged, {
+          deliveredAmountUBA: net,
+          destinationTag: 99n,
+        }),
+      ),
+      false,
+    );
+    // tag 0 is a valid required tag: an absent observed tag must not settle it.
+    const zeroTag = redemptionFixture({
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+      valueUBA: 1_000_000n,
+      feeUBA: 10n,
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        zeroTag,
+        xrplObservationFixture(zeroTag, {
+          deliveredAmountUBA: net,
+          destinationTag: 0n,
+        }),
+      ),
+      true,
+    );
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        zeroTag,
+        xrplObservationFixture(zeroTag, {
+          deliveredAmountUBA: net,
+          destinationTag: null,
+        }),
+      ),
+      false,
+    );
+  });
+});
+
+
+describe("isValidXrplObservationForRedemption — tag matrix and window boundaries", () => {
+  test("STANDARD ignores the observed destination tag for any tag value or absent tag", () => {
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.constant<bigint | null>(null),
+          fc.bigInt({ min: 0n, max: 0xffffffffn }),
+        ),
+        (tag) => {
+          const redemption = redemptionFixture({
+            redemptionKind: "STANDARD",
+            destinationTag: null,
+          });
+          assert.equal(
+            isValidXrplObservationForRedemption(
+              redemption,
+              xrplObservationFixture(redemption, { destinationTag: tag }),
+            ),
+            true,
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  test("WITH_TAG requires an exact tag: off-by-one and absent tags are rejected (property)", () => {
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: 0xffffffffn }), (required) => {
+        const redemption = redemptionFixture({
+          redemptionKind: "WITH_TAG",
+          destinationTag: required,
+        });
+        assert.equal(
+          isValidXrplObservationForRedemption(
+            redemption,
+            xrplObservationFixture(redemption, { destinationTag: required }),
+          ),
+          true,
+        );
+        const other = required === 0xffffffffn ? 0n : required + 1n;
+        assert.equal(
+          isValidXrplObservationForRedemption(
+            redemption,
+            xrplObservationFixture(redemption, { destinationTag: other }),
+          ),
+          false,
+        );
+        assert.equal(
+          isValidXrplObservationForRedemption(
+            redemption,
+            xrplObservationFixture(redemption, { destinationTag: null }),
+          ),
+          false,
+        );
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  test("accepts a payment delivering one UBA above the net amount", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 10n });
+    const net = netUnderlyingUBA(redemption.valueUBA, redemption.feeUBA);
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: net + 1n }),
+      ),
+      true,
+    );
+  });
+
+  test("ledger window is inclusive at both ends and rejects one block outside", () => {
+    const redemption = redemptionFixture(); // window [100, 200]
+    for (const ledgerIndex of [100n, 200n] as const) {
+      assert.equal(
+        isValidXrplObservationForRedemption(
+          redemption,
+          xrplObservationFixture(redemption, { ledgerIndex }),
+        ),
+        true,
+      );
+    }
+    for (const ledgerIndex of [99n, 201n] as const) {
+      assert.equal(
+        isValidXrplObservationForRedemption(
+          redemption,
+          xrplObservationFixture(redemption, { ledgerIndex }),
+        ),
+        false,
+      );
+    }
+  });
+
+  test("close timestamp on the deadline settles; after the deadline or unparseable is rejected", () => {
+    const redemption = redemptionFixture(); // lastUnderlyingTimestamp = deadlineSeconds
+    // Exactly on the deadline.
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { closeTimestamp: deadlineIso }),
+      ),
+      true,
+    );
+    // One second after the deadline.
+    const afterDeadlineIso = new Date(
+      Number(deadlineSeconds + 1n) * 1_000,
+    ).toISOString();
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, {
+          closeTimestamp: afterDeadlineIso,
+        }),
+      ),
+      false,
+    );
+    // Unparseable close timestamp is treated as absent (rejected, not a crash).
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, {
+          closeTimestamp: "not-a-timestamp" as IsoTimestamp,
+        }),
+      ),
+      false,
+    );
+  });
+});
+
+describe("keeper terminal-status safety (recovery / idempotency)", () => {
+  test("a SETTLED redemption is never driven to default, even past the deadline", async () => {
+    const repository = new FakeRepository();
+    const executor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "SETTLED",
+        transactionHash: xrplTransactionHash,
+      }),
+    );
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor: executor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "SETTLED");
+    assert.equal(result.action, "ignored");
+    assert.equal(repository.getRedemption(redemption)?.status, "SETTLED");
+    assert.equal(executor.executeCalls, 0);
+  });
+
+  test("a RECOVERED redemption stays terminal and executes no further default", async () => {
+    const repository = new FakeRepository();
+    const executor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "RECOVERED",
+        defaultTransactionHash,
+      }),
+    );
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor: executor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "RECOVERED");
+    assert.equal(result.action, "ignored");
+    assert.equal(repository.getRedemption(redemption)?.status, "RECOVERED");
+    assert.equal(executor.executeCalls, 0);
+  });
+
+  test("a FAILED redemption is ignored and never re-processed into a default", async () => {
+    const repository = new FakeRepository();
+    const executor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({ status: "FAILED" }),
+    );
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor: executor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "FAILED");
+    assert.equal(result.action, "ignored");
+    assert.equal(executor.executeCalls, 0);
+  });
+});

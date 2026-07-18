@@ -1,7 +1,9 @@
 import {
+  isRedemptionKind,
   parseSerializedBigint,
   serializeBigint,
   type EvmAddress,
+  type RedemptionKind,
   type RedemptionRequestId,
   type TransactionHash,
 } from "@harbor/shared";
@@ -39,6 +41,8 @@ type RedemptionRow = Readonly<{
   status: StoredRedemptionRequest["status"];
   default_transaction_hash: string | null;
   status_reason: string | null;
+  destination_tag: string | null;
+  redemption_kind: string;
   created_at: string;
   updated_at: string;
 }>;
@@ -60,7 +64,58 @@ type RedemptionEventRow = Readonly<{
   created_at: string;
 }>;
 
+/**
+ * Validate a persisted `redemption_kind` against the domain enum. A corrupt or
+ * unknown value is a data-integrity violation that could misroute an on-chain
+ * default (e.g. a WITH_TAG row settled via the standard lane), so we fail loudly
+ * with the offending value and request id rather than silently coercing it.
+ */
+function parseRedemptionKind(value: string, requestId: string): RedemptionKind {
+  if (isRedemptionKind(value)) {
+    return value;
+  }
+  throw new Error(
+    `Corrupt redemption_kind ${JSON.stringify(value)} for redemption request ${requestId}`,
+  );
+}
+
+/**
+ * Enforce the `WITH_TAG` ⟺ non-null `destinationTag` invariant. A `WITH_TAG`
+ * redemption only ever settles on a payment carrying its exact required tag, and
+ * its on-chain default is built from that tag, so a `WITH_TAG` row without a tag
+ * — or a `STANDARD` row that carries one — is a data-integrity violation that
+ * would misroute settlement matching and the default. Fail loudly with the
+ * offending value and request id (the same posture as {@link parseRedemptionKind}
+ * for a corrupt lane) instead of silently settling on an arbitrary tag.
+ */
+function assertRedemptionTagConsistency(
+  redemptionKind: RedemptionKind,
+  destinationTag: bigint | null,
+  requestId: string,
+): void {
+  if (redemptionKind === "WITH_TAG" && destinationTag === null) {
+    throw new Error(
+      `WITH_TAG redemption request ${requestId} is missing its destination tag`,
+    );
+  }
+  if (redemptionKind === "STANDARD" && destinationTag !== null) {
+    throw new Error(
+      `STANDARD redemption request ${requestId} must not carry a destination tag (found ${destinationTag})`,
+    );
+  }
+}
+
 function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
+  const redemptionKind = parseRedemptionKind(
+    row.redemption_kind,
+    row.request_id,
+  );
+  const destinationTag =
+    row.destination_tag === null
+      ? null
+      : parseSerializedBigint(row.destination_tag);
+  assertRedemptionTagConsistency(redemptionKind, destinationTag, row.request_id);
+
   return {
     assetManagerAddress: row.asset_manager_address as EvmAddress,
     requestId: row.request_id,
@@ -88,6 +143,8 @@ function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
     defaultTransactionHash:
       row.default_transaction_hash as TransactionHash | null,
     statusReason: row.status_reason,
+    redemptionKind,
+    destinationTag,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -144,6 +201,8 @@ INSERT INTO redemptions (
   status,
   default_transaction_hash,
   status_reason,
+  destination_tag,
+  redemption_kind,
   created_at,
   updated_at
 ) VALUES (
@@ -168,6 +227,8 @@ INSERT INTO redemptions (
   @status,
   @defaultTransactionHash,
   @statusReason,
+  @destinationTag,
+  @redemptionKind,
   @createdAt,
   @updatedAt
 )
@@ -190,6 +251,15 @@ ON CONFLICT(asset_manager_address, request_id) DO UPDATE SET
   executor_fee_nat_wei = excluded.executor_fee_nat_wei,
   default_transaction_hash = COALESCE(excluded.default_transaction_hash, redemptions.default_transaction_hash),
   status_reason = COALESCE(excluded.status_reason, redemptions.status_reason),
+  destination_tag = COALESCE(excluded.destination_tag, redemptions.destination_tag),
+  -- Preserve the lane monotonically: WITH_TAG is intrinsic to the request and
+  -- must never be downgraded to STANDARD by a later status-carrying upsert that
+  -- omits the kind (which defaults to STANDARD). Downgrading would misroute the
+  -- on-chain default to the standard ReferencedPaymentNonexistence lane.
+  redemption_kind = CASE
+    WHEN redemptions.redemption_kind = 'WITH_TAG' THEN 'WITH_TAG'
+    ELSE excluded.redemption_kind
+  END,
   updated_at = excluded.updated_at
 `,
     )
@@ -215,6 +285,11 @@ ON CONFLICT(asset_manager_address, request_id) DO UPDATE SET
       status: input.status ?? "REQUESTED",
       defaultTransactionHash: input.defaultTransactionHash ?? null,
       statusReason: input.statusReason ?? null,
+      destinationTag:
+        input.destinationTag === undefined || input.destinationTag === null
+          ? null
+          : serializeBigint(input.destinationTag),
+      redemptionKind: input.redemptionKind ?? "STANDARD",
       createdAt,
       updatedAt,
     });

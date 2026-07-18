@@ -382,6 +382,129 @@ const referencedPaymentNonexistenceProof = {
   components: referencedPaymentNonexistenceProofAbi,
 } as const satisfies AbiParameter;
 
+// ---------------------------------------------------------------------------
+// XRPPaymentNonexistence — the FDC default proof for redeem-by-tag.
+// Mirrors `IXRPPaymentNonexistence` (coston2 periphery, attestation id 0x09).
+// ---------------------------------------------------------------------------
+
+export const xrpPaymentNonexistenceRequestBodyAbi = [
+  { name: "minimalBlockNumber", internalType: "uint64", type: "uint64" },
+  { name: "deadlineBlockNumber", internalType: "uint64", type: "uint64" },
+  { name: "deadlineTimestamp", internalType: "uint64", type: "uint64" },
+  bytes32("destinationAddressHash"),
+  uint("amount"),
+  bool("checkFirstMemoData"),
+  bytes32("firstMemoDataHash"),
+  bool("checkDestinationTag"),
+  uint("destinationTag"),
+  address("proofOwner"),
+] as const satisfies readonly AbiParameter[];
+
+export const xrpPaymentNonexistenceResponseBodyAbi = [
+  { name: "minimalBlockTimestamp", internalType: "uint64", type: "uint64" },
+  { name: "firstOverflowBlockNumber", internalType: "uint64", type: "uint64" },
+  {
+    name: "firstOverflowBlockTimestamp",
+    internalType: "uint64",
+    type: "uint64",
+  },
+] as const satisfies readonly AbiParameter[];
+
+export const xrpPaymentNonexistenceResponseAbi = [
+  bytes32("attestationType"),
+  bytes32("sourceId"),
+  { name: "votingRound", internalType: "uint64", type: "uint64" },
+  { name: "lowestUsedTimestamp", internalType: "uint64", type: "uint64" },
+  {
+    name: "requestBody",
+    internalType: "struct IXRPPaymentNonexistence.RequestBody",
+    type: "tuple",
+    components: xrpPaymentNonexistenceRequestBodyAbi,
+  },
+  {
+    name: "responseBody",
+    internalType: "struct IXRPPaymentNonexistence.ResponseBody",
+    type: "tuple",
+    components: xrpPaymentNonexistenceResponseBodyAbi,
+  },
+] as const satisfies readonly AbiParameter[];
+
+export const xrpPaymentNonexistenceProofAbi = [
+  { name: "merkleProof", internalType: "bytes32[]", type: "bytes32[]" },
+  {
+    name: "data",
+    internalType: "struct IXRPPaymentNonexistence.Response",
+    type: "tuple",
+    components: xrpPaymentNonexistenceResponseAbi,
+  },
+] as const satisfies readonly AbiParameter[];
+
+const xrpPaymentNonexistenceProof = {
+  name: "_proof",
+  internalType: "struct IXRPPaymentNonexistence.Proof",
+  type: "tuple",
+  components: xrpPaymentNonexistenceProofAbi,
+} as const satisfies AbiParameter;
+
+// ---------------------------------------------------------------------------
+// XRPPayment — the FDC confirm proof for redeem-by-tag (attestation id 0x08).
+// Exposed for observation/verification; Harbor does not call
+// `confirmXRPRedemptionPayment` itself (that is the agent's action), but the
+// ABI must be available so clients can decode/verify an XRP payment proof.
+// ---------------------------------------------------------------------------
+
+export const xrpPaymentRequestBodyAbi = [
+  bytes32("transactionId"),
+  address("proofOwner"),
+] as const satisfies readonly AbiParameter[];
+
+export const xrpPaymentResponseBodyAbi = [
+  { name: "blockNumber", internalType: "uint64", type: "uint64" },
+  { name: "blockTimestamp", internalType: "uint64", type: "uint64" },
+  { name: "sourceAddress", internalType: "string", type: "string" },
+  bytes32("sourceAddressHash"),
+  bytes32("receivingAddressHash"),
+  bytes32("intendedReceivingAddressHash"),
+  { name: "spentAmount", internalType: "int256", type: "int256" },
+  { name: "intendedSpentAmount", internalType: "int256", type: "int256" },
+  { name: "receivedAmount", internalType: "int256", type: "int256" },
+  { name: "intendedReceivedAmount", internalType: "int256", type: "int256" },
+  bool("hasMemoData"),
+  { name: "firstMemoData", internalType: "bytes", type: "bytes" },
+  bool("hasDestinationTag"),
+  uint("destinationTag"),
+  { name: "status", internalType: "uint8", type: "uint8" },
+] as const satisfies readonly AbiParameter[];
+
+export const xrpPaymentResponseAbi = [
+  bytes32("attestationType"),
+  bytes32("sourceId"),
+  { name: "votingRound", internalType: "uint64", type: "uint64" },
+  { name: "lowestUsedTimestamp", internalType: "uint64", type: "uint64" },
+  {
+    name: "requestBody",
+    internalType: "struct IXRPPayment.RequestBody",
+    type: "tuple",
+    components: xrpPaymentRequestBodyAbi,
+  },
+  {
+    name: "responseBody",
+    internalType: "struct IXRPPayment.ResponseBody",
+    type: "tuple",
+    components: xrpPaymentResponseBodyAbi,
+  },
+] as const satisfies readonly AbiParameter[];
+
+export const xrpPaymentProofAbi = [
+  { name: "merkleProof", internalType: "bytes32[]", type: "bytes32[]" },
+  {
+    name: "data",
+    internalType: "struct IXRPPayment.Response",
+    type: "tuple",
+    components: xrpPaymentResponseAbi,
+  },
+] as const satisfies readonly AbiParameter[];
+
 export const assetManagerEventsAbi = [
   {
     type: "event",
@@ -450,6 +573,15 @@ export const assetManagerEventsAbi = [
     inputs: [
       { ...address("redeemer"), indexed: true },
       { ...uint("remainingLots"), indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    anonymous: false,
+    name: "RedemptionAmountIncomplete",
+    inputs: [
+      { ...address("redeemer"), indexed: true },
+      { ...uint("remainingAmountUBA"), indexed: false },
     ],
   },
   {
@@ -700,6 +832,51 @@ export const assetManagerAbi = [
     inputs: [referencedPaymentNonexistenceProof, uint("_redemptionRequestId")],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "redeemWithTag",
+    inputs: [
+      uint("_amountUBA"),
+      {
+        name: "_redeemerUnderlyingAddressString",
+        internalType: "string",
+        type: "string",
+      },
+      address("_executor", "address payable"),
+      uint("_destinationTag"),
+    ],
+    outputs: [uint("_redeemedAmountUBA")],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "confirmXRPRedemptionPayment",
+    inputs: [
+      {
+        name: "_payment",
+        type: "tuple",
+        internalType: "struct IXRPPayment.Proof",
+        components: xrpPaymentProofAbi,
+      },
+      uint("_redemptionRequestId"),
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "xrpRedemptionPaymentDefault",
+    inputs: [xrpPaymentNonexistenceProof, uint("_redemptionRequestId")],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "redeemWithTagSupported",
+    inputs: [],
+    outputs: [bool("")],
+    stateMutability: "view",
   },
   ...assetManagerEventsAbi,
 ] as const satisfies Abi;

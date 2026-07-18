@@ -83,6 +83,7 @@ function renderPanel(
   info = proofReadyInfo(),
   overrides: {
     harborRedeemerAddress?: string | null;
+    redemptionKind?: "STANDARD" | "WITH_TAG";
     onRecoveryRefresh?: () => void;
   } = {},
 ) {
@@ -96,6 +97,9 @@ function renderPanel(
     <SelfRecoveryPanel
       requestId={REQUEST_ID}
       selfRecovery={info}
+      redemptionKind={
+        "redemptionKind" in overrides ? overrides.redemptionKind : "STANDARD"
+      }
       harborRedeemerAddress={harborRedeemerAddress}
       onRecoveryRefresh={overrides.onRecoveryRefresh}
     />,

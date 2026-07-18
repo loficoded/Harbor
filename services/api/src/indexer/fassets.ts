@@ -34,6 +34,7 @@ export const indexedAssetManagerEventNames = [
   "RedemptionWithTagRequested",
   "RedemptionPerformed",
   "RedemptionDefault",
+  "RedemptionAmountIncomplete",
   "RedemptionTicketCreated",
   "RedemptionTicketUpdated",
 ] as const;
@@ -409,6 +410,8 @@ function processRedemptionRequested(
     lastUnderlyingTimestamp: fields.lastUnderlyingTimestamp,
     executor: fields.executor,
     executorFeeNatWei: fields.executorFeeNatWei,
+    redemptionKind: "STANDARD",
+    destinationTag: null,
     status: "REQUESTED",
   });
 
@@ -425,18 +428,41 @@ function processRedemptionWithTagRequested(
   const fields = {
     ...getRedemptionRequestedFields(args),
     destinationTag: bigintArg(args, "destinationTag"),
-    unsupportedReason: "redemption-with-tag-not-supported-in-mvp",
   };
+  const assetManagerAddress = normalizeEvmAddress(input.assetManagerAddress);
 
   insertObservedEvent(input, log, identity, {
-    assetManagerAddress: normalizeEvmAddress(input.assetManagerAddress),
+    assetManagerAddress,
     requestId: fields.requestId,
     agentVault: fields.agentVault,
     redeemer: fields.redeemer,
     payload: fields,
   });
 
-  summary.unsupportedEventsIndexed += 1;
+  upsertRedemption(input.database, {
+    assetManagerAddress,
+    requestId: fields.requestId,
+    sourceChainId: input.chainId,
+    sourceBlockNumber: identity.blockNumber,
+    sourceLogIndex: identity.logIndex,
+    sourceTransactionHash: identity.transactionHash,
+    redeemer: fields.redeemer,
+    agentVault: fields.agentVault,
+    paymentAddress: fields.paymentAddress,
+    valueUBA: fields.valueUBA,
+    feeUBA: fields.feeUBA,
+    paymentReference: fields.paymentReference,
+    firstUnderlyingBlock: fields.firstUnderlyingBlock,
+    lastUnderlyingBlock: fields.lastUnderlyingBlock,
+    lastUnderlyingTimestamp: fields.lastUnderlyingTimestamp,
+    executor: fields.executor,
+    executorFeeNatWei: fields.executorFeeNatWei,
+    redemptionKind: "WITH_TAG",
+    destinationTag: fields.destinationTag,
+    status: "REQUESTED",
+  });
+
+  summary.redemptionRequestsIndexed += 1;
 }
 
 function processRedemptionPerformed(
@@ -527,6 +553,29 @@ function processRedemptionDefault(
   summary.statusUpdatesIndexed += 1;
 }
 
+function processRedemptionAmountIncomplete(
+  input: FAssetIndexerConfig,
+  log: ViemDecodedEventLog,
+  identity: MinedLogIdentity,
+  summary: MutableFAssetIndexingSummary,
+): void {
+  const args = requireRecord(log.args, log.eventName);
+  const redeemer = evmAddressArg(args, "redeemer");
+
+  insertObservedEvent(input, log, identity, {
+    assetManagerAddress: normalizeEvmAddress(input.assetManagerAddress),
+    requestId: null,
+    agentVault: null,
+    redeemer,
+    payload: {
+      redeemer,
+      remainingAmountUBA: bigintArg(args, "remainingAmountUBA"),
+    },
+  });
+
+  summary.metadataEventsIndexed += 1;
+}
+
 function processTicketEvent(
   input: FAssetIndexerConfig,
   log: ViemDecodedEventLog,
@@ -608,6 +657,9 @@ function processLog(
       return;
     case "RedemptionPerformed":
       processRedemptionPerformed(input, log, identity, summary);
+      return;
+    case "RedemptionAmountIncomplete":
+      processRedemptionAmountIncomplete(input, log, identity, summary);
       return;
     case "RedemptionTicketCreated":
     case "RedemptionTicketUpdated":

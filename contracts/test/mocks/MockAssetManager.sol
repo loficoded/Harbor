@@ -6,10 +6,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     IReferencedPaymentNonexistence
 } from "@flarenetwork/flare-periphery-contracts/coston2/IReferencedPaymentNonexistence.sol";
+import {
+    IXRPPaymentNonexistence
+} from "@flarenetwork/flare-periphery-contracts/coston2/IXRPPaymentNonexistence.sol";
 import {AssetManagerSettings} from "@flarenetwork/flare-periphery-contracts/coston2/data/AssetManagerSettings.sol";
 
 interface IHarborDefaultExecutor {
     function executeDefault(IReferencedPaymentNonexistence.Proof calldata proof, uint256 redemptionRequestId) external;
+}
+
+interface IHarborXrpDefaultExecutor {
+    function executeXrpDefault(IXRPPaymentNonexistence.Proof calldata proof, uint256 redemptionRequestId) external;
 }
 
 contract MockAssetManager {
@@ -49,6 +56,16 @@ contract MockAssetManager {
     bool public reentrantCallSucceeded;
     bool public reentrantCallReverted;
 
+    // XRP-default (redeem-by-tag) tracking.
+    uint256 public xrpDefaultCallCount;
+    address public lastXrpDefaultCaller;
+    uint256 public lastXrpRedemptionRequestId;
+    bytes32 public lastXrpProofHash;
+    bool public lastCheckDestinationTag;
+    bool public lastCheckFirstMemoData;
+    uint256 public lastDestinationTag;
+    bool public redeemWithTagSupportedFlag = true;
+
     bool public newRedemptionsPaused;
     bool private attemptReentrancy;
 
@@ -69,6 +86,14 @@ contract MockAssetManager {
         attemptReentrancy = attemptReentrancy_;
         reentrantCallSucceeded = false;
         reentrantCallReverted = false;
+    }
+
+    function setRedeemWithTagSupported(bool supported) external {
+        redeemWithTagSupportedFlag = supported;
+    }
+
+    function redeemWithTagSupported() external view returns (bool) {
+        return redeemWithTagSupportedFlag;
     }
 
     function lotSize() external view returns (uint256) {
@@ -177,6 +202,54 @@ contract MockAssetManager {
         if (attemptReentrancy) {
             attemptReentrancy = false;
             try IHarborDefaultExecutor(msg.sender).executeDefault(proof, redemptionRequestId + 1) {
+                reentrantCallSucceeded = true;
+            } catch {
+                reentrantCallReverted = true;
+            }
+        }
+
+        request.defaulted = true;
+
+        uint256 redemptionDefaultValueNatWei = request.redemptionDefaultValueNatWei;
+        request.redemptionDefaultValueNatWei = 0;
+        if (redemptionDefaultValueNatWei != 0) {
+            defaultValuePaidTo[request.redeemer] += redemptionDefaultValueNatWei;
+            _sendNative(payable(request.redeemer), redemptionDefaultValueNatWei);
+        }
+
+        uint256 executorFeeNatWei = request.executorFeeNatWei;
+        request.executorFeeNatWei = 0;
+        if (executorFeeNatWei != 0) {
+            executorFeePaidTo[msg.sender] += executorFeeNatWei;
+            _sendNative(payable(msg.sender), executorFeeNatWei);
+        }
+    }
+
+    /// @dev XRP-native default for redeem-by-tag. Mirrors `redemptionPaymentDefault`
+    /// payout accounting but records the XRP-specific proof fields and re-enters
+    /// `executeXrpDefault` when `attemptReentrancy` is set.
+    function xrpRedemptionPaymentDefault(IXRPPaymentNonexistence.Proof calldata proof, uint256 redemptionRequestId)
+        external
+    {
+        RedemptionRequest storage request = redemptionRequests[redemptionRequestId];
+        require(request.exists, "unknown redemption request");
+        require(!request.defaulted, "request already defaulted");
+        require(
+            msg.sender == request.redeemer || msg.sender == request.executor || msg.sender == request.agentOwner,
+            "default caller not authorized"
+        );
+
+        xrpDefaultCallCount++;
+        lastXrpDefaultCaller = msg.sender;
+        lastXrpRedemptionRequestId = redemptionRequestId;
+        lastXrpProofHash = keccak256(abi.encode(proof));
+        lastCheckDestinationTag = proof.data.requestBody.checkDestinationTag;
+        lastCheckFirstMemoData = proof.data.requestBody.checkFirstMemoData;
+        lastDestinationTag = proof.data.requestBody.destinationTag;
+
+        if (attemptReentrancy) {
+            attemptReentrancy = false;
+            try IHarborXrpDefaultExecutor(msg.sender).executeXrpDefault(proof, redemptionRequestId + 1) {
                 reentrantCallSucceeded = true;
             } catch {
                 reentrantCallReverted = true;

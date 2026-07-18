@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
+import fc from "fast-check";
 
 import { coston2Chain, coston2FxrpAssetManagerAddress } from "@harbor/protocol";
 import type { Bytes32, EvmAddress, TransactionHash } from "@harbor/shared";
@@ -202,7 +203,7 @@ describe("FAssets event indexer", () => {
     assert.equal(redemption?.status, "REQUESTED");
   });
 
-  test("stores unsupported with-tag, ticket, and Harbor events as metadata", (t) => {
+  test("stores with-tag redemption as a tracked WITH_TAG request, and ticket/Harbor events as metadata", (t) => {
     const database = createTestDatabase(t);
 
     indexFAssetEventLogs({
@@ -257,7 +258,8 @@ describe("FAssets event indexer", () => {
       ],
     });
 
-    assert.equal(countRows(database, "redemptions"), 0);
+    // The with-tag event now creates a tracked redemption row (WITH_TAG).
+    assert.equal(countRows(database, "redemptions"), 1);
     assert.deepEqual(
       listEventRows(database).map((row) => row.event_name),
       [
@@ -273,11 +275,16 @@ describe("FAssets event indexer", () => {
     const withTagPayload = JSON.parse(
       listEventRows(database)[0]?.payload_json ?? "{}",
     ) as Record<string, unknown>;
-    assert.equal(
-      withTagPayload.unsupportedReason,
-      "redemption-with-tag-not-supported-in-mvp",
-    );
+    assert.equal(withTagPayload.unsupportedReason, undefined);
     assert.equal(withTagPayload.destinationTag, "12345");
+
+    const redemption = getRedemption(database, {
+      assetManagerAddress,
+      requestId: "99",
+    });
+    assert.equal(redemption?.redemptionKind, "WITH_TAG");
+    assert.equal(redemption?.destinationTag, 12345n);
+    assert.equal(redemption?.status, "REQUESTED");
   });
 
   test("repeated indexing of the same logs does not duplicate rows", (t) => {
@@ -568,4 +575,168 @@ describe("FAssets event indexer", () => {
       assert.ok(summary.logsProcessed >= 0);
     },
   );
+});
+
+
+describe("FAssets event indexer — redemption-kind routing and fuzz", () => {
+  test("RedemptionWithTagRequested is a tracked request, not an unsupported event", (t) => {
+    const database = createTestDatabase(t);
+    const summary = indexFAssetEventLogs({
+      database,
+      chainId,
+      assetManagerAddress,
+      observedAt,
+      logs: [
+        mockLog(
+          "RedemptionWithTagRequested",
+          redemptionRequestedArgs({ requestId: 99n, destinationTag: 12345n }),
+        ),
+      ],
+    });
+
+    // Former MVP-skip behavior is gone: the with-tag event counts as an indexed
+    // redemption request and never as an unsupported event.
+    assert.equal(summary.redemptionRequestsIndexed, 1);
+    assert.equal(summary.unsupportedEventsIndexed, 0);
+    assert.equal(summary.metadataEventsIndexed, 0);
+
+    const redemption = getRedemption(database, {
+      assetManagerAddress,
+      requestId: "99",
+    });
+    assert.equal(redemption?.redemptionKind, "WITH_TAG");
+    assert.equal(redemption?.destinationTag, 12345n);
+    assert.notEqual(redemption?.destinationTag, null);
+  });
+
+  test("RedemptionRequested persists a STANDARD redemption with a null destination tag", (t) => {
+    const database = createTestDatabase(t);
+    const summary = indexFAssetEventLogs({
+      database,
+      chainId,
+      assetManagerAddress,
+      observedAt,
+      logs: [
+        mockLog("RedemptionRequested", redemptionRequestedArgs({ requestId: 7n })),
+      ],
+    });
+
+    assert.equal(summary.redemptionRequestsIndexed, 1);
+    assert.equal(summary.unsupportedEventsIndexed, 0);
+    const redemption = getRedemption(database, {
+      assetManagerAddress,
+      requestId: "7",
+    });
+    assert.equal(redemption?.redemptionKind, "STANDARD");
+    assert.equal(redemption?.destinationTag, null);
+  });
+
+  test("RedemptionAmountIncomplete is a metadata event and does not upsert a redemption", (t) => {
+    const database = createTestDatabase(t);
+    const summary = indexFAssetEventLogs({
+      database,
+      chainId,
+      assetManagerAddress,
+      observedAt,
+      logs: [
+        mockLog("RedemptionAmountIncomplete", {
+          redeemer,
+          remainingAmountUBA: 250_000n,
+        }),
+      ],
+    });
+
+    assert.equal(summary.metadataEventsIndexed, 1);
+    assert.equal(summary.redemptionRequestsIndexed, 0);
+    assert.equal(summary.unsupportedEventsIndexed, 0);
+    assert.equal(countRows(database, "redemptions"), 0);
+    assert.equal(countRows(database, "redemption_events"), 1);
+  });
+
+  test("indexing the same WITH_TAG event twice is idempotent (no duplicate row)", (t) => {
+    const database = createTestDatabase(t);
+    const logs = [
+      mockLog(
+        "RedemptionWithTagRequested",
+        redemptionRequestedArgs({ requestId: 55n, destinationTag: 7n }),
+      ),
+    ];
+    indexFAssetEventLogs({
+      database,
+      chainId,
+      assetManagerAddress,
+      observedAt,
+      logs,
+    });
+    indexFAssetEventLogs({
+      database,
+      chainId,
+      assetManagerAddress,
+      observedAt,
+      logs,
+    });
+    assert.equal(countRows(database, "redemptions"), 1);
+    assert.equal(countRows(database, "redemption_events"), 1);
+    const redemption = getRedemption(database, {
+      assetManagerAddress,
+      requestId: "55",
+    });
+    assert.equal(redemption?.destinationTag, 7n);
+  });
+
+  test("fuzz: arbitrary event args upsert the correct lane, tag, and amounts", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom<"STANDARD" | "WITH_TAG">("STANDARD", "WITH_TAG"),
+        fc.record({
+          requestId: fc.bigInt({ min: 1n, max: 10n ** 12n }),
+          value: fc.bigInt({ min: 0n, max: 10n ** 18n }),
+          fee: fc.bigInt({ min: 0n, max: 10n ** 18n }),
+          tag: fc.bigInt({ min: 0n, max: 0xffffffffn }),
+          firstBlock: fc.bigInt({ min: 0n, max: 10n ** 9n }),
+        }),
+        (kind, r) => {
+          const database = openSqliteDatabase(":memory:");
+          runMigrations(database);
+
+          const eventName =
+            kind === "WITH_TAG"
+              ? "RedemptionWithTagRequested"
+              : "RedemptionRequested";
+          const args = redemptionRequestedArgs({
+            requestId: r.requestId,
+            valueUBA: r.value,
+            feeUBA: r.fee,
+            firstUnderlyingBlock: r.firstBlock,
+            lastUnderlyingBlock: r.firstBlock + 100n,
+            ...(kind === "WITH_TAG" ? { destinationTag: r.tag } : {}),
+          });
+
+          indexFAssetEventLogs({
+            database,
+            chainId,
+            assetManagerAddress,
+            observedAt,
+            logs: [mockLog(eventName, args)],
+          });
+
+          const stored = getRedemption(database, {
+            assetManagerAddress,
+            requestId: String(r.requestId),
+          });
+          assert.equal(stored?.redemptionKind, kind);
+          assert.equal(stored?.valueUBA, r.value);
+          assert.equal(stored?.feeUBA, r.fee);
+          if (kind === "WITH_TAG") {
+            assert.equal(stored?.destinationTag, r.tag);
+          } else {
+            assert.equal(stored?.destinationTag, null);
+          }
+
+          database.close();
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
 });

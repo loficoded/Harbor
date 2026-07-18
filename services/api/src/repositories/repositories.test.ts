@@ -3,8 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test, type TestContext } from "node:test";
+import fc from "fast-check";
 
-import type { Bytes32, EvmAddress, TransactionHash } from "@harbor/shared";
+import type {
+  Bytes32,
+  EvmAddress,
+  RedemptionKind,
+  TransactionHash,
+} from "@harbor/shared";
 
 import {
   listAppliedMigrations,
@@ -15,6 +21,7 @@ import {
 import {
   getFdcProofByRequestAndRound,
   getAgent,
+  getRedemptionByRequestId,
   insertFdcProof,
   insertRedemptionEvent,
   listAgents,
@@ -113,6 +120,7 @@ describe("SQLite migrations", () => {
       { id: "0004_xrpl_observation_receipts", applied: true },
       { id: "0005_fdc_request_proof_ready_status", applied: true },
       { id: "0006_agent_details_fields", applied: true },
+      { id: "0007_redemption_tag_fields", applied: true },
     ]);
 
     const tableNames = database
@@ -164,6 +172,10 @@ ORDER BY name
         id: "0006_agent_details_fields",
         appliedAt: listAppliedMigrations(database)[5]?.appliedAt,
       },
+      {
+        id: "0007_redemption_tag_fields",
+        appliedAt: listAppliedMigrations(database)[6]?.appliedAt,
+      },
     ]);
     assert.deepEqual(runMigrations(database), [
       { id: "0001_initial_schema", applied: false },
@@ -172,6 +184,7 @@ ORDER BY name
       { id: "0004_xrpl_observation_receipts", applied: false },
       { id: "0005_fdc_request_proof_ready_status", applied: false },
       { id: "0006_agent_details_fields", applied: false },
+      { id: "0007_redemption_tag_fields", applied: false },
     ]);
   });
 });
@@ -255,6 +268,105 @@ WHERE request_id = '42'
         (redemption) => redemption.requestId,
       ),
       ["42"],
+    );
+  });
+
+  test("never downgrades a WITH_TAG redemption to STANDARD on a later upsert (regression: item 3)", (t) => {
+    const database = createTestDatabase(t);
+
+    const base = {
+      assetManagerAddress,
+      requestId: "77",
+      sourceChainId: "114",
+      redeemer,
+      agentVault,
+      paymentAddress: "rDestinationAddress",
+      valueUBA: 10_000_000n,
+      feeUBA: 0n,
+      paymentReference,
+      firstUnderlyingBlock: 100n,
+      lastUnderlyingBlock: 200n,
+      lastUnderlyingTimestamp: 1893456000n,
+      executor,
+      executorFeeNatWei: 0n,
+    };
+
+    // Created as a tag-lane (WITH_TAG) redemption with tag 12345.
+    const created = upsertRedemption(database, {
+      ...base,
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+      createdAt: "2026-07-08T00:00:00.000Z",
+      updatedAt: "2026-07-08T00:00:00.000Z",
+    });
+    assert.equal(created.redemptionKind, "WITH_TAG");
+    assert.equal(created.destinationTag, 12345n);
+
+    // A later status-carrying upsert omits redemptionKind (which defaults to
+    // STANDARD) and destinationTag. Before the fix this downgraded the row and
+    // would misroute the on-chain default to the standard lane.
+    const updated = upsertRedemption(database, {
+      ...base,
+      status: "WATCHING",
+      updatedAt: "2026-07-08T01:00:00.000Z",
+    });
+    assert.equal(updated.redemptionKind, "WITH_TAG");
+    assert.equal(updated.destinationTag, 12345n);
+  });
+
+  test("keeps STANDARD when omitted and allows a STANDARD→WITH_TAG upgrade (regression: item 3)", (t) => {
+    const database = createTestDatabase(t);
+
+    const base = {
+      assetManagerAddress,
+      requestId: "78",
+      sourceChainId: "114",
+      redeemer,
+      agentVault,
+      paymentAddress: "rDestinationAddress",
+      valueUBA: 10_000_000n,
+      feeUBA: 0n,
+      paymentReference,
+      firstUnderlyingBlock: 100n,
+      lastUnderlyingBlock: 200n,
+      lastUnderlyingTimestamp: 1893456000n,
+      executor,
+      executorFeeNatWei: 0n,
+    };
+
+    // Standard row; a later upsert that omits the kind must stay STANDARD.
+    upsertRedemption(database, { ...base });
+    const stillStandard = upsertRedemption(database, {
+      ...base,
+      status: "WATCHING",
+    });
+    assert.equal(stillStandard.redemptionKind, "STANDARD");
+
+    // An explicit WITH_TAG value upgrades the lane (the intrinsic kind is
+    // corrected forward, never backward).
+    const upgraded = upsertRedemption(database, {
+      ...base,
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+    });
+    assert.equal(upgraded.redemptionKind, "WITH_TAG");
+    assert.equal(upgraded.destinationTag, 0n);
+  });
+
+  test("fails loudly when a persisted redemption_kind is corrupt (regression: item 4)", (t) => {
+    const database = createTestDatabase(t);
+    insertRedemptionFixture(database); // request_id "42", kind STANDARD
+
+    // Corrupt the persisted lane directly (bad migration / manual edit).
+    database
+      .prepare(
+        `UPDATE redemptions SET redemption_kind = 'BOGUS' WHERE request_id = '42'`,
+      )
+      .run();
+
+    assert.throws(
+      () => getRedemptionByRequestId(database, "42"),
+      /Corrupt redemption_kind "BOGUS" for redemption request 42/,
     );
   });
 });
@@ -563,5 +675,182 @@ describe("agent, keeper, and cursor repositories", () => {
 
     assert.equal(running.status, "RUNNING");
     assert.equal(running.attempts, 1);
+  });
+});
+
+
+function tagConsistencyBase(requestId: string) {
+  return {
+    assetManagerAddress,
+    requestId,
+    sourceChainId: "114",
+    redeemer,
+    agentVault,
+    paymentAddress: "rDestinationAddress",
+    valueUBA: 10_000_000n,
+    feeUBA: 0n,
+    paymentReference,
+    firstUnderlyingBlock: 100n,
+    lastUnderlyingBlock: 200n,
+    lastUnderlyingTimestamp: 1893456000n,
+    executor,
+    executorFeeNatWei: 0n,
+  };
+}
+
+describe("redemption tag/kind consistency (item 4)", () => {
+  test("rejects a WITH_TAG redemption that is missing its destination tag", (t) => {
+    const database = createTestDatabase(t);
+    assert.throws(
+      () =>
+        upsertRedemption(database, {
+          ...tagConsistencyBase("200"),
+          redemptionKind: "WITH_TAG",
+          destinationTag: null,
+        }),
+      /WITH_TAG redemption request 200 is missing its destination tag/,
+    );
+  });
+
+  test("rejects a STANDARD redemption that carries a destination tag (with the tag in the message)", (t) => {
+    const database = createTestDatabase(t);
+    assert.throws(
+      () =>
+        upsertRedemption(database, {
+          ...tagConsistencyBase("201"),
+          redemptionKind: "STANDARD",
+          destinationTag: 42n,
+        }),
+      /STANDARD redemption request 201 must not carry a destination tag \(found 42\)/,
+    );
+  });
+
+  test("accepts WITH_TAG with tag 0 and STANDARD with a null tag", (t) => {
+    const database = createTestDatabase(t);
+    const withZero = upsertRedemption(database, {
+      ...tagConsistencyBase("202"),
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+    });
+    assert.equal(withZero.redemptionKind, "WITH_TAG");
+    assert.equal(withZero.destinationTag, 0n);
+
+    const standard = upsertRedemption(database, {
+      ...tagConsistencyBase("203"),
+      redemptionKind: "STANDARD",
+      destinationTag: null,
+    });
+    assert.equal(standard.redemptionKind, "STANDARD");
+    assert.equal(standard.destinationTag, null);
+  });
+
+  test("round-trips WITH_TAG tag=4242 and STANDARD tag=null through getRedemption", (t) => {
+    const database = createTestDatabase(t);
+    upsertRedemption(database, {
+      ...tagConsistencyBase("204"),
+      redemptionKind: "WITH_TAG",
+      destinationTag: 4242n,
+    });
+    const tagged = getRedemptionByRequestId(database, "204");
+    assert.equal(tagged?.redemptionKind, "WITH_TAG");
+    assert.equal(tagged?.destinationTag, 4242n);
+
+    upsertRedemption(database, {
+      ...tagConsistencyBase("205"),
+      redemptionKind: "STANDARD",
+    });
+    const standard = getRedemptionByRequestId(database, "205");
+    assert.equal(standard?.redemptionKind, "STANDARD");
+    assert.equal(standard?.destinationTag, null);
+  });
+
+  test("tag 0 round-trips as 0n and is preserved by a later tag-omitting upsert (never collapses to null)", (t) => {
+    const database = createTestDatabase(t);
+    upsertRedemption(database, {
+      ...tagConsistencyBase("206"),
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+    });
+    const stored = getRedemptionByRequestId(database, "206");
+    assert.equal(stored?.destinationTag, 0n);
+    assert.notEqual(stored?.destinationTag, null);
+
+    // A later status-only upsert omits both kind and tag: the WITH_TAG lane and
+    // the tag=0 must survive (COALESCE keeps "0", CASE keeps WITH_TAG).
+    const updated = upsertRedemption(database, {
+      ...tagConsistencyBase("206"),
+      status: "WATCHING",
+    });
+    assert.equal(updated.redemptionKind, "WITH_TAG");
+    assert.equal(updated.destinationTag, 0n);
+  });
+
+  test("corrupt DB: a WITH_TAG row with a NULL destination tag fails loudly on read", (t) => {
+    const database = createTestDatabase(t);
+    upsertRedemption(database, {
+      ...tagConsistencyBase("300"),
+      redemptionKind: "STANDARD",
+    });
+    // Simulate a bad migration / manual edit that violates the invariant.
+    database
+      .prepare(
+        `UPDATE redemptions SET redemption_kind = 'WITH_TAG', destination_tag = NULL WHERE request_id = '300'`,
+      )
+      .run();
+    assert.throws(
+      () => getRedemptionByRequestId(database, "300"),
+      /WITH_TAG redemption request 300 is missing its destination tag/,
+    );
+  });
+
+  test("corrupt DB: a STANDARD row that carries a destination tag fails loudly on read", (t) => {
+    const database = createTestDatabase(t);
+    upsertRedemption(database, {
+      ...tagConsistencyBase("301"),
+      redemptionKind: "STANDARD",
+    });
+    database
+      .prepare(
+        `UPDATE redemptions SET destination_tag = '42' WHERE request_id = '301'`,
+      )
+      .run();
+    assert.throws(
+      () => getRedemptionByRequestId(database, "301"),
+      /STANDARD redemption request 301 must not carry a destination tag \(found 42\)/,
+    );
+  });
+
+  test("fuzz: only consistent kind/tag combinations persist; inconsistent ones throw", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom<RedemptionKind>("STANDARD", "WITH_TAG"),
+        fc.oneof(
+          fc.constant<bigint | null>(null),
+          fc.bigInt({ min: 0n, max: 0xffffffffn }),
+        ),
+        (kind, tag) => {
+          const database = openSqliteDatabase(":memory:");
+          runMigrations(database);
+          const input = {
+            ...tagConsistencyBase("1"),
+            redemptionKind: kind,
+            destinationTag: tag,
+          };
+          const consistent =
+            (kind === "WITH_TAG" && tag !== null) ||
+            (kind === "STANDARD" && tag === null);
+
+          if (consistent) {
+            const stored = upsertRedemption(database, input);
+            assert.equal(stored.redemptionKind, kind);
+            assert.equal(stored.destinationTag, tag);
+          } else {
+            assert.throws(() => upsertRedemption(database, input));
+          }
+          database.close();
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });

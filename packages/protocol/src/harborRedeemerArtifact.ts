@@ -214,6 +214,137 @@ export const harborRedeemerAbi = [
   },
   {
     type: "function",
+    name: "executeXrpDefault",
+    inputs: [
+      {
+        name: "proof",
+        type: "tuple",
+        internalType: "struct IXRPPaymentNonexistence.Proof",
+        components: [
+          {
+            name: "merkleProof",
+            type: "bytes32[]",
+            internalType: "bytes32[]",
+          },
+          {
+            name: "data",
+            type: "tuple",
+            internalType: "struct IXRPPaymentNonexistence.Response",
+            components: [
+              {
+                name: "attestationType",
+                type: "bytes32",
+                internalType: "bytes32",
+              },
+              {
+                name: "sourceId",
+                type: "bytes32",
+                internalType: "bytes32",
+              },
+              {
+                name: "votingRound",
+                type: "uint64",
+                internalType: "uint64",
+              },
+              {
+                name: "lowestUsedTimestamp",
+                type: "uint64",
+                internalType: "uint64",
+              },
+              {
+                name: "requestBody",
+                type: "tuple",
+                internalType: "struct IXRPPaymentNonexistence.RequestBody",
+                components: [
+                  {
+                    name: "minimalBlockNumber",
+                    type: "uint64",
+                    internalType: "uint64",
+                  },
+                  {
+                    name: "deadlineBlockNumber",
+                    type: "uint64",
+                    internalType: "uint64",
+                  },
+                  {
+                    name: "deadlineTimestamp",
+                    type: "uint64",
+                    internalType: "uint64",
+                  },
+                  {
+                    name: "destinationAddressHash",
+                    type: "bytes32",
+                    internalType: "bytes32",
+                  },
+                  {
+                    name: "amount",
+                    type: "uint256",
+                    internalType: "uint256",
+                  },
+                  {
+                    name: "checkFirstMemoData",
+                    type: "bool",
+                    internalType: "bool",
+                  },
+                  {
+                    name: "firstMemoDataHash",
+                    type: "bytes32",
+                    internalType: "bytes32",
+                  },
+                  {
+                    name: "checkDestinationTag",
+                    type: "bool",
+                    internalType: "bool",
+                  },
+                  {
+                    name: "destinationTag",
+                    type: "uint256",
+                    internalType: "uint256",
+                  },
+                  {
+                    name: "proofOwner",
+                    type: "address",
+                    internalType: "address",
+                  },
+                ],
+              },
+              {
+                name: "responseBody",
+                type: "tuple",
+                internalType: "struct IXRPPaymentNonexistence.ResponseBody",
+                components: [
+                  {
+                    name: "minimalBlockTimestamp",
+                    type: "uint64",
+                    internalType: "uint64",
+                  },
+                  {
+                    name: "firstOverflowBlockNumber",
+                    type: "uint64",
+                    internalType: "uint64",
+                  },
+                  {
+                    name: "firstOverflowBlockTimestamp",
+                    type: "uint64",
+                    internalType: "uint64",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: "redemptionRequestId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "fAssetTokenAddress",
     inputs: [],
     outputs: [

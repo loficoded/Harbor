@@ -9,6 +9,9 @@ import {IAssetManager} from "@flarenetwork/flare-periphery-contracts/coston2/IAs
 import {
     IReferencedPaymentNonexistence
 } from "@flarenetwork/flare-periphery-contracts/coston2/IReferencedPaymentNonexistence.sol";
+import {
+    IXRPPaymentNonexistence
+} from "@flarenetwork/flare-periphery-contracts/coston2/IXRPPaymentNonexistence.sol";
 
 interface IFlareContractRegistry {
     function getContractAddressByName(string calldata name) external view returns (address);
@@ -72,6 +75,32 @@ contract HarborRedeemer is Ownable, ReentrancyGuard {
         uint256 balanceBefore = address(this).balance;
 
         fxrpAssetManager.redemptionPaymentDefault(proof, redemptionRequestId);
+
+        uint256 executorFeeReceived = address(this).balance - balanceBefore;
+        if (executorFeeReceived != 0) {
+            _forwardNative(payable(msg.sender), executorFeeReceived);
+        }
+
+        emit RedemptionDefaultForwarded(msg.sender, redemptionRequestId, executorFeeReceived);
+    }
+
+    /// @notice Permissionless XRP default executor for redeem-by-tag redemptions.
+    /// @dev Mirrors `executeDefault` but forwards an `IXRPPaymentNonexistence`
+    /// proof to `AssetManager.xrpRedemptionPaymentDefault` — the XRP-native
+    /// default path that supports destination tags. A tag redemption (started
+    /// via `redeemWithTag`) can only be defaulted through this entrypoint; the
+    /// standard `executeDefault`/`redemptionPaymentDefault` do not apply. The
+    /// same non-custodial balance accounting applies: the AssetManager pays the
+    /// redeemer's collateral directly to the recorded redeemer and returns any
+    /// executor fee to this contract, which is immediately forwarded to the
+    /// caller. Permissionless, reentrancy-guarded, and rejects stray native.
+    function executeXrpDefault(IXRPPaymentNonexistence.Proof calldata proof, uint256 redemptionRequestId)
+        external
+        nonReentrant
+    {
+        uint256 balanceBefore = address(this).balance;
+
+        fxrpAssetManager.xrpRedemptionPaymentDefault(proof, redemptionRequestId);
 
         uint256 executorFeeReceived = address(this).balance - balanceBefore;
         if (executorFeeReceived != 0) {

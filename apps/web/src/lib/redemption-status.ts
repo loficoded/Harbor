@@ -3,6 +3,7 @@ import {
   type AgentDetails,
   type FdcRequestStatus,
   type GetRedemptionResponse,
+  type RedemptionKind,
   type RedemptionStatus,
   type SerializedFdcProofRecord,
   type SerializedFdcRequestRecord,
@@ -323,6 +324,8 @@ export type SettlementReceipt = Readonly<{
   closeTimestamp: string;
   validatedAt: string;
   destinationAddress: string;
+  /** Observed XRPL DestinationTag, or `null` when the payment had none. */
+  destinationTag: string | null;
   paymentReference: string;
   agentVault: string;
   /** Number of XRPL observations recorded for this request (usually one). */
@@ -355,6 +358,7 @@ export function deriveSettlementReceipt(
     closeTimestamp: primary.closeTimestamp,
     validatedAt: primary.validatedAt,
     destinationAddress: primary.destinationAddress,
+    destinationTag: primary.destinationTag,
     paymentReference: primary.paymentReference,
     agentVault: response.redemption.agentVault,
     observationCount: receipts.length,
@@ -599,6 +603,10 @@ export type RedemptionStatusViewModel = Readonly<{
   agentDetails: AgentDetails;
   redeemer: string;
   paymentReference: string;
+  /** Whether this is a standard or destination-tag redemption. */
+  redemptionKind: RedemptionKind;
+  /** Required destination tag for a WITH_TAG redemption, or null. */
+  destinationTag: string | null;
   generatedAt: string;
 }>;
 
@@ -644,6 +652,8 @@ export function deriveRedemptionStatusViewModel(
     agentDetails: response.redemption.agentDetails ?? emptyAgentDetails,
     redeemer: response.redemption.redeemer,
     paymentReference: response.redemption.paymentReference,
+    redemptionKind: response.redemption.redemptionKind,
+    destinationTag: response.redemption.destinationTag,
     generatedAt: response.generatedAt,
   };
 }

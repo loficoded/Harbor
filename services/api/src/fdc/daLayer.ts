@@ -1,17 +1,21 @@
 import {
   coston2Chain,
   referencedPaymentNonexistenceResponseAbi,
+  xrpPaymentNonexistenceResponseAbi,
 } from "@harbor/protocol";
 import {
   normalizeBytes32,
+  normalizeEvmAddress,
   serializeBigints,
   type Bytes32,
+  type EvmAddress,
   type HexString,
 } from "@harbor/shared";
 import { setTimeout as defaultSleep } from "node:timers/promises";
 import { decodeAbiParameters, encodeAbiParameters } from "viem";
 
 import type { ReferencedPaymentNonexistenceRequestBody } from "./referencedPaymentNonexistence.js";
+import type { XrpPaymentNonexistenceRequestBody } from "./xrpPaymentNonexistence.js";
 
 export const defaultDaLayerProofPath = "/api/v1/fdc/proof-by-request-round";
 export const defaultCoston2DaLayerBaseUrl =
@@ -21,6 +25,13 @@ const referencedPaymentNonexistenceResponseTupleAbi = [
   {
     type: "tuple",
     components: referencedPaymentNonexistenceResponseAbi,
+  },
+] as const;
+
+const xrpPaymentNonexistenceResponseTupleAbi = [
+  {
+    type: "tuple",
+    components: xrpPaymentNonexistenceResponseAbi,
   },
 ] as const;
 
@@ -75,11 +86,46 @@ export type NormalizedReferencedPaymentNonexistenceProof = Readonly<{
   calldataJson: string;
 }>;
 
+// ---------------------------------------------------------------------------
+// XRPPaymentNonexistence — the redeem-by-tag default proof.
+// ---------------------------------------------------------------------------
+
+export type XrpPaymentNonexistenceResponseBody = Readonly<{
+  minimalBlockTimestamp: bigint;
+  firstOverflowBlockNumber: bigint;
+  firstOverflowBlockTimestamp: bigint;
+}>;
+
+export type XrpPaymentNonexistenceResponseData = Readonly<{
+  attestationType: Bytes32;
+  sourceId: Bytes32;
+  votingRound: bigint;
+  lowestUsedTimestamp: bigint;
+  requestBody: XrpPaymentNonexistenceRequestBody;
+  responseBody: XrpPaymentNonexistenceResponseBody;
+}>;
+
+export type XrpPaymentNonexistenceProofCalldata = Readonly<{
+  merkleProof: readonly Bytes32[];
+  data: XrpPaymentNonexistenceResponseData;
+}>;
+
+export type NormalizedXrpPaymentNonexistenceProof = Readonly<{
+  proofCalldata: XrpPaymentNonexistenceProofCalldata;
+  encodedResponse: HexString;
+  proofJson: string;
+  calldataJson: string;
+}>;
+
 export type DaLayerProofReadyResult =
-  NormalizedReferencedPaymentNonexistenceProof &
-    Readonly<{
-      status: "PROOF_READY";
-    }>;
+  | (NormalizedReferencedPaymentNonexistenceProof &
+      Readonly<{
+        status: "PROOF_READY";
+      }>)
+  | (NormalizedXrpPaymentNonexistenceProof &
+      Readonly<{
+        status: "PROOF_READY";
+      }>);
 
 export type DaLayerProofNotReadyResult = Readonly<{
   status: "NOT_READY";
@@ -90,6 +136,22 @@ export type DaLayerProofNotReadyResult = Readonly<{
 export type DaLayerProofResult =
   DaLayerProofReadyResult | DaLayerProofNotReadyResult;
 
+type DaLayerProofRequestInput = {
+  votingRoundId: bigint;
+  requestBytes: HexString;
+  baseUrl?: string | undefined;
+  proofPath?: string | undefined;
+  apiKey?: string | undefined;
+  fetch?: DaLayerFetch | undefined;
+  retry?: DaLayerRetryOptions | undefined;
+};
+
+type AnyDaLayerNormalizedProof =
+  | NormalizedReferencedPaymentNonexistenceProof
+  | NormalizedXrpPaymentNonexistenceProof;
+
+type DaLayerProofNormalizer = (payload: unknown) => AnyDaLayerNormalizedProof;
+
 export async function requestReferencedPaymentNonexistenceProof(input: {
   votingRoundId: bigint;
   requestBytes: HexString;
@@ -99,12 +161,35 @@ export async function requestReferencedPaymentNonexistenceProof(input: {
   fetch?: DaLayerFetch | undefined;
   retry?: DaLayerRetryOptions | undefined;
 }): Promise<DaLayerProofResult> {
+  return requestDaLayerProof(input, (payload) =>
+    normalizeReferencedPaymentNonexistenceProof(payload),
+  );
+}
+
+export async function requestXrpPaymentNonexistenceProof(input: {
+  votingRoundId: bigint;
+  requestBytes: HexString;
+  baseUrl?: string | undefined;
+  proofPath?: string | undefined;
+  apiKey?: string | undefined;
+  fetch?: DaLayerFetch | undefined;
+  retry?: DaLayerRetryOptions | undefined;
+}): Promise<DaLayerProofResult> {
+  return requestDaLayerProof(input, (payload) =>
+    normalizeXrpPaymentNonexistenceProof(payload),
+  );
+}
+
+async function requestDaLayerProof(
+  input: DaLayerProofRequestInput,
+  normalize: DaLayerProofNormalizer,
+): Promise<DaLayerProofResult> {
   const retryOptions = resolveDaLayerRetryOptions(input.retry);
   let delayMs = retryOptions.initialDelayMs;
   let lastNotReady: DaLayerProofNotReadyResult | null = null;
 
   for (let attempt = 0; attempt <= retryOptions.maxRetries; attempt += 1) {
-    const result = await requestReferencedPaymentNonexistenceProofOnce(input);
+    const result = await requestDaLayerProofOnce(input, normalize);
 
     if (result.status === "PROOF_READY") {
       return result;
@@ -124,14 +209,10 @@ export async function requestReferencedPaymentNonexistenceProof(input: {
   return lastNotReady!;
 }
 
-export async function requestReferencedPaymentNonexistenceProofOnce(input: {
-  votingRoundId: bigint;
-  requestBytes: HexString;
-  baseUrl?: string | undefined;
-  proofPath?: string | undefined;
-  apiKey?: string | undefined;
-  fetch?: DaLayerFetch | undefined;
-}): Promise<DaLayerProofResult> {
+async function requestDaLayerProofOnce(
+  input: DaLayerProofRequestInput,
+  normalize: DaLayerProofNormalizer,
+): Promise<DaLayerProofResult> {
   const fetch = input.fetch ?? defaultDaLayerFetch();
   const response = await fetch(
     resolveDaLayerProofUrl(input.baseUrl, input.proofPath),
@@ -174,7 +255,7 @@ export async function requestReferencedPaymentNonexistenceProofOnce(input: {
 
   return {
     status: "PROOF_READY",
-    ...normalizeReferencedPaymentNonexistenceProof(payload),
+    ...normalize(payload),
   };
 }
 
@@ -326,6 +407,167 @@ export function normalizeReferencedPaymentNonexistenceResponse(
           tupleField(requestBody, "sourceAddressesRoot", 7),
           "sourceAddressesRoot",
         ),
+      ),
+    },
+    responseBody: {
+      minimalBlockTimestamp: parseInteger(
+        tupleField(responseBody, "minimalBlockTimestamp", 0),
+        "minimalBlockTimestamp",
+      ),
+      firstOverflowBlockNumber: parseInteger(
+        tupleField(responseBody, "firstOverflowBlockNumber", 1),
+        "firstOverflowBlockNumber",
+      ),
+      firstOverflowBlockTimestamp: parseInteger(
+        tupleField(responseBody, "firstOverflowBlockTimestamp", 2),
+        "firstOverflowBlockTimestamp",
+      ),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// XRPPaymentNonexistence normalize / encode / decode
+// ---------------------------------------------------------------------------
+
+export function normalizeXrpPaymentNonexistenceProof(
+  payload: unknown,
+): NormalizedXrpPaymentNonexistenceProof {
+  const payloadRecord = requireRecord(payload, "DA Layer proof payload");
+  const proof = requireArray(payloadRecord.proof, "proof").map((entry) =>
+    normalizeBytes32(requireString(entry, "proof entry")),
+  );
+  const encodedResponseFromPayload = optionalHex(
+    payloadRecord.response_hex ??
+      payloadRecord.responseHex ??
+      payloadRecord.response_body ??
+      payloadRecord.responseBody,
+  );
+  const response =
+    payloadRecord.response ??
+    (encodedResponseFromPayload === null
+      ? undefined
+      : decodeXrpPaymentNonexistenceResponse(encodedResponseFromPayload));
+
+  if (response === undefined) {
+    throw new Error("DA Layer proof payload is missing response");
+  }
+
+  const data = normalizeXrpPaymentNonexistenceResponse(response);
+  const encodedResponse =
+    encodedResponseFromPayload ?? encodeXrpPaymentNonexistenceResponse(data);
+  const proofCalldata = {
+    merkleProof: proof,
+    data,
+  } as const satisfies XrpPaymentNonexistenceProofCalldata;
+
+  return {
+    proofCalldata,
+    encodedResponse,
+    proofJson: JSON.stringify(serializeBigints(payload)),
+    calldataJson: JSON.stringify(serializeBigints(proofCalldata)),
+  };
+}
+
+export function encodeXrpPaymentNonexistenceResponse(
+  response: XrpPaymentNonexistenceResponseData,
+): HexString {
+  return encodeAbiParameters(xrpPaymentNonexistenceResponseTupleAbi, [
+    [
+      response.attestationType,
+      response.sourceId,
+      response.votingRound,
+      response.lowestUsedTimestamp,
+      [
+        response.requestBody.minimalBlockNumber,
+        response.requestBody.deadlineBlockNumber,
+        response.requestBody.deadlineTimestamp,
+        response.requestBody.destinationAddressHash,
+        response.requestBody.amount,
+        response.requestBody.checkFirstMemoData,
+        response.requestBody.firstMemoDataHash,
+        response.requestBody.checkDestinationTag,
+        response.requestBody.destinationTag,
+        response.requestBody.proofOwner,
+      ],
+      response.responseBody,
+    ],
+  ]) as HexString;
+}
+
+export function decodeXrpPaymentNonexistenceResponse(
+  encodedResponse: HexString,
+): unknown {
+  return decodeAbiParameters(
+    xrpPaymentNonexistenceResponseTupleAbi,
+    encodedResponse,
+  )[0];
+}
+
+export function normalizeXrpPaymentNonexistenceResponse(
+  response: unknown,
+): XrpPaymentNonexistenceResponseData {
+  const requestBody = tupleField(response, "requestBody", 4);
+  const responseBody = tupleField(response, "responseBody", 5);
+
+  return {
+    attestationType: normalizeBytes32(
+      requireString(
+        tupleField(response, "attestationType", 0),
+        "attestationType",
+      ),
+    ),
+    sourceId: normalizeBytes32(
+      requireString(tupleField(response, "sourceId", 1), "sourceId"),
+    ),
+    votingRound: parseInteger(
+      tupleField(response, "votingRound", 2),
+      "votingRound",
+    ),
+    lowestUsedTimestamp: parseInteger(
+      tupleField(response, "lowestUsedTimestamp", 3),
+      "lowestUsedTimestamp",
+    ),
+    requestBody: {
+      minimalBlockNumber: parseInteger(
+        tupleField(requestBody, "minimalBlockNumber", 0),
+        "minimalBlockNumber",
+      ),
+      deadlineBlockNumber: parseInteger(
+        tupleField(requestBody, "deadlineBlockNumber", 1),
+        "deadlineBlockNumber",
+      ),
+      deadlineTimestamp: parseInteger(
+        tupleField(requestBody, "deadlineTimestamp", 2),
+        "deadlineTimestamp",
+      ),
+      destinationAddressHash: normalizeBytes32(
+        requireString(
+          tupleField(requestBody, "destinationAddressHash", 3),
+          "destinationAddressHash",
+        ),
+      ),
+      amount: parseInteger(tupleField(requestBody, "amount", 4), "amount"),
+      checkFirstMemoData: requireBoolean(
+        tupleField(requestBody, "checkFirstMemoData", 5),
+        "checkFirstMemoData",
+      ),
+      firstMemoDataHash: normalizeBytes32(
+        requireString(
+          tupleField(requestBody, "firstMemoDataHash", 6),
+          "firstMemoDataHash",
+        ),
+      ),
+      checkDestinationTag: requireBoolean(
+        tupleField(requestBody, "checkDestinationTag", 7),
+        "checkDestinationTag",
+      ),
+      destinationTag: parseInteger(
+        tupleField(requestBody, "destinationTag", 8),
+        "destinationTag",
+      ),
+      proofOwner: normalizeEvmAddress(
+        requireString(tupleField(requestBody, "proofOwner", 9), "proofOwner"),
       ),
     },
     responseBody: {

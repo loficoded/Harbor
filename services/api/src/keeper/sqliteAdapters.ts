@@ -8,13 +8,16 @@ import {
 import {
   refreshFdcRequestFinalization,
   retrieveAndPersistReferencedPaymentNonexistenceProof,
+  retrieveAndPersistXrpPaymentNonexistenceProof,
   submitStoredFdcRequest,
 } from "../fdc/pipeline.js";
 import { buildAndPersistReferencedPaymentNonexistenceRequest } from "../fdc/referencedPaymentNonexistence.js";
+import { xrpPaymentNonexistenceAttestationType } from "../fdc/xrpPaymentNonexistence.js";
 import type {
   FdcReadContractClient,
   VotingRoundTiming,
 } from "../fdc/rounds.js";
+import { buildAndPersistXrpPaymentNonexistenceRequest } from "../fdc/xrpPaymentNonexistence.js";
 import type { SqliteDatabase } from "../db/index.js";
 import {
   findRedemptionDefaultEvent,
@@ -95,6 +98,33 @@ export function createSqliteKeeperFdcClient(
 ): KeeperFdcClient {
   return {
     buildOrReuseNonPaymentRequest(parameters): StoredFdcRequestRecord {
+      const isWithTag = parameters.redemption.redemptionKind === "WITH_TAG";
+
+      if (isWithTag) {
+        const buildInput = {
+          database: input.database,
+          assetManagerAddress: parameters.redemption.assetManagerAddress,
+          requestId: parameters.redemption.requestId,
+          messageIntegrityCode: input.messageIntegrityCode,
+          currentUnixTimestamp: parameters.currentUnixTimestamp,
+          status: "PENDING",
+          createdAt: parameters.createdAt,
+          updatedAt: parameters.updatedAt,
+          ...(input.sourceIdName === undefined
+            ? {}
+            : { sourceIdName: input.sourceIdName }),
+        } satisfies Parameters<
+          typeof buildAndPersistXrpPaymentNonexistenceRequest
+        >[0];
+        const result = buildAndPersistXrpPaymentNonexistenceRequest(buildInput);
+
+        if (result.fdcRequest === null) {
+          throw new Error("FDC request build unexpectedly returned dry-run");
+        }
+
+        return result.fdcRequest;
+      }
+
       const buildInput = {
         database: input.database,
         assetManagerAddress: parameters.redemption.assetManagerAddress,
@@ -154,7 +184,13 @@ export function createSqliteKeeperFdcClient(
     },
 
     retrieveProof(parameters) {
-      return retrieveAndPersistReferencedPaymentNonexistenceProof({
+      const isXrp =
+        parameters.request.attestationType ===
+        xrpPaymentNonexistenceAttestationType;
+      const retrieve = isXrp
+        ? retrieveAndPersistXrpPaymentNonexistenceProof
+        : retrieveAndPersistReferencedPaymentNonexistenceProof;
+      return retrieve({
         database: input.database,
         fdcRequestId: parameters.request.fdcRequestId,
         ...(input.daLayerBaseUrl === undefined

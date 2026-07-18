@@ -1,16 +1,23 @@
+import { destinationTagMax } from "@harbor/shared";
 import {
+  buildRedeemCallArgs,
   buildStatusPath,
   FXRP_DECIMALS,
   formatFxrpAmount,
   hasSufficientBalance,
   isApprovalRequired,
+  parseDestinationTag,
   parseRedeemAmount,
   parseRedemptionRequestIds,
   redemptionBlockedReason,
   resolveExecutor,
   type RedemptionReadiness,
 } from "@/lib/redemption";
-import { NOISE_LOG, redemptionRequestedLog } from "@/test/redemption-fixtures";
+import {
+  NOISE_LOG,
+  redemptionRequestedLog,
+  redemptionWithTagRequestedLog,
+} from "@/test/redemption-fixtures";
 import { getAddress, zeroAddress } from "viem";
 import { describe, expect, it } from "vitest";
 
@@ -242,6 +249,89 @@ describe("parseRedemptionRequestIds", () => {
   it("ignores logs with no topics", () => {
     expect(parseRedemptionRequestIds([{ data: "0x", topics: [] }])).toEqual([]);
   });
+
+  it("parses RedemptionWithTagRequested ids (tag redemptions emit this, not RedemptionRequested)", () => {
+    expect(
+      parseRedemptionRequestIds([redemptionWithTagRequestedLog(5100n)]),
+    ).toEqual(["5100"]);
+  });
+
+  it("parses a mixed batch of standard and tag redemption logs in order", () => {
+    const ids = parseRedemptionRequestIds([
+      redemptionRequestedLog(1n),
+      redemptionWithTagRequestedLog(2n),
+      redemptionRequestedLog(3n),
+    ]);
+    expect(ids).toEqual(["1", "2", "3"]);
+  });
+});
+
+// --- destination tag (redeem-by-tag) ---------------------------------------
+
+describe("parseDestinationTag", () => {
+  it("treats empty input as 'no tag' (not an error)", () => {
+    expect(parseDestinationTag("")).toEqual({ tag: null, error: null });
+    expect(parseDestinationTag("   ")).toEqual({ tag: null, error: null });
+  });
+
+  it("accepts zero as a valid tag (selects the tag path)", () => {
+    expect(parseDestinationTag("0")).toEqual({ tag: 0n, error: null });
+  });
+
+  it("accepts the full uint32 range inclusive", () => {
+    expect(parseDestinationTag("1")).toEqual({ tag: 1n, error: null });
+    expect(parseDestinationTag("4294967295")).toEqual({
+      tag: destinationTagMax,
+      error: null,
+    });
+  });
+
+  it("rejects values at or above 2**32", () => {
+    expect(parseDestinationTag("4294967296").error).toMatch(/32 bits/);
+  });
+
+  it("rejects non-numeric and negative input", () => {
+    expect(parseDestinationTag("abc").error).toMatch(/whole number/);
+    expect(parseDestinationTag("-1").error).toMatch(/whole number/);
+    expect(parseDestinationTag("1.5").error).toMatch(/whole number/);
+  });
+});
+
+describe("buildRedeemCallArgs", () => {
+  const executor = getAddress("0x00000000000000000000000000000000000000cc");
+
+  it("routes to redeemAmount when no tag is provided", () => {
+    const call = buildRedeemCallArgs({
+      amountUba: 10_000_000n,
+      xrplAddress: "rDestination",
+      executor,
+      destinationTag: null,
+    });
+    expect(call.functionName).toBe("redeemAmount");
+    expect(call.args).toEqual([10_000_000n, "rDestination", executor]);
+  });
+
+  it("routes to redeemWithTag with the tag as the 4th arg when a tag is present", () => {
+    const call = buildRedeemCallArgs({
+      amountUba: 10_000_000n,
+      xrplAddress: "rDestination",
+      executor,
+      destinationTag: 12345n,
+    });
+    expect(call.functionName).toBe("redeemWithTag");
+    expect(call.args).toEqual([10_000_000n, "rDestination", executor, 12345n]);
+  });
+
+  it("treats tag 0 as the tag path (not standard)", () => {
+    const call = buildRedeemCallArgs({
+      amountUba: 5_000_000n,
+      xrplAddress: "rDest",
+      executor,
+      destinationTag: 0n,
+    });
+    expect(call.functionName).toBe("redeemWithTag");
+    expect(call.args[3]).toBe(0n);
+  });
 });
 
 // --- routing ----------------------------------------------------------------
@@ -287,6 +377,9 @@ const readyState: RedemptionReadiness = {
   requiredUba: 1_000_000n,
   inputError: null,
   addressValid: true,
+  tagError: null,
+  tagRequested: false,
+  tagSupported: true,
   balanceKnown: true,
   sufficientBalance: true,
 };
@@ -326,6 +419,44 @@ describe("redemptionBlockedReason", () => {
     ).toMatch(/destination address/i);
   });
 
+  it("blocks an invalid destination tag (after a valid amount and address)", () => {
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagError: "Destination tag must fit in 32 bits (at most 4294967295).",
+      }),
+    ).toMatch(/32 bits/);
+  });
+
+  it("blocks a requested tag only when redeemWithTagSupported() is explicitly false", () => {
+    // A tag was entered but the AssetManager advertises no tag support.
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: true,
+        tagSupported: false,
+      }),
+    ).toMatch(/does not support destination-tag/i);
+
+    // A transient/unknown capability (undefined) never blocks the tag lane.
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: true,
+        tagSupported: undefined,
+      }),
+    ).toBeNull();
+
+    // No tag requested ⇒ capability is irrelevant to the standard lane.
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: false,
+        tagSupported: false,
+      }),
+    ).toBeNull();
+  });
+
   it("blocks insufficient balance only when the balance is known", () => {
     expect(
       redemptionBlockedReason({
@@ -350,6 +481,9 @@ describe("redemptionBlockedReason", () => {
       requiredUba: null,
       inputError: "FXRP supports up to 6 decimal places.",
       addressValid: false,
+      tagError: null,
+      tagRequested: false,
+      tagSupported: undefined,
       balanceKnown: true,
       sufficientBalance: false,
     };
@@ -379,5 +513,107 @@ describe("redemptionBlockedReason", () => {
         requiredUba: 1_000_000n,
       }),
     ).toMatch(/destination address/i);
+  });
+});
+
+
+// --- redeem-by-tag fuzz + gate matrix (extended) ---------------------------
+
+/** Deterministic PRNG (mulberry32) so the fuzz below is reproducible. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe("redeem-by-tag fuzz and gate matrix", () => {
+  it("fuzz: every uint32 string parses to exactly BigInt(string); >= 2**32 is an error", () => {
+    const rng = mulberry32(0xc0ffee);
+    for (let i = 0; i < 2000; i += 1) {
+      const value = Math.floor(rng() * 4_294_967_296);
+      const raw = String(value);
+      const result = parseDestinationTag(raw);
+      expect(result.error).toBeNull();
+      expect(result.tag).toBe(BigInt(raw));
+    }
+    expect(parseDestinationTag("0")).toEqual({ tag: 0n, error: null });
+    expect(parseDestinationTag(String(destinationTagMax))).toEqual({
+      tag: destinationTagMax,
+      error: null,
+    });
+    for (const over of ["4294967296", "4294967300", "99999999999"]) {
+      const result = parseDestinationTag(over);
+      expect(result.tag).toBeNull();
+      expect(result.error).toMatch(/32 bits/);
+    }
+  });
+
+  it("fuzz: a present tag always routes to redeemWithTag with the tag as the 4th arg", () => {
+    const executor = getAddress("0x00000000000000000000000000000000000000cc");
+    const rng = mulberry32(0x1234);
+    for (let i = 0; i < 1000; i += 1) {
+      const tag = BigInt(Math.floor(rng() * 4_294_967_296));
+      const call = buildRedeemCallArgs({
+        amountUba: 5_000_000n,
+        xrplAddress: "rDest",
+        executor,
+        destinationTag: tag,
+      });
+      expect(call.functionName).toBe("redeemWithTag");
+      if (call.functionName === "redeemWithTag") {
+        expect(call.args).toEqual([5_000_000n, "rDest", executor, tag]);
+      }
+    }
+    const standard = buildRedeemCallArgs({
+      amountUba: 5_000_000n,
+      xrplAddress: "rDest",
+      executor,
+      destinationTag: null,
+    });
+    expect(standard.functionName).toBe("redeemAmount");
+    expect(standard.args).toEqual([5_000_000n, "rDest", executor]);
+  });
+
+  it("parseDestinationTag then buildRedeemCallArgs: empty -> redeemAmount, '0' -> redeemWithTag(tag 0)", () => {
+    const executor = getAddress("0x00000000000000000000000000000000000000cc");
+
+    const empty = parseDestinationTag("");
+    expect(empty).toEqual({ tag: null, error: null });
+    expect(
+      buildRedeemCallArgs({
+        amountUba: 1n,
+        xrplAddress: "rDest",
+        executor,
+        destinationTag: empty.tag,
+      }).functionName,
+    ).toBe("redeemAmount");
+
+    const zero = parseDestinationTag("0");
+    expect(zero.tag).toBe(0n);
+    const zeroCall = buildRedeemCallArgs({
+      amountUba: 1n,
+      xrplAddress: "rDest",
+      executor,
+      destinationTag: zero.tag,
+    });
+    expect(zeroCall.functionName).toBe("redeemWithTag");
+    if (zeroCall.functionName === "redeemWithTag") {
+      expect(zeroCall.args[3]).toBe(0n);
+    }
+  });
+
+  it("does not block a requested tag when redeemWithTagSupported() is true", () => {
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: true,
+        tagSupported: true,
+      }),
+    ).toBeNull();
   });
 });

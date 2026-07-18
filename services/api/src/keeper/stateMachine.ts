@@ -1,4 +1,5 @@
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   type EvmAddress,
   type IsoTimestamp,
@@ -352,7 +353,24 @@ export function isValidXrplObservationForRedemption(
     return false;
   }
 
-  if (observation.deliveredAmountUBA < redemption.valueUBA) {
+  // A WITH_TAG redemption only settles on an observation whose destination tag
+  // matches exactly. Standard redemptions ignore the observed tag.
+  if (
+    redemption.redemptionKind === "WITH_TAG" &&
+    redemption.destinationTag !== null &&
+    observation.destinationTag !== redemption.destinationTag
+  ) {
+    return false;
+  }
+
+  // A settling payment delivers the NET underlying amount (gross valueUBA minus
+  // the redemption feeUBA), matching the XRPL observer and FAssets semantics.
+  // Comparing against the gross valueUBA rejected every redemption with a
+  // non-zero fee, misclassifying valid settlements as non-payment.
+  if (
+    observation.deliveredAmountUBA <
+    netUnderlyingUBA(redemption.valueUBA, redemption.feeUBA)
+  ) {
     return false;
   }
 

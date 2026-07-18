@@ -1,9 +1,13 @@
-import { referencedPaymentNonexistenceResponseAbi } from "@harbor/protocol";
+import {
+  referencedPaymentNonexistenceResponseAbi,
+  xrpPaymentNonexistenceResponseAbi,
+} from "@harbor/protocol";
 import {
   emptyAgentDetails,
   type AgentDetails,
   type FdcRequestStatus,
   type GetRedemptionResponse,
+  type RedemptionKind,
   type RedemptionStatus,
   type RedemptionTimelineEntry,
   type SerializedFdcProofRecord,
@@ -70,11 +74,27 @@ export type RedemptionScenarioOptions = Readonly<{
    * test opts into official metadata.
    */
   agentDetails?: AgentDetails;
+  /**
+   * Redemption lane. Defaults to `STANDARD`. Set to `WITH_TAG` (together with a
+   * `destinationTag`) to exercise the redeem-by-tag status view.
+   */
+  redemptionKind?: RedemptionKind;
+  /**
+   * Required destination tag on the redemption detail (serialized as a decimal
+   * string), or `null`. Defaults to `null` (standard lane).
+   */
+  destinationTag?: `${bigint}` | null;
+  /**
+   * Destination tag stamped on the synthesized XRPL settlement receipt(s), or
+   * `null`. Defaults to `null` so standard receipts render no tag row.
+   */
+  receiptDestinationTag?: `${bigint}` | null;
 }>;
 
 function makeReceipt(
   requestId: string,
   index: number,
+  destinationTag: `${bigint}` | null = null,
 ): SerializedXrplPaymentObservation {
   return {
     observationId: `obs-${requestId}-${index}`,
@@ -88,6 +108,7 @@ function makeReceipt(
     ledgerIndex: "48213377",
     closeTimestamp: fixtureTime(6),
     validatedAt: fixtureTime(6),
+    destinationTag,
     createdAt: fixtureTime(6),
   };
 }
@@ -159,6 +180,45 @@ export function encodeSampleProofResponseBody(): `0x${string}` {
   ] as never) as `0x${string}`;
 }
 
+/** viem descriptor for the encoded `IXRPPaymentNonexistence.Response`. */
+const XRP_RESPONSE_TUPLE_ABI = [
+  { type: "tuple", components: xrpPaymentNonexistenceResponseAbi },
+] as const;
+
+/** A structurally valid decoded XRP `Response` for `executeXrpDefault`. */
+export function sampleXrpProofResponseData() {
+  return {
+    attestationType: `0x${"09".repeat(32)}`,
+    sourceId: `0x${"22".repeat(32)}`,
+    votingRound: 12345n,
+    lowestUsedTimestamp: 1700000000n,
+    requestBody: {
+      minimalBlockNumber: 100n,
+      deadlineBlockNumber: 200n,
+      deadlineTimestamp: 1700000500n,
+      destinationAddressHash: `0x${"33".repeat(32)}`,
+      amount: 9990000n,
+      checkFirstMemoData: true,
+      firstMemoDataHash: DEFAULT_PAYMENT_REFERENCE,
+      checkDestinationTag: true,
+      destinationTag: 12345n,
+      proofOwner: `0x${"00".repeat(20)}`,
+    },
+    responseBody: {
+      minimalBlockTimestamp: 1699999000n,
+      firstOverflowBlockNumber: 250n,
+      firstOverflowBlockTimestamp: 1700000600n,
+    },
+  } as const;
+}
+
+/** ABI-encoded XRP `Response` tuple for the redeem-by-tag default proof. */
+export function encodeSampleXrpProofResponseBody(): `0x${string}` {
+  return encodeAbiParameters(XRP_RESPONSE_TUPLE_ABI, [
+    sampleXrpProofResponseData(),
+  ] as never) as `0x${string}`;
+}
+
 function makeFdcProof(
   requestId: string,
   valid: boolean,
@@ -172,6 +232,18 @@ function makeFdcProof(
     merkleProof: [`0x${"44".repeat(32)}`, `0x${"55".repeat(32)}`],
     votingRoundId: "12345",
     createdAt: fixtureTime(30),
+  };
+}
+
+/** An XRP-shaped proof record for redeem-by-tag self-recovery tests. */
+export function makeXrpFdcProof(
+  requestId: string,
+  valid: boolean = true,
+): SerializedFdcProofRecord {
+  return {
+    ...makeFdcProof(requestId, valid),
+    fdcProofId: `xrp-fdc-proof-${requestId}`,
+    responseBody: valid ? encodeSampleXrpProofResponseBody() : "0xfeed",
   };
 }
 
@@ -263,7 +335,8 @@ export function makeRedemptionResponse(
     : 0;
   const receipts: SerializedXrplPaymentObservation[] = Array.from(
     { length: settlementCount },
-    (_unused, index) => makeReceipt(requestId, index),
+    (_unused, index) =>
+      makeReceipt(requestId, index, options.receiptDestinationTag ?? null),
   );
 
   const fdcRequests: SerializedFdcRequestRecord[] =
@@ -284,6 +357,8 @@ export function makeRedemptionResponse(
     agentVault: DEFAULT_AGENT_VAULT,
     agentDetails: options.agentDetails ?? emptyAgentDetails,
     paymentAddress: DEFAULT_XRPL_ADDRESS,
+    redemptionKind: options.redemptionKind ?? "STANDARD",
+    destinationTag: options.destinationTag ?? null,
     valueUBA: "10000000",
     feeUBA: "0",
     paymentReference: DEFAULT_PAYMENT_REFERENCE,

@@ -32,6 +32,10 @@ import {
   iFlareContractRegistryAbi,
   iRelayAbi,
   relayAbi,
+  xrpPaymentNonexistenceRequestBodyAbi,
+  xrpPaymentNonexistenceResponseAbi,
+  xrpPaymentNonexistenceResponseBodyAbi,
+  xrpPaymentResponseBodyAbi,
   type Abi,
   type AbiFragment,
   type EvmAddress,
@@ -149,6 +153,58 @@ describe("ABI exports", () => {
       "redemptionPaymentDefault",
       2,
     );
+    expectInputCount(assetManagerAbi, "function", "redeemWithTag", 4);
+    expectInputCount(
+      assetManagerAbi,
+      "function",
+      "confirmXRPRedemptionPayment",
+      2,
+    );
+    expectInputCount(
+      assetManagerAbi,
+      "function",
+      "xrpRedemptionPaymentDefault",
+      2,
+    );
+    expectInputCount(assetManagerAbi, "function", "redeemWithTagSupported", 0);
+  });
+
+  test("exports the XRP-native FDC attestation tuples for redeem-by-tag", () => {
+    // IXRPPaymentNonexistence.RequestBody — 10 fields, in struct order.
+    assert.equal(xrpPaymentNonexistenceRequestBodyAbi.length, 10);
+    assert.equal(
+      xrpPaymentNonexistenceRequestBodyAbi[0]!.name,
+      "minimalBlockNumber",
+    );
+    assert.equal(
+      xrpPaymentNonexistenceRequestBodyAbi[5]!.name,
+      "checkFirstMemoData",
+    );
+    assert.equal(
+      xrpPaymentNonexistenceRequestBodyAbi[6]!.name,
+      "firstMemoDataHash",
+    );
+    assert.equal(
+      xrpPaymentNonexistenceRequestBodyAbi[7]!.name,
+      "checkDestinationTag",
+    );
+    assert.equal(
+      xrpPaymentNonexistenceRequestBodyAbi[8]!.name,
+      "destinationTag",
+    );
+    assert.equal(xrpPaymentNonexistenceRequestBodyAbi[9]!.name, "proofOwner");
+    assert.equal(xrpPaymentNonexistenceRequestBodyAbi[9]!.type, "address");
+
+    // ResponseBody — 3 uint64 fields.
+    assert.equal(xrpPaymentNonexistenceResponseBodyAbi.length, 3);
+    assert.equal(xrpPaymentNonexistenceResponseAbi[4]!.type, "tuple");
+    assert.equal(xrpPaymentNonexistenceResponseAbi[5]!.type, "tuple");
+
+    // IXRPPayment.ResponseBody — exposes destination-tag + status fields.
+    assert.equal(xrpPaymentResponseBodyAbi.length, 15);
+    assert.equal(xrpPaymentResponseBodyAbi[12]!.name, "hasDestinationTag");
+    assert.equal(xrpPaymentResponseBodyAbi[13]!.name, "destinationTag");
+    assert.equal(xrpPaymentResponseBodyAbi[14]!.name, "status");
   });
 
   test("exports the AssetManager event fragments used by the indexer", () => {
@@ -177,6 +233,12 @@ describe("ABI exports", () => {
       assetManagerEventsAbi,
       "event",
       "RedemptionRequestIncomplete",
+      2,
+    );
+    expectInputCount(
+      assetManagerEventsAbi,
+      "event",
+      "RedemptionAmountIncomplete",
       2,
     );
     expectInputCount(assetManagerEventsAbi, "event", "RedemptionRejected", 4);
@@ -252,6 +314,7 @@ describe("ABI exports", () => {
     expectInputCount(harborRedeemerAbi, "function", "assetDecimals", 0);
     expectInputCount(harborRedeemerAbi, "function", "defaultKeeperExecutor", 0);
     expectInputCount(harborRedeemerAbi, "function", "executeDefault", 2);
+    expectInputCount(harborRedeemerAbi, "function", "executeXrpDefault", 2);
     expectInputCount(
       harborRedeemerAbi,
       "function",

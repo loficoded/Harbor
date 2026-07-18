@@ -5,3 +5,5 @@ dist.cjs
 !scripts/*.mjs
 proof-req.json
 proof-payload.json
+_bundle.mjs
+tag-run.txt

@@ -17,7 +17,7 @@ import {
   settledResponse,
 } from "@/test/redemption-status-fixtures";
 import type { GetRedemptionResponse } from "@harbor/shared";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -364,5 +364,112 @@ describe("RedemptionStatusView — assigned agent official identity", () => {
       formatAddress(response.redemption.agentVault),
     );
     expect(screen.queryByTestId("agent-identity-icon")).toBeNull();
+  });
+});
+
+describe("RedemptionStatusView — redeem-by-tag submission details", () => {
+  it("WITH_TAG shows the redemption type as 'Destination tag' and the required tag", () => {
+    renderReady(
+      makeRedemptionResponse({
+        status: "REQUESTED",
+        redemptionKind: "WITH_TAG",
+        destinationTag: "777",
+      }),
+    );
+    expect(screen.getByText("Submission details")).toBeInTheDocument();
+    expect(screen.getByText("Redemption type")).toBeInTheDocument();
+    // The type value for a redeem-by-tag redemption.
+    expect(screen.getByText("Destination tag")).toBeInTheDocument();
+    expect(screen.getByText("Required destination tag")).toBeInTheDocument();
+    expect(screen.getByText("777")).toBeInTheDocument();
+  });
+
+  it("WITH_TAG renders the submission card even with no redeem tx hash, omitting the tx row", () => {
+    // baseSubmission carries no transaction hash; a WITH_TAG redemption still
+    // renders its type + required tag (the tag is a fact the agent must pay
+    // with), and simply omits the redeem-transaction row.
+    renderReady(
+      makeRedemptionResponse({
+        status: "REQUESTED",
+        redemptionKind: "WITH_TAG",
+        destinationTag: "9",
+      }),
+      {
+        submission: {
+          transactionHash: null,
+          relatedRequests: baseSubmission.relatedRequests,
+        },
+      },
+    );
+    expect(screen.getByText("Submission details")).toBeInTheDocument();
+    expect(screen.getByText("Destination tag")).toBeInTheDocument();
+    expect(screen.getByText("9")).toBeInTheDocument();
+    expect(screen.queryByText("Redeem transaction")).toBeNull();
+  });
+
+  it("WITH_TAG with a null tag shows the type but no required-tag row", () => {
+    renderReady(
+      makeRedemptionResponse({
+        status: "REQUESTED",
+        redemptionKind: "WITH_TAG",
+        destinationTag: null,
+      }),
+    );
+    expect(screen.getByText("Destination tag")).toBeInTheDocument();
+    expect(screen.queryByText("Required destination tag")).toBeNull();
+  });
+
+  it("STANDARD shows the 'Standard' type and never a required-tag row", () => {
+    renderReady(makeRedemptionResponse({ status: "REQUESTED" }), {
+      submission: {
+        transactionHash: `0x${"ab".repeat(32)}`,
+        relatedRequests: baseSubmission.relatedRequests,
+      },
+    });
+    expect(screen.getByText("Submission details")).toBeInTheDocument();
+    expect(screen.getByText("Redemption type")).toBeInTheDocument();
+    expect(screen.getByText("Standard")).toBeInTheDocument();
+    expect(screen.queryByText("Required destination tag")).toBeNull();
+    // The redeem-by-tag type value must not appear for a standard redemption.
+    expect(screen.queryByText("Destination tag")).toBeNull();
+  });
+
+  it("omits the submission card entirely for a STANDARD redemption with no redeem tx hash", () => {
+    // Even though the sidebar renders (assigned agent), SubmissionDetailsCard
+    // returns null for STANDARD + no tx hash, so no submission facts show.
+    renderReady(makeRedemptionResponse({ status: "REQUESTED" }), {
+      submission: {
+        transactionHash: null,
+        relatedRequests: baseSubmission.relatedRequests,
+      },
+    });
+    expect(screen.queryByText("Submission details")).toBeNull();
+    expect(screen.queryByText("Redemption type")).toBeNull();
+  });
+});
+
+describe("RedemptionStatusView — settlement receipt destination tag", () => {
+  it("renders the Destination tag row when the observed payment carried one", () => {
+    renderReady(settledResponse({ receiptDestinationTag: "12345" }));
+    expect(screen.getByText("Settlement receipt")).toBeInTheDocument();
+    expect(screen.getByText("Destination tag")).toBeInTheDocument();
+    expect(screen.getByText("12345")).toBeInTheDocument();
+  });
+
+  it("renders a Destination tag row for tag 0 (a valid, present tag)", () => {
+    // Tag 0 is a real destination tag, not "absent"; the row must render with
+    // the literal value 0. Scope the value lookup to the tag row since "0"
+    // also appears in other numeric fields (e.g. fees).
+    renderReady(settledResponse({ receiptDestinationTag: "0" }));
+    const label = screen.getByText("Destination tag");
+    const row = label.closest("div");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("0")).toBeInTheDocument();
+  });
+
+  it("omits the Destination tag row when the observed payment had none", () => {
+    renderReady(settledResponse());
+    expect(screen.getByText("Settlement receipt")).toBeInTheDocument();
+    expect(screen.queryByText("Destination tag")).toBeNull();
   });
 });

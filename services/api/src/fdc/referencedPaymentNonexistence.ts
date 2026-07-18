@@ -1,5 +1,6 @@
 import { referencedPaymentNonexistenceRequestBodyAbi } from "@harbor/protocol";
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   type Bytes32,
   type FdcRequestStatus,
@@ -18,8 +19,16 @@ import type {
   StoredFdcRequestRecord,
   StoredRedemptionRequest,
 } from "../repositories/types.js";
+import {
+  assertDeadlinePassed,
+  concatHex,
+  fdcRequestId,
+  requireBigint,
+  requireString,
+  uint256,
+  uint64,
+} from "./encoding.js";
 
-const uint64Max = (1n << 64n) - 1n;
 const fdcIdentifierPattern = /^[A-Za-z0-9]+$/;
 
 export const referencedPaymentNonexistenceAttestationTypeName =
@@ -128,7 +137,20 @@ export function createReferencedPaymentNonexistenceRequestBody(
     destinationAddressHash: standardXrplAddressHash(
       requireString(redemption.paymentAddress, "paymentAddress"),
     ),
-    amount: uint256(requireBigint(redemption.valueUBA, "valueUBA"), "valueUBA"),
+    // The on-chain `redemptionPaymentDefault` asserts the proof amount equals the
+    // NET underlying value the agent had to deliver (`valueUBA - feeUBA`), not the
+    // gross `valueUBA` — the redeemer only ever receives the net (the agent keeps
+    // the redemption fee), so a nonexistence proof built for the gross value is
+    // rejected on-chain (`RedemptionNonPaymentMismatch`). Shared with the XRPL
+    // observer and the keeper settlement check via `netUnderlyingUBA` so all four
+    // amount sites (both proof builders, observer, keeper) stay in lockstep.
+    amount: uint256(
+      netUnderlyingUBA(
+        requireBigint(redemption.valueUBA, "valueUBA"),
+        requireBigint(redemption.feeUBA, "feeUBA"),
+      ),
+      "valueUBA - feeUBA",
+    ),
     standardPaymentReference: paymentReference,
     checkSourceAddresses: false,
     sourceAddressesRoot: zeroBytes32,
@@ -256,7 +278,10 @@ export function buildAndPersistReferencedPaymentNonexistenceRequest(
   }
 
   const upsertInput = {
-    fdcRequestId: fdcRequestId(encodedRequest.requestHash),
+    fdcRequestId: fdcRequestId(
+      "referenced-payment-nonexistence",
+      encodedRequest.requestHash,
+    ),
     redemptionRequestId: redemption.requestId,
     assetManagerAddress: redemption.assetManagerAddress,
     attestationType: encodedRequest.attestationType,
@@ -279,65 +304,6 @@ export function buildAndPersistReferencedPaymentNonexistenceRequest(
   };
 }
 
-function assertDeadlinePassed(
-  redemption: StoredRedemptionRequest,
-  options: Pick<
-    ReferencedPaymentNonexistenceBuildOptions,
-    "currentUnixTimestamp" | "dryRun"
-  >,
-): void {
-  if (options.dryRun === true) {
-    return;
-  }
-
-  const currentUnixTimestamp =
-    options.currentUnixTimestamp ?? BigInt(Math.floor(Date.now() / 1000));
-
-  if (currentUnixTimestamp <= redemption.lastUnderlyingTimestamp) {
-    throw new Error(
-      `Redemption ${redemption.assetManagerAddress}/${redemption.requestId} payment deadline has not passed`,
-    );
-  }
-}
-
-function concatHex(values: readonly HexString[]): HexString {
-  return `0x${values.map((value) => value.slice(2)).join("")}` as HexString;
-}
-
-function fdcRequestId(requestHash: Bytes32): string {
-  return `referenced-payment-nonexistence:${requestHash}`;
-}
-
-function requireString(value: unknown, fieldName: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${fieldName} is required`);
-  }
-
-  return value;
-}
-
-function requireBigint(value: unknown, fieldName: string): bigint {
-  if (typeof value !== "bigint") {
-    throw new Error(`${fieldName} is required`);
-  }
-
-  return value;
-}
-
-function uint64(value: bigint, fieldName: string): bigint {
-  const unsignedValue = uint256(value, fieldName);
-
-  if (unsignedValue > uint64Max) {
-    throw new Error(`${fieldName} exceeds uint64`);
-  }
-
-  return unsignedValue;
-}
-
-function uint256(value: bigint, fieldName: string): bigint {
-  if (value < 0n) {
-    throw new Error(`${fieldName} cannot be negative`);
-  }
-
-  return value;
-}
+// Encoding primitives (assertDeadlinePassed, concatHex, fdcRequestId,
+// requireString, requireBigint, uint64, uint256, uint64Max) now live in
+// ./encoding.ts, shared byte-for-byte with the XRP nonexistence lane.
