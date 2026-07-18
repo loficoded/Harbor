@@ -4,11 +4,14 @@ import { getFunctionSelector } from "viem";
 
 /**
  * Redeem-by-tag E2E with a mocked wallet and mocked network. Mirrors
- * `redeem.spec.ts` but enters a destination tag and asserts the wired call is
- * `AssetManager.redeemWithTag(amount, xrplAddress, executor, tag)` — and that
- * the status route is reached from the emitted `RedemptionWithTagRequested`
- * receipt. Also covers tag validation and the `redeemWithTagSupported == false`
- * graceful-disable state.
+ * `redeem.spec.ts`. Covers exactly four flows:
+ *   1. the destination-tag input renders and validates its uint32 bound;
+ *   2. a present tag wires `AssetManager.redeemWithTag(amount, xrplAddress,
+ *      executor, tag)` (never `redeemAmount`) and routes to `/status/{id}` from
+ *      the emitted `RedemptionWithTagRequested` receipt;
+ *   3. an empty tag falls back to the standard `redeemAmount` call;
+ *   4. `redeemWithTagSupported() == false` gracefully disables the tag input
+ *      while the standard lane still submits.
  */
 
 const ADDRESS = "0x00000000000000000000000000000000000000b2";
@@ -24,6 +27,9 @@ const REDEEM_WITH_TAG_SELECTOR = getFunctionSelector(
 );
 const REDEEM_AMOUNT_SELECTOR = getFunctionSelector(
   "redeemAmount(uint256,string,address)",
+);
+const REDEEM_WITH_TAG_SUPPORTED_SELECTOR = getFunctionSelector(
+  "redeemWithTagSupported()",
 );
 
 const CORS_HEADERS: Record<string, string> = {
@@ -92,7 +98,12 @@ function installMockWallet(config: {
 }
 
 test.describe("Redeem-by-tag", () => {
+  // Mutable capability flag the RPC mock reads at request time so a single test
+  // can exercise the `redeemWithTagSupported() == false` graceful-disable state.
+  let redeemWithTagSupported = true;
+
   test.beforeEach(async ({ page }) => {
+    redeemWithTagSupported = true;
     await page.addInitScript(installMockWallet, {
       address: ADDRESS,
       chainIdHex: CHAIN_ID_HEX,
@@ -163,6 +174,9 @@ test.describe("Redeem-by-tag", () => {
                 result = uint256Hex(1_000_000_000n); // 1000 FXRP
               } else if (data.startsWith("0xdd62ed3e")) {
                 result = uint256Hex(2n ** 256n - 1n); // unlimited allowance
+              } else if (data.startsWith(REDEEM_WITH_TAG_SUPPORTED_SELECTOR)) {
+                // AssetManager.redeemWithTagSupported() -> bool capability.
+                result = uint256Hex(redeemWithTagSupported ? 1n : 0n);
               } else {
                 result = uint256Hex(0n);
               }
@@ -227,6 +241,22 @@ test.describe("Redeem-by-tag", () => {
       .first()
       .click();
     await expect(page.getByText(/0x0000…00b2/i)).toBeVisible();
+    // Wait for the initial on-chain reads (balance/allowance/tag-support) to
+    // resolve. Filling controlled inputs before these settle can let a late
+    // read-driven re-render revert the typed value — the root cause of the
+    // earlier flaky "empty amount → disabled Redeem" routing failure.
+    await expect(page.getByText(/1000 FXRP/).first()).toBeVisible();
+  }
+
+  /** Reads the mock wallet's captured `eth_sendTransaction` calldata. */
+  async function sentTransactions(
+    page: import("@playwright/test").Page,
+  ): Promise<{ data?: string }[]> {
+    return (await page.evaluate(
+      () =>
+        (window as unknown as { __sentTransactions: { data?: string }[] })
+          .__sentTransactions,
+    )) as { data?: string }[];
   }
 
   test("the destination-tag input renders and validates", async ({ page }) => {
@@ -237,12 +267,14 @@ test.describe("Redeem-by-tag", () => {
 
     // An out-of-range tag surfaces a validation error and disables redeem.
     await tagInput.fill("4294967296");
+    await expect(tagInput).toHaveValue("4294967296");
     await expect(
       page.getByText(/destination tag must fit in 32 bits/i),
     ).toBeVisible();
 
     // A valid tag clears the error.
     await tagInput.fill("12345");
+    await expect(tagInput).toHaveValue("12345");
     await expect(
       page.getByText(/destination tag must fit in 32 bits/i),
     ).toHaveCount(0);
@@ -253,18 +285,26 @@ test.describe("Redeem-by-tag", () => {
   }) => {
     await connect(page);
 
-    await page.getByLabel(/FXRP amount/i).fill("10");
+    await page.getByLabel(/amount \(fxrp\)/i).fill("10");
+    // Sync point: wait for the parsed amount to commit before proceeding, so
+    // the Redeem button deterministically enables (mirrors redeem.spec.ts).
+    await expect(page.getByText(/Redeems 10 FXRP/i)).toBeVisible();
     await page.getByLabel("XRPL destination address").fill(VALID_XRPL);
-    await page.getByLabel("XRPL destination tag").fill("12345");
+    const tagInput = page.getByLabel("XRPL destination tag");
+    await tagInput.fill("12345");
+    await expect(tagInput).toHaveValue("12345");
 
-    await page.getByRole("button", { name: /redeem/i }).click();
+    const redeem = page.getByRole("button", { name: "Redeem" });
+    await expect(redeem).toBeEnabled();
+    await redeem.click();
+
+    // Routes to the status page for the request id emitted by the
+    // RedemptionWithTagRequested receipt. waitForURL (30s) tolerates the real
+    // send → receipt → navigate latency.
+    await page.waitForURL(/\/status\/5100/, { timeout: 30_000 });
 
     // The sent transaction's calldata must be redeemWithTag (not redeemAmount).
-    const sent = (await page.evaluate(
-      () =>
-        (window as unknown as { __sentTransactions: { data?: string }[] })
-          .__sentTransactions,
-    )) as { data?: string }[];
+    const sent = await sentTransactions(page);
     const redeemCall = sent.find((tx) =>
       tx.data?.startsWith(REDEEM_WITH_TAG_SELECTOR),
     );
@@ -273,9 +313,6 @@ test.describe("Redeem-by-tag", () => {
       tx.data?.startsWith(REDEEM_AMOUNT_SELECTOR),
     );
     expect(standardCall).toBeUndefined();
-
-    // Routes to the status page for the emitted request id.
-    await expect(page).toHaveURL(/\/status\/5100/);
   });
 
   test("an empty tag falls back to the standard redeemAmount call", async ({
@@ -283,17 +320,21 @@ test.describe("Redeem-by-tag", () => {
   }) => {
     await connect(page);
 
-    await page.getByLabel(/FXRP amount/i).fill("10");
+    await page.getByLabel(/amount \(fxrp\)/i).fill("10");
+    await expect(page.getByText(/Redeems 10 FXRP/i)).toBeVisible();
     await page.getByLabel("XRPL destination address").fill(VALID_XRPL);
     // Leave the destination tag empty.
 
-    await page.getByRole("button", { name: /redeem/i }).click();
+    const redeem = page.getByRole("button", { name: "Redeem" });
+    await expect(redeem).toBeEnabled();
+    await redeem.click();
 
-    const sent = (await page.evaluate(
-      () =>
-        (window as unknown as { __sentTransactions: { data?: string }[] })
-          .__sentTransactions,
-    )) as { data?: string }[];
+    // Wait for the wallet to capture the send before asserting calldata.
+    await expect
+      .poll(async () => (await sentTransactions(page)).length)
+      .toBeGreaterThan(0);
+
+    const sent = await sentTransactions(page);
     const standardCall = sent.find((tx) =>
       tx.data?.startsWith(REDEEM_AMOUNT_SELECTOR),
     );
@@ -302,5 +343,42 @@ test.describe("Redeem-by-tag", () => {
       tx.data?.startsWith(REDEEM_WITH_TAG_SELECTOR),
     );
     expect(tagCall).toBeUndefined();
+  });
+
+  test("gracefully disables the tag input when redeemWithTagSupported() is false", async ({
+    page,
+  }) => {
+    // The AssetManager advertises no tag support for this session.
+    redeemWithTagSupported = false;
+    await connect(page);
+
+    // The tag field is present (discoverable) but disabled, with a graceful
+    // explanation instead of the normal helper copy.
+    const tagInput = page.getByLabel("XRPL destination tag");
+    await expect(tagInput).toBeVisible();
+    await expect(tagInput).toBeDisabled();
+    await expect(
+      page.getByText(/does not support destination-tag redemptions/i),
+    ).toBeVisible();
+
+    // The standard lane still works end-to-end: a normal redeemAmount submits.
+    await page.getByLabel(/amount \(fxrp\)/i).fill("10");
+    await expect(page.getByText(/Redeems 10 FXRP/i)).toBeVisible();
+    await page.getByLabel("XRPL destination address").fill(VALID_XRPL);
+
+    const redeem = page.getByRole("button", { name: "Redeem" });
+    await expect(redeem).toBeEnabled();
+    await redeem.click();
+
+    await expect
+      .poll(async () => (await sentTransactions(page)).length)
+      .toBeGreaterThan(0);
+    const sent = await sentTransactions(page);
+    expect(
+      sent.find((tx) => tx.data?.startsWith(REDEEM_AMOUNT_SELECTOR)),
+    ).toBeDefined();
+    expect(
+      sent.find((tx) => tx.data?.startsWith(REDEEM_WITH_TAG_SELECTOR)),
+    ).toBeUndefined();
   });
 });
