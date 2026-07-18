@@ -65,6 +65,18 @@ export function normalizeDestinationTag(value: unknown): bigint | null {
   return null;
 }
 
+/**
+ * The net underlying amount an agent must deliver for a redemption: the gross
+ * `valueUBA` minus the redemption `feeUBA`, per FAssets semantics. This is the
+ * single source of truth for the amount the XRPL settlement observer matches a
+ * delivered payment against and the amount the keeper's settlement check
+ * requires, so the observer and keeper can never drift (a delivered payment
+ * equals the net, not the gross, value).
+ */
+export function netUnderlyingUBA(valueUBA: bigint, feeUBA: bigint): bigint {
+  return valueUBA - feeUBA;
+}
+
 export const redemptionStatuses = [
   "REQUESTED",
   "WATCHING",

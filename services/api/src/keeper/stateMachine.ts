@@ -1,4 +1,5 @@
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   type EvmAddress,
   type IsoTimestamp,
@@ -362,7 +363,14 @@ export function isValidXrplObservationForRedemption(
     return false;
   }
 
-  if (observation.deliveredAmountUBA < redemption.valueUBA) {
+  // A settling payment delivers the NET underlying amount (gross valueUBA minus
+  // the redemption feeUBA), matching the XRPL observer and FAssets semantics.
+  // Comparing against the gross valueUBA rejected every redemption with a
+  // non-zero fee, misclassifying valid settlements as non-payment.
+  if (
+    observation.deliveredAmountUBA <
+    netUnderlyingUBA(redemption.valueUBA, redemption.feeUBA)
+  ) {
     return false;
   }
 

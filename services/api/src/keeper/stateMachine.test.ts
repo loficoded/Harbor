@@ -27,6 +27,7 @@ import {
 } from "./defaultExecutor.js";
 import { xrpPaymentNonexistenceAttestationType } from "../fdc/xrpPaymentNonexistence.js";
 import {
+  isValidXrplObservationForRedemption,
   processKeeperRedemption,
   runKeeperBatch,
   type KeeperClock,
@@ -933,3 +934,131 @@ function xrpProofFixture(
     createdAt: "2026-07-08T00:00:01.000Z",
   };
 }
+
+describe("isValidXrplObservationForRedemption — net settlement boundary (item 13)", () => {
+  test("accepts a payment delivering exactly the net amount (valueUBA - feeUBA)", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 10n });
+    const observation = xrplObservationFixture(redemption, {
+      deliveredAmountUBA: 999_990n, // net = 1_000_000 - 10
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(redemption, observation),
+      true,
+    );
+  });
+
+  test("rejects a payment one UBA below the net amount", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 10n });
+    const observation = xrplObservationFixture(redemption, {
+      deliveredAmountUBA: 999_989n, // net - 1
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(redemption, observation),
+      false,
+    );
+  });
+
+  test("regression: a non-zero-fee redemption settles on the net amount (gross would reject)", () => {
+    // Before the fix the keeper compared the delivered amount against the gross
+    // valueUBA, so a correct net payment (every real payment) was misclassified
+    // as non-payment — reconciled here to match the observer and FAssets.
+    const redemption = redemptionFixture({
+      valueUBA: 5_000_000n,
+      feeUBA: 250_000n,
+    });
+    const net = 4_750_000n;
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: net }),
+      ),
+      true,
+    );
+    // An over-delivery (up to and beyond the gross value) is still acceptable.
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, {
+          deliveredAmountUBA: redemption.valueUBA,
+        }),
+      ),
+      true,
+    );
+  });
+
+  test("a zero-fee redemption still requires the full value", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 0n });
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: 1_000_000n }),
+      ),
+      true,
+    );
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: 999_999n }),
+      ),
+      false,
+    );
+  });
+
+  test("a WITH_TAG redemption only settles on an exact destination-tag match (incl. tag 0)", () => {
+    const net = 999_990n;
+    const tagged = redemptionFixture({
+      redemptionKind: "WITH_TAG",
+      destinationTag: 12345n,
+      valueUBA: 1_000_000n,
+      feeUBA: 10n,
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        tagged,
+        xrplObservationFixture(tagged, {
+          deliveredAmountUBA: net,
+          destinationTag: 12345n,
+        }),
+      ),
+      true,
+    );
+    // A wrong tag never settles, even with a sufficient amount.
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        tagged,
+        xrplObservationFixture(tagged, {
+          deliveredAmountUBA: net,
+          destinationTag: 99n,
+        }),
+      ),
+      false,
+    );
+    // tag 0 is a valid required tag: an absent observed tag must not settle it.
+    const zeroTag = redemptionFixture({
+      redemptionKind: "WITH_TAG",
+      destinationTag: 0n,
+      valueUBA: 1_000_000n,
+      feeUBA: 10n,
+    });
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        zeroTag,
+        xrplObservationFixture(zeroTag, {
+          deliveredAmountUBA: net,
+          destinationTag: 0n,
+        }),
+      ),
+      true,
+    );
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        zeroTag,
+        xrplObservationFixture(zeroTag, {
+          deliveredAmountUBA: net,
+          destinationTag: null,
+        }),
+      ),
+      false,
+    );
+  });
+});

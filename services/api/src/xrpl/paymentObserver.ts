@@ -1,4 +1,5 @@
 import {
+  netUnderlyingUBA,
   normalizeBytes32,
   normalizeTransactionHash,
   serializeBigints,
@@ -418,11 +419,15 @@ export function matchXrplPaymentToRedemption(
   const deliveredAmountUBA = payment.deliveredAmountUBA;
 
   // FAssets agents deliver the redemption value minus the redemption fee they
-  // keep, so the redeemer's underlying address legitimately receives
-  // (valueUBA - feeUBA). Comparing against the gross valueUBA rejected every
-  // valid payment (the on-chain RedemptionPerformed settles on this same net
-  // amount).
-  const requiredDeliveredUBA = redemption.valueUBA - redemption.feeUBA;
+  // keep, so the redeemer's underlying address legitimately receives the net
+  // amount (valueUBA - feeUBA). Comparing against the gross valueUBA rejected
+  // every valid payment (the on-chain RedemptionPerformed settles on this same
+  // net amount). Shared with the keeper state machine via netUnderlyingUBA so
+  // the two settlement checks can never drift.
+  const requiredDeliveredUBA = netUnderlyingUBA(
+    redemption.valueUBA,
+    redemption.feeUBA,
+  );
 
   if (deliveredAmountUBA < requiredDeliveredUBA) {
     return {
