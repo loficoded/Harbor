@@ -154,7 +154,10 @@ describe("parseStoredXrpFdcProofCalldata", () => {
     );
 
     assert.deepEqual(parsed.merkleProof, [proofNode]);
-    assert.equal(parsed.data.attestationType, xrpPaymentNonexistenceAttestationType);
+    assert.equal(
+      parsed.data.attestationType,
+      xrpPaymentNonexistenceAttestationType,
+    );
     assert.equal(parsed.data.sourceId, sourceId);
     assert.equal(parsed.data.votingRound, 7n);
     assert.equal(parsed.data.lowestUsedTimestamp, 1n);

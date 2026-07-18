@@ -577,7 +577,6 @@ describe("FAssets event indexer", () => {
   );
 });
 
-
 describe("FAssets event indexer — redemption-kind routing and fuzz", () => {
   test("RedemptionWithTagRequested is a tracked request, not an unsupported event", (t) => {
     const database = createTestDatabase(t);
@@ -617,7 +616,10 @@ describe("FAssets event indexer — redemption-kind routing and fuzz", () => {
       assetManagerAddress,
       observedAt,
       logs: [
-        mockLog("RedemptionRequested", redemptionRequestedArgs({ requestId: 7n })),
+        mockLog(
+          "RedemptionRequested",
+          redemptionRequestedArgs({ requestId: 7n }),
+        ),
       ],
     });
 

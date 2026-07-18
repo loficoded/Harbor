@@ -28,7 +28,13 @@ function Brand() {
           fill="none"
           aria-hidden="true"
         >
-          <circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="1.8" />
+          <circle
+            cx="12"
+            cy="5"
+            r="2"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
           <path
             d="M12 7v12M12 19c-3.6 0-6.5-2.9-6.5-6.5M12 19c3.6 0 6.5-2.9 6.5-6.5M7 10H5.5M12 10h0M17 10h1.5"
             stroke="currentColor"

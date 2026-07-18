@@ -116,7 +116,6 @@ describe("XRPPaymentNonexistence DA-layer encode/decode/normalize", () => {
   });
 });
 
-
 describe("XRPPaymentNonexistence DA-layer field coverage and malformed payloads", () => {
   test("normalizes all 10 request-body and 3 response-body fields from a full payload", () => {
     const original = sampleResponse();

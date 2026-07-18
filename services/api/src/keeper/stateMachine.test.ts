@@ -1065,7 +1065,6 @@ describe("isValidXrplObservationForRedemption — net settlement boundary (item 
   });
 });
 
-
 describe("isValidXrplObservationForRedemption — tag matrix and window boundaries", () => {
   test("STANDARD ignores the observed destination tag for any tag value or absent tag", () => {
     fc.assert(

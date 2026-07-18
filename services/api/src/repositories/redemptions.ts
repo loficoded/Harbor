@@ -114,7 +114,11 @@ function mapRedemptionRow(row: RedemptionRow): StoredRedemptionRequest {
     row.destination_tag === null
       ? null
       : parseSerializedBigint(row.destination_tag);
-  assertRedemptionTagConsistency(redemptionKind, destinationTag, row.request_id);
+  assertRedemptionTagConsistency(
+    redemptionKind,
+    destinationTag,
+    row.request_id,
+  );
 
   return {
     assetManagerAddress: row.asset_manager_address as EvmAddress,

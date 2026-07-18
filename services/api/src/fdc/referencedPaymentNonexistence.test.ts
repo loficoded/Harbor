@@ -297,7 +297,6 @@ describe("ReferencedPaymentNonexistence FDC request builder", () => {
   });
 });
 
-
 describe("ReferencedPaymentNonexistence net amount, boundaries, determinism", () => {
   test("encodes the net underlying amount (value - fee) for any value >= fee", (t) => {
     const database = createTestDatabase(t);

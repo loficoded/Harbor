@@ -123,6 +123,18 @@ export function AgentLeaderboardView({
             </EmptyState>
           ) : (
             <>
+              {/*
+               * Region-level description shared by the desktop table and the
+               * mobile cards. Rendered once here — outside the responsive
+               * table/cards split — so the heuristic framing is present at every
+               * viewport. The desktop <table> caption below is `hidden` on
+               * mobile (the table is `md:block`), so it cannot be the sole home
+               * of this text without disappearing on the mobile cards layout.
+               */}
+              <p className="sr-only">
+                Agent reliability leaderboard, ranked highest score first.
+                Scores are a heuristic, not a guarantee.
+              </p>
               <LeaderboardTable agents={agents} />
               <LeaderboardCards agents={agents} />
             </>
@@ -284,7 +296,9 @@ function LeaderboardToolbar({
             <input
               type="checkbox"
               checked={hideUnavailable}
-              onChange={(event) => onHideUnavailableChange(event.target.checked)}
+              onChange={(event) =>
+                onHideUnavailableChange(event.target.checked)
+              }
               className="h-4 w-4 rounded border-gray-300 text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 dark:border-gray-700"
             />
             Hide unavailable agents
@@ -345,7 +359,9 @@ function ScoreDetails({ agent }: { agent: RankedAgent }): ReactElement {
     <details className="min-w-[3.5rem]">
       <summary className="cursor-pointer list-inside text-sm font-semibold tabular-nums text-gray-900 marker:text-gray-400 dark:text-gray-100">
         {agent.score}
-        <span className="ml-1 text-xs font-normal text-gray-400">breakdown</span>
+        <span className="ml-1 text-xs font-normal text-gray-400">
+          breakdown
+        </span>
       </summary>
       <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
         {formatScoreBreakdown(agent)}
@@ -433,11 +449,10 @@ function LeaderboardTable({
   return (
     <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm md:block dark:border-gray-800 dark:bg-gray-900">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm">
-          <caption className="sr-only">
-            Agent reliability leaderboard, ranked highest score first. Scores are
-            a heuristic, not a guarantee.
-          </caption>
+        <table
+          aria-label="Agent reliability leaderboard"
+          className="w-full border-collapse text-left text-sm"
+        >
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/60">
               <th scope="col" className={HEAD_CELL_NUM}>

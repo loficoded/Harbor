@@ -468,7 +468,6 @@ function result2Body() {
   };
 }
 
-
 describe("XRPPaymentNonexistence net amount, lane isolation, fuzz", () => {
   test("encodes the net underlying amount (value - fee) for any value >= fee", (t) => {
     const database = createTestDatabase(t);
@@ -611,7 +610,12 @@ describe("XRPPaymentNonexistence net amount, lane isolation, fuzz", () => {
           assert.equal(encodedA.requestBytes, encodedB.requestBytes);
 
           const [decoded] = decodeAbiParameters(
-            [{ type: "tuple", components: xrpPaymentNonexistenceRequestBodyAbi }],
+            [
+              {
+                type: "tuple",
+                components: xrpPaymentNonexistenceRequestBodyAbi,
+              },
+            ],
             encodedA.encodedRequestBody,
           ) as unknown as readonly [XrpPaymentNonexistenceRequestBody];
 

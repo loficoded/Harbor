@@ -516,7 +516,6 @@ describe("redemptionBlockedReason", () => {
   });
 });
 
-
 // --- redeem-by-tag fuzz + gate matrix (extended) ---------------------------
 
 /** Deterministic PRNG (mulberry32) so the fuzz below is reproducible. */

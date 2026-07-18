@@ -678,7 +678,6 @@ describe("agent, keeper, and cursor repositories", () => {
   });
 });
 
-
 function tagConsistencyBase(requestId: string) {
   return {
     assetManagerAddress,

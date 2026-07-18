@@ -664,7 +664,6 @@ describe("retrying XRPL client", () => {
   );
 });
 
-
 function paymentWithRawTag(tag: unknown) {
   const fixture = xrplPaymentFixture();
   return { ...fixture, tx: { ...fixture.tx, DestinationTag: tag } };
@@ -740,10 +739,7 @@ describe("XRPL payment matching — tag matrix (property-based)", () => {
             tag === undefined
               ? xrplPaymentFixture()
               : xrplPaymentFixture({ destinationTag: Number(tag) });
-          assert.equal(
-            matchXrplPaymentToRedemption(base, raw).matched,
-            true,
-          );
+          assert.equal(matchXrplPaymentToRedemption(base, raw).matched, true);
         },
       ),
       { numRuns: 200 },
@@ -765,7 +761,10 @@ describe("XRPL payment matching — tag matrix (property-based)", () => {
       base,
       xrplPaymentFixture({ destinationTag: "777" }),
     );
-    const asBigint = matchXrplPaymentToRedemption(base, paymentWithRawTag(777n));
+    const asBigint = matchXrplPaymentToRedemption(
+      base,
+      paymentWithRawTag(777n),
+    );
 
     for (const result of [asNumber, asString, asBigint]) {
       assert.equal(result.matched, true);
@@ -780,7 +779,9 @@ describe("XRPL payment matching — tag matrix (property-based)", () => {
       destinationTag: 5n,
     });
 
-    const overflowPayment = xrplPaymentFixture({ destinationTag: "4294967296" });
+    const overflowPayment = xrplPaymentFixture({
+      destinationTag: "4294967296",
+    });
     const normalized = normalizeXrplPayment(overflowPayment);
     assert.notEqual(normalized, null);
     assert.equal(normalized?.destinationTag, null);
@@ -1119,7 +1120,9 @@ describe("XRPL payment matching — fuzz (never throws)", () => {
               TransactionResult: parts.result ?? "tesSUCCESS",
               delivered_amount: parts.amount,
             },
-            ...(parts.ledger === undefined ? {} : { ledger_index: parts.ledger }),
+            ...(parts.ledger === undefined
+              ? {}
+              : { ledger_index: parts.ledger }),
             validated: parts.validated ?? false,
           };
 
