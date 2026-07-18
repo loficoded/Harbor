@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import type { RedemptionKind } from "@harbor/shared";
+
 import {
   Badge,
   Button,
@@ -256,7 +258,8 @@ function ReadyPhase({
   const hasSidebar =
     isAssignedAgent(viewModel.agentVault) ||
     submission.transactionHash !== null ||
-    submission.relatedRequests.length > 1;
+    submission.relatedRequests.length > 1 ||
+    viewModel.redemptionKind === "WITH_TAG";
 
   return (
     <div className="flex flex-col gap-6">
@@ -313,6 +316,8 @@ function ReadyPhase({
 
             <SubmissionDetailsCard
               transactionHash={submission.transactionHash}
+              redemptionKind={viewModel.redemptionKind}
+              destinationTag={viewModel.destinationTag}
             />
           </aside>
         ) : null}
@@ -753,10 +758,19 @@ function AssignedAgentCard({
 
 function SubmissionDetailsCard({
   transactionHash,
+  redemptionKind,
+  destinationTag,
 }: {
   transactionHash: string | null;
+  redemptionKind: RedemptionKind;
+  destinationTag: string | null;
 }) {
-  if (transactionHash === null) {
+  const isWithTag = redemptionKind === "WITH_TAG";
+
+  // Render whenever there is a submission fact to show. A WITH_TAG redemption
+  // always carries a required destination tag the agent must pay with, so its
+  // details are shown even before the redeem transaction hash is known.
+  if (transactionHash === null && !isWithTag) {
     return null;
   }
 
@@ -767,9 +781,19 @@ function SubmissionDetailsCard({
         description="Preserved from the redemption submission."
       />
       <dl className="flex flex-col gap-3 text-sm">
-        <DetailRow label="Redeem transaction">
-          <TxLink hash={transactionHash} />
+        <DetailRow label="Redemption type">
+          <span>{isWithTag ? "Destination tag" : "Standard"}</span>
         </DetailRow>
+        {isWithTag && destinationTag !== null ? (
+          <DetailRow label="Required destination tag">
+            <span className="font-mono">{destinationTag}</span>
+          </DetailRow>
+        ) : null}
+        {transactionHash !== null ? (
+          <DetailRow label="Redeem transaction">
+            <TxLink hash={transactionHash} />
+          </DetailRow>
+        ) : null}
       </dl>
     </Card>
   );
