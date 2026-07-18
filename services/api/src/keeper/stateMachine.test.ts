@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import fc from "fast-check";
 
+import { netUnderlyingUBA } from "@harbor/shared";
 import type {
   Bytes32,
   EvmAddress,
@@ -1060,5 +1062,206 @@ describe("isValidXrplObservationForRedemption — net settlement boundary (item 
       ),
       false,
     );
+  });
+});
+
+
+describe("isValidXrplObservationForRedemption — tag matrix and window boundaries", () => {
+  test("STANDARD ignores the observed destination tag for any tag value or absent tag", () => {
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.constant<bigint | null>(null),
+          fc.bigInt({ min: 0n, max: 0xffffffffn }),
+        ),
+        (tag) => {
+          const redemption = redemptionFixture({
+            redemptionKind: "STANDARD",
+            destinationTag: null,
+          });
+          assert.equal(
+            isValidXrplObservationForRedemption(
+              redemption,
+              xrplObservationFixture(redemption, { destinationTag: tag }),
+            ),
+            true,
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  test("WITH_TAG requires an exact tag: off-by-one and absent tags are rejected (property)", () => {
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: 0xffffffffn }), (required) => {
+        const redemption = redemptionFixture({
+          redemptionKind: "WITH_TAG",
+          destinationTag: required,
+        });
+        assert.equal(
+          isValidXrplObservationForRedemption(
+            redemption,
+            xrplObservationFixture(redemption, { destinationTag: required }),
+          ),
+          true,
+        );
+        const other = required === 0xffffffffn ? 0n : required + 1n;
+        assert.equal(
+          isValidXrplObservationForRedemption(
+            redemption,
+            xrplObservationFixture(redemption, { destinationTag: other }),
+          ),
+          false,
+        );
+        assert.equal(
+          isValidXrplObservationForRedemption(
+            redemption,
+            xrplObservationFixture(redemption, { destinationTag: null }),
+          ),
+          false,
+        );
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  test("accepts a payment delivering one UBA above the net amount", () => {
+    const redemption = redemptionFixture({ valueUBA: 1_000_000n, feeUBA: 10n });
+    const net = netUnderlyingUBA(redemption.valueUBA, redemption.feeUBA);
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { deliveredAmountUBA: net + 1n }),
+      ),
+      true,
+    );
+  });
+
+  test("ledger window is inclusive at both ends and rejects one block outside", () => {
+    const redemption = redemptionFixture(); // window [100, 200]
+    for (const ledgerIndex of [100n, 200n] as const) {
+      assert.equal(
+        isValidXrplObservationForRedemption(
+          redemption,
+          xrplObservationFixture(redemption, { ledgerIndex }),
+        ),
+        true,
+      );
+    }
+    for (const ledgerIndex of [99n, 201n] as const) {
+      assert.equal(
+        isValidXrplObservationForRedemption(
+          redemption,
+          xrplObservationFixture(redemption, { ledgerIndex }),
+        ),
+        false,
+      );
+    }
+  });
+
+  test("close timestamp on the deadline settles; after the deadline or unparseable is rejected", () => {
+    const redemption = redemptionFixture(); // lastUnderlyingTimestamp = deadlineSeconds
+    // Exactly on the deadline.
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, { closeTimestamp: deadlineIso }),
+      ),
+      true,
+    );
+    // One second after the deadline.
+    const afterDeadlineIso = new Date(
+      Number(deadlineSeconds + 1n) * 1_000,
+    ).toISOString();
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, {
+          closeTimestamp: afterDeadlineIso,
+        }),
+      ),
+      false,
+    );
+    // Unparseable close timestamp is treated as absent (rejected, not a crash).
+    assert.equal(
+      isValidXrplObservationForRedemption(
+        redemption,
+        xrplObservationFixture(redemption, {
+          closeTimestamp: "not-a-timestamp" as IsoTimestamp,
+        }),
+      ),
+      false,
+    );
+  });
+});
+
+describe("keeper terminal-status safety (recovery / idempotency)", () => {
+  test("a SETTLED redemption is never driven to default, even past the deadline", async () => {
+    const repository = new FakeRepository();
+    const executor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "SETTLED",
+        transactionHash: xrplTransactionHash,
+      }),
+    );
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor: executor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "SETTLED");
+    assert.equal(result.action, "ignored");
+    assert.equal(repository.getRedemption(redemption)?.status, "SETTLED");
+    assert.equal(executor.executeCalls, 0);
+  });
+
+  test("a RECOVERED redemption stays terminal and executes no further default", async () => {
+    const repository = new FakeRepository();
+    const executor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({
+        status: "RECOVERED",
+        defaultTransactionHash,
+      }),
+    );
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor: executor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "RECOVERED");
+    assert.equal(result.action, "ignored");
+    assert.equal(repository.getRedemption(redemption)?.status, "RECOVERED");
+    assert.equal(executor.executeCalls, 0);
+  });
+
+  test("a FAILED redemption is ignored and never re-processed into a default", async () => {
+    const repository = new FakeRepository();
+    const executor = new FakeDefaultExecutor();
+    const redemption = repository.insertRedemption(
+      redemptionFixture({ status: "FAILED" }),
+    );
+
+    const result = await processKeeperRedemption({
+      repository,
+      fdcClient: new FakeFdcClient(repository),
+      defaultExecutor: executor,
+      redemption,
+      clock: afterDeadlineClock,
+    });
+
+    assert.equal(result.toStatus, "FAILED");
+    assert.equal(result.action, "ignored");
+    assert.equal(executor.executeCalls, 0);
   });
 });

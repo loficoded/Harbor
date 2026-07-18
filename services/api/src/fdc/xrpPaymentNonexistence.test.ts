@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { describe, test, type TestContext } from "node:test";
 import fc from "fast-check";
 
+import { netUnderlyingUBA } from "@harbor/shared";
 import type { Bytes32, EvmAddress, TransactionHash } from "@harbor/shared";
-import { keccak256 } from "viem";
+import { xrpPaymentNonexistenceRequestBodyAbi } from "@harbor/protocol";
+import { decodeAbiParameters, keccak256 } from "viem";
 
 import {
   openSqliteDatabase,
@@ -20,11 +22,13 @@ import {
 import type { StoredRedemptionRequest } from "../repositories/types.js";
 import {
   buildAndPersistXrpPaymentNonexistenceRequest,
+  buildXrpPaymentNonexistenceRequest,
   createXrpPaymentNonexistenceRequestBody,
   defaultXrpPaymentNonexistenceSourceIdName,
   encodeXrpPaymentNonexistenceRequest,
   standardFirstMemoDataHash,
   xrpPaymentNonexistenceAttestationType,
+  type XrpPaymentNonexistenceRequestBody,
 } from "./xrpPaymentNonexistence.js";
 import {
   fdcIdentifier as fdcIdentifierFromStandard,
@@ -463,3 +467,199 @@ function result2Body() {
     proofOwner: zeroAddress,
   };
 }
+
+
+describe("XRPPaymentNonexistence net amount, lane isolation, fuzz", () => {
+  test("encodes the net underlying amount (value - fee) for any value >= fee", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertWithTagRedemptionFixture(database);
+
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        (a, b) => {
+          const valueUBA = a >= b ? a : b;
+          const feeUBA = a >= b ? b : a;
+          const body = createXrpPaymentNonexistenceRequestBody({
+            ...base,
+            valueUBA,
+            feeUBA,
+          });
+          assert.equal(body.amount, netUnderlyingUBA(valueUBA, feeUBA));
+          assert.equal(body.amount, valueUBA - feeUBA);
+        },
+      ),
+      { numRuns: 500 },
+    );
+  });
+
+  test("throws when the fee exceeds the value (negative net) on the tag lane", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertWithTagRedemptionFixture(database);
+
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        fc.bigInt({ min: 1n, max: 10n ** 18n }),
+        (valueUBA, extra) => {
+          assert.throws(
+            () =>
+              createXrpPaymentNonexistenceRequestBody({
+                ...base,
+                valueUBA,
+                feeUBA: valueUBA + extra,
+              }),
+            /cannot be negative/,
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  test("destination tag round-trips and both check flags stay set across the uint32 range", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertWithTagRedemptionFixture(database);
+
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: 0xffffffffn }), (tag) => {
+        const body = createXrpPaymentNonexistenceRequestBody({
+          ...base,
+          destinationTag: tag,
+        });
+        assert.equal(body.destinationTag, tag);
+        assert.equal(body.checkDestinationTag, true);
+        assert.equal(body.checkFirstMemoData, true);
+        assert.equal(body.proofOwner, zeroAddress);
+        assert.equal(
+          body.firstMemoDataHash,
+          standardFirstMemoDataHash(paymentReference),
+        );
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  test("persists under the XRP lane prefix, distinct from the standard lane", (t) => {
+    const database = createTestDatabase(t);
+    insertWithTagRedemptionFixture(database);
+
+    const result = buildAndPersistXrpPaymentNonexistenceRequest({
+      database,
+      assetManagerAddress,
+      requestId: "42",
+      messageIntegrityCode,
+      currentUnixTimestamp: 301n,
+    });
+
+    assert.ok(result.fdcRequest);
+    assert.equal(
+      result.fdcRequest.fdcRequestId,
+      `xrp-payment-nonexistence:${result.encodedRequest.requestHash}`,
+    );
+    assert.match(result.fdcRequest.fdcRequestId, /^xrp-payment-nonexistence:/);
+    assert.equal(
+      result.fdcRequest.fdcRequestId.startsWith(
+        "referenced-payment-nonexistence:",
+      ),
+      false,
+    );
+  });
+
+  test("fuzz: valid random redemptions build without throwing, hash is stable, and the body ABI round-trips", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertWithTagRedemptionFixture(database);
+    const uint64Bound = (1n << 63n) - 1n;
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          value: fc.bigInt({ min: 0n, max: 10n ** 18n }),
+          feeSeed: fc.bigInt({ min: 0n, max: 10n ** 18n }),
+          tag: fc.bigInt({ min: 0n, max: 0xffffffffn }),
+          firstBlock: fc.bigInt({ min: 0n, max: uint64Bound }),
+          lastBlock: fc.bigInt({ min: 0n, max: uint64Bound }),
+          lastTimestamp: fc.bigInt({ min: 0n, max: uint64Bound }),
+        }),
+        ({ value, feeSeed, tag, firstBlock, lastBlock, lastTimestamp }) => {
+          // Keep the redemption valid: fee never exceeds value (net >= 0).
+          const feeUBA = value === 0n ? 0n : feeSeed % (value + 1n);
+          const redemption = {
+            ...base,
+            valueUBA: value,
+            feeUBA,
+            destinationTag: tag,
+            firstUnderlyingBlock: firstBlock,
+            lastUnderlyingBlock: lastBlock,
+            lastUnderlyingTimestamp: lastTimestamp,
+          };
+
+          const body = createXrpPaymentNonexistenceRequestBody(redemption);
+          assert.equal(body.amount, value - feeUBA);
+          assert.equal(body.destinationTag, tag);
+
+          const encodedA = encodeXrpPaymentNonexistenceRequest({
+            messageIntegrityCode,
+            requestBody: body,
+          });
+          const encodedB = encodeXrpPaymentNonexistenceRequest({
+            messageIntegrityCode,
+            requestBody: body,
+          });
+          assert.equal(encodedA.requestHash, encodedB.requestHash);
+          assert.equal(encodedA.requestBytes, encodedB.requestBytes);
+
+          const [decoded] = decodeAbiParameters(
+            [{ type: "tuple", components: xrpPaymentNonexistenceRequestBodyAbi }],
+            encodedA.encodedRequestBody,
+          ) as unknown as readonly [XrpPaymentNonexistenceRequestBody];
+
+          assert.equal(decoded.minimalBlockNumber, body.minimalBlockNumber);
+          assert.equal(decoded.deadlineBlockNumber, body.deadlineBlockNumber);
+          assert.equal(decoded.deadlineTimestamp, body.deadlineTimestamp);
+          assert.equal(
+            decoded.destinationAddressHash,
+            body.destinationAddressHash,
+          );
+          assert.equal(decoded.amount, body.amount);
+          assert.equal(decoded.checkFirstMemoData, body.checkFirstMemoData);
+          assert.equal(decoded.firstMemoDataHash, body.firstMemoDataHash);
+          assert.equal(decoded.checkDestinationTag, body.checkDestinationTag);
+          assert.equal(decoded.destinationTag, body.destinationTag);
+          assert.equal(
+            (decoded.proofOwner as string).toLowerCase(),
+            body.proofOwner.toLowerCase(),
+          );
+        },
+      ),
+      { numRuns: 300 },
+    );
+  });
+
+  test("stress: large bigint amounts and tags stay net-consistent (numRuns 1000)", (t) => {
+    const database = createTestDatabase(t);
+    const base = insertWithTagRedemptionFixture(database);
+
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        fc.bigInt({ min: 0n, max: 0xffffffffn }),
+        (a, b, tag) => {
+          const valueUBA = a >= b ? a : b;
+          const feeUBA = a >= b ? b : a;
+          const encoded = buildXrpPaymentNonexistenceRequest(
+            { ...base, valueUBA, feeUBA, destinationTag: tag },
+            { messageIntegrityCode, dryRun: true },
+          );
+          assert.equal(encoded.requestBody.amount, valueUBA - feeUBA);
+          assert.equal(encoded.requestBody.destinationTag, tag);
+          assert.equal(encoded.requestBody.checkDestinationTag, true);
+          assert.equal(encoded.requestBody.checkFirstMemoData, true);
+        },
+      ),
+      { numRuns: 1000 },
+    );
+  });
+});

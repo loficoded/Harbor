@@ -149,6 +149,15 @@ type XrplRawPaymentContainer = Readonly<{
 
 const rippleEpochOffsetSeconds = 946_684_800n;
 
+/**
+ * The maximum absolute Unix-seconds value that `new Date(...)` can represent
+ * (ECMAScript caps the time value at ±100,000,000 days = ±8.64e15 ms from the
+ * epoch). A ripple `date` that maps outside this range would make
+ * `Date#toISOString` throw `RangeError: Invalid time value`; the observer must
+ * never throw on a malformed field, so such a timestamp is treated as absent.
+ */
+const maxRepresentableUnixSeconds = 8_640_000_000_000n;
+
 function createEmptySummary(): MutableObserveXrplPaymentsSummary {
   return {
     transactionsScanned: 0,
@@ -202,10 +211,17 @@ function decimalNumber(value: bigint, fieldName: string): number {
   return Number(value);
 }
 
-function rippleTimeToIsoTimestamp(rippleTime: bigint): string {
-  return new Date(
-    Number(rippleTime + rippleEpochOffsetSeconds) * 1_000,
-  ).toISOString();
+function rippleTimeToIsoTimestamp(rippleTime: bigint): string | null {
+  const unixSeconds = rippleTime + rippleEpochOffsetSeconds;
+
+  if (
+    unixSeconds < -maxRepresentableUnixSeconds ||
+    unixSeconds > maxRepresentableUnixSeconds
+  ) {
+    return null;
+  }
+
+  return new Date(Number(unixSeconds) * 1_000).toISOString();
 }
 
 function rippleTimeToUnixSeconds(rippleTime: bigint): bigint {
@@ -324,14 +340,17 @@ export function normalizeXrplPayment(
   }
 
   const rippleCloseTimestampSeconds = decimalBigint(transaction.date);
-  const closeTimestampSeconds =
-    rippleCloseTimestampSeconds === null
-      ? null
-      : rippleTimeToUnixSeconds(rippleCloseTimestampSeconds);
+  // Derive the ISO string first: an out-of-range ripple `date` yields `null`
+  // here (rather than throwing), and both close-timestamp fields are then held
+  // absent together so a malformed timestamp is rejected, never crashes.
   const closeTimestamp =
     rippleCloseTimestampSeconds === null
       ? null
       : rippleTimeToIsoTimestamp(rippleCloseTimestampSeconds);
+  const closeTimestampSeconds =
+    rippleCloseTimestampSeconds === null || closeTimestamp === null
+      ? null
+      : rippleTimeToUnixSeconds(rippleCloseTimestampSeconds);
 
   let transactionHash: TransactionHash;
   try {

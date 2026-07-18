@@ -515,3 +515,105 @@ describe("redemptionBlockedReason", () => {
     ).toMatch(/destination address/i);
   });
 });
+
+
+// --- redeem-by-tag fuzz + gate matrix (extended) ---------------------------
+
+/** Deterministic PRNG (mulberry32) so the fuzz below is reproducible. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe("redeem-by-tag fuzz and gate matrix", () => {
+  it("fuzz: every uint32 string parses to exactly BigInt(string); >= 2**32 is an error", () => {
+    const rng = mulberry32(0xc0ffee);
+    for (let i = 0; i < 2000; i += 1) {
+      const value = Math.floor(rng() * 4_294_967_296);
+      const raw = String(value);
+      const result = parseDestinationTag(raw);
+      expect(result.error).toBeNull();
+      expect(result.tag).toBe(BigInt(raw));
+    }
+    expect(parseDestinationTag("0")).toEqual({ tag: 0n, error: null });
+    expect(parseDestinationTag(String(destinationTagMax))).toEqual({
+      tag: destinationTagMax,
+      error: null,
+    });
+    for (const over of ["4294967296", "4294967300", "99999999999"]) {
+      const result = parseDestinationTag(over);
+      expect(result.tag).toBeNull();
+      expect(result.error).toMatch(/32 bits/);
+    }
+  });
+
+  it("fuzz: a present tag always routes to redeemWithTag with the tag as the 4th arg", () => {
+    const executor = getAddress("0x00000000000000000000000000000000000000cc");
+    const rng = mulberry32(0x1234);
+    for (let i = 0; i < 1000; i += 1) {
+      const tag = BigInt(Math.floor(rng() * 4_294_967_296));
+      const call = buildRedeemCallArgs({
+        amountUba: 5_000_000n,
+        xrplAddress: "rDest",
+        executor,
+        destinationTag: tag,
+      });
+      expect(call.functionName).toBe("redeemWithTag");
+      if (call.functionName === "redeemWithTag") {
+        expect(call.args).toEqual([5_000_000n, "rDest", executor, tag]);
+      }
+    }
+    const standard = buildRedeemCallArgs({
+      amountUba: 5_000_000n,
+      xrplAddress: "rDest",
+      executor,
+      destinationTag: null,
+    });
+    expect(standard.functionName).toBe("redeemAmount");
+    expect(standard.args).toEqual([5_000_000n, "rDest", executor]);
+  });
+
+  it("parseDestinationTag then buildRedeemCallArgs: empty -> redeemAmount, '0' -> redeemWithTag(tag 0)", () => {
+    const executor = getAddress("0x00000000000000000000000000000000000000cc");
+
+    const empty = parseDestinationTag("");
+    expect(empty).toEqual({ tag: null, error: null });
+    expect(
+      buildRedeemCallArgs({
+        amountUba: 1n,
+        xrplAddress: "rDest",
+        executor,
+        destinationTag: empty.tag,
+      }).functionName,
+    ).toBe("redeemAmount");
+
+    const zero = parseDestinationTag("0");
+    expect(zero.tag).toBe(0n);
+    const zeroCall = buildRedeemCallArgs({
+      amountUba: 1n,
+      xrplAddress: "rDest",
+      executor,
+      destinationTag: zero.tag,
+    });
+    expect(zeroCall.functionName).toBe("redeemWithTag");
+    if (zeroCall.functionName === "redeemWithTag") {
+      expect(zeroCall.args[3]).toBe(0n);
+    }
+  });
+
+  it("does not block a requested tag when redeemWithTagSupported() is true", () => {
+    expect(
+      redemptionBlockedReason({
+        ...readyState,
+        tagRequested: true,
+        tagSupported: true,
+      }),
+    ).toBeNull();
+  });
+});

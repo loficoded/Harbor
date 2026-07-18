@@ -115,3 +115,130 @@ describe("XRPPaymentNonexistence DA-layer encode/decode/normalize", () => {
     );
   });
 });
+
+
+describe("XRPPaymentNonexistence DA-layer field coverage and malformed payloads", () => {
+  test("normalizes all 10 request-body and 3 response-body fields from a full payload", () => {
+    const original = sampleResponse();
+    const merkleProof = [
+      `0x${"0a".repeat(32)}` as Bytes32,
+      `0x${"0b".repeat(32)}` as Bytes32,
+    ];
+    const normalized = normalizeXrpPaymentNonexistenceProof({
+      proof: merkleProof,
+      response: original,
+    });
+
+    assert.deepEqual(normalized.proofCalldata.merkleProof, merkleProof);
+
+    const rb = normalized.proofCalldata.data.requestBody;
+    assert.equal(rb.minimalBlockNumber, 100n);
+    assert.equal(rb.deadlineBlockNumber, 200n);
+    assert.equal(rb.deadlineTimestamp, 300n);
+    assert.equal(rb.destinationAddressHash, destinationAddressHash);
+    assert.equal(rb.amount, 999000n);
+    assert.equal(rb.checkFirstMemoData, true);
+    assert.equal(rb.firstMemoDataHash, firstMemoDataHash);
+    assert.equal(rb.checkDestinationTag, true);
+    assert.equal(rb.destinationTag, 12345n);
+    assert.equal(rb.proofOwner, proofOwner);
+
+    const responseBody = normalized.proofCalldata.data.responseBody;
+    assert.equal(responseBody.minimalBlockTimestamp, 101n);
+    assert.equal(responseBody.firstOverflowBlockNumber, 201n);
+    assert.equal(responseBody.firstOverflowBlockTimestamp, 301n);
+  });
+
+  test("serializes every bigint field of the calldata JSON as a string (bigint-safe)", () => {
+    const normalized = normalizeXrpPaymentNonexistenceProof({
+      proof: [`0x${"0c".repeat(32)}` as Bytes32],
+      response: sampleResponse(),
+    });
+    const calldata = JSON.parse(normalized.calldataJson) as Record<
+      string,
+      unknown
+    >;
+    const data = calldata.data as Record<string, unknown>;
+    const requestBody = data.requestBody as Record<string, unknown>;
+    const responseBody = data.responseBody as Record<string, unknown>;
+
+    assert.equal(data.votingRound, "1392000");
+    assert.equal(data.lowestUsedTimestamp, "1700000000");
+    assert.equal(requestBody.minimalBlockNumber, "100");
+    assert.equal(requestBody.deadlineBlockNumber, "200");
+    assert.equal(requestBody.deadlineTimestamp, "300");
+    assert.equal(requestBody.amount, "999000");
+    assert.equal(requestBody.destinationTag, "12345");
+    assert.equal(typeof requestBody.amount, "string");
+    assert.equal(responseBody.minimalBlockTimestamp, "101");
+    assert.equal(responseBody.firstOverflowBlockNumber, "201");
+    assert.equal(responseBody.firstOverflowBlockTimestamp, "301");
+  });
+
+  test("rejects a payload whose proof is not an array", () => {
+    assert.throws(
+      () =>
+        normalizeXrpPaymentNonexistenceProof({ response: sampleResponse() }),
+      /proof must be an array/,
+    );
+  });
+
+  test("rejects a payload whose response is not an object", () => {
+    assert.throws(
+      () =>
+        normalizeXrpPaymentNonexistenceProof({
+          proof: [],
+          response: "not-an-object",
+        }),
+      /must be an object/,
+    );
+  });
+
+  test("rejects a response missing a required request-body field", () => {
+    const original = sampleResponse();
+    const { amount: _amount, ...requestBodyWithoutAmount } =
+      original.requestBody;
+    void _amount;
+    const responseMissingAmount = {
+      ...original,
+      requestBody: requestBodyWithoutAmount,
+    };
+
+    assert.throws(
+      () =>
+        normalizeXrpPaymentNonexistenceProof({
+          proof: [],
+          response: responseMissingAmount,
+        }),
+      /amount is required/,
+    );
+  });
+
+  test("rejects a request-body field of the wrong type", () => {
+    const original = sampleResponse();
+    const responseWrongType = {
+      ...original,
+      requestBody: { ...original.requestBody, checkFirstMemoData: "yes" },
+    };
+
+    assert.throws(
+      () =>
+        normalizeXrpPaymentNonexistenceProof({
+          proof: [],
+          response: responseWrongType,
+        }),
+      /checkFirstMemoData must be boolean/,
+    );
+  });
+
+  test("encodes a decoded response object back to the exact hex it decodes from", () => {
+    const original = sampleResponse();
+    const encoded = encodeXrpPaymentNonexistenceResponse(original);
+    const roundTripped = encodeXrpPaymentNonexistenceResponse(
+      normalizeXrpPaymentNonexistenceResponse(
+        decodeXrpPaymentNonexistenceResponse(encoded),
+      ),
+    );
+    assert.equal(roundTripped, encoded);
+  });
+});
