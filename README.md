@@ -44,10 +44,10 @@ The system drives one settlement lifecycle end to end:
 
 > **redeem → watch XRPL → settle · or prove non-payment → execute default → recover collateral**
 
-|             |                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| Live demo   | [harbor-web-olive.vercel.app](https://harbor-web-olive.vercel.app)                          |
-| Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)          |
+|             |                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| Live demo   | [harbor-web-olive.vercel.app](https://harbor-web-olive.vercel.app)                         |
+| Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)         |
 | Walkthrough | ▶ [Watch the 2-minute walkthrough on YouTube](https://www.youtube.com/watch?v=97Q2v0fn6VI) |
 
 [![Harbor — FXRP redemption console on Flare Coston2](./assets/screenshots/redemption-console.png)](https://www.youtube.com/watch?v=97Q2v0fn6VI)
@@ -749,6 +749,18 @@ The happy path — from a submitted redemption to on-chain settlement:
 [![Settled — XRPL settlement observed, with a settlement receipt](./assets/screenshots/redemption-status-settled.png)](https://harbor-web-olive.vercel.app/status/38217645)
 
 <p align="center"><em>The FIFO-assigned agent paid on the XRP Ledger, so the request settled: the evidence-based timeline completes and a settlement receipt records the delivered FXRP.</em></p>
+
+The redeem-by-tag lane — for XRPL destinations that require a destination tag
+(exchanges, custodials). An optional tag input routes to `redeemWithTag`; the
+agent's XRPL payment must carry that exact `DestinationTag` to settle.
+
+[![Redeem-by-tag — destination tag entered in the redemption console](./assets/screenshots/redemption-console-with-tag.png)](https://harbor-web-olive.vercel.app)
+
+<p align="center"><em>Entering a destination tag selects the <code>redeemWithTag</code> lane; an empty tag keeps the standard <code>redeemAmount</code> path.</em></p>
+
+[![Settled with a destination tag — receipt records the matched tag](./assets/screenshots/redemption-status-with-tag-settled.png)](https://harbor-web-olive.vercel.app/status/38220471)
+
+<p align="center"><em>A <code>WITH_TAG</code> redemption settles when the observed XRPL payment matches the destination, net amount, <em>and</em> required destination tag — shown in both the settlement receipt and the submission details.</em></p>
 
 [![Agent statistics — informational analytics only](./assets/screenshots/agent-statistics.png)](https://harbor-web-olive.vercel.app/agents)
 
