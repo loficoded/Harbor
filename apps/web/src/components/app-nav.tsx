@@ -11,38 +11,9 @@ const navLinks: readonly NavLink[] = [
   { href: "/agents", label: "Agents" },
 ];
 
-/**
- * Harness routes under `/harness/*` reuse the same nav. Each harness page maps
- * to the real section it mirrors so the active pill reflects the user's logical
- * location: redemption console/status pages highlight Overview (the redemption
- * console lives on the overview route), and the agent-statistics harness
- * highlights Agents.
- */
-const HARNESS_OVERVIEW_PREFIXES = [
-  "/harness/redemption-console",
-  "/harness/redemption-submitted",
-  "/harness/redemption-status",
-];
-
-function isHarnessAgents(pathname: string): boolean {
-  return pathname.startsWith("/harness/agent-statistics");
-}
-
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {
-    if (pathname === "/") {
-      return true;
-    }
-    return HARNESS_OVERVIEW_PREFIXES.some((prefix) =>
-      pathname.startsWith(prefix),
-    );
-  }
-
-  if (href === "/agents") {
-    if (pathname === "/agents" || pathname.startsWith("/agents/")) {
-      return true;
-    }
-    return isHarnessAgents(pathname);
+    return pathname === "/";
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
