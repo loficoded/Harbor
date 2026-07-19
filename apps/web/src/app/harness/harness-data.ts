@@ -62,10 +62,12 @@ export const HARNESS_MERKLE_PROOF: readonly string[] = [
   "0x4444444444444444444444444444444444444444444444444444444444444444",
 ];
 
-// Official agent vaults/names mirror the live FAssets registry (read from the
-// production API). Scores are realistic, varied heuristics (42–100) with a
-// transparent term-by-term breakdown so the leaderboard demonstrates the
-// breakdown affordance — they are NOT the live scores.
+// Official agent vaults/names/icons AND scores/breakdowns mirror the live
+// FAssets registry verbatim — read from the production API
+// (api-production-6f3ec.up.railway.app/agents?asset=FXRP) so the leaderboard
+// screenshot is a faithful snapshot of the real Coston2 agent reliability
+// state, not fabricated data. Only the iconUrl is repointed to the locally
+// served PNG so the screenshot run is offline and deterministic.
 export type HarnessAgent = RankedAgent;
 
 const baseAgent = {
@@ -73,27 +75,27 @@ const baseAgent = {
   formulaVersion: "agent-reliability-mvp-v1",
   collateralRatioSource: "INVENTORY" as const,
   ftsoStatus: "AVAILABLE" as const,
-  updatedAt: "2026-07-13T09:12:50.608Z",
+  updatedAt: "2026-07-19T11:48:15.819Z",
 };
 
 export const HARNESS_AGENTS: readonly RankedAgent[] = [
   {
     ...baseAgent,
     agentVault: "0x165c62b4531d28e34c68a8b2acbf4d0421e4e028",
-    score: 96,
-    fulfillmentRate: 0.98,
-    fulfillmentScore: 44,
-    settlementTimeScore: 14,
+    score: 100,
+    fulfillmentRate: 1,
+    fulfillmentScore: 45,
+    settlementTimeScore: 15,
     defaultPenalty: 0,
-    availabilityScore: 18,
+    availabilityScore: 20,
     collateralScore: 20,
-    successfulRedemptions: 1084,
+    successfulRedemptions: 1090,
     defaultedRedemptions: 0,
-    totalTerminalRedemptions: 1084,
-    averageSettlementSeconds: 42,
+    totalTerminalRedemptions: 1090,
+    averageSettlementSeconds: 10,
     availability: "AVAILABLE",
-    availableLots: "131",
-    collateralRatioBips: "27723",
+    availableLots: "112",
+    collateralRatioBips: "23624",
     details: {
       name: "Oracle-Daemon 1",
       description: "Oracle Daemon auxiliary agent bot",
@@ -104,20 +106,20 @@ export const HARNESS_AGENTS: readonly RankedAgent[] = [
   {
     ...baseAgent,
     agentVault: "0x55c815260cbe6c45fe5bfe5ff32e3c7d746f14dc",
-    score: 87,
-    fulfillmentRate: 0.95,
-    fulfillmentScore: 42,
-    settlementTimeScore: 13,
+    score: 100,
+    fulfillmentRate: 1,
+    fulfillmentScore: 45,
+    settlementTimeScore: 15,
     defaultPenalty: 0,
-    availabilityScore: 15,
-    collateralScore: 17,
+    availabilityScore: 20,
+    collateralScore: 20,
     successfulRedemptions: 249,
     defaultedRedemptions: 0,
     totalTerminalRedemptions: 249,
-    averageSettlementSeconds: 96,
+    averageSettlementSeconds: 35,
     availability: "AVAILABLE",
-    availableLots: "490",
-    collateralRatioBips: "18800",
+    availableLots: "491",
+    collateralRatioBips: "55625",
     details: {
       name: "Oracle-Daemon",
       description: "Oracle Daemon agent bot open beta",
@@ -128,20 +130,20 @@ export const HARNESS_AGENTS: readonly RankedAgent[] = [
   {
     ...baseAgent,
     agentVault: "0xd5defe2c62d48788bb3889534fbfe7aea0602d64",
-    score: 74,
-    fulfillmentRate: 0.89,
-    fulfillmentScore: 40,
-    settlementTimeScore: 11,
+    score: 100,
+    fulfillmentRate: 1,
+    fulfillmentScore: 45,
+    settlementTimeScore: 15,
     defaultPenalty: 0,
-    availabilityScore: 13,
-    collateralScore: 10,
+    availabilityScore: 20,
+    collateralScore: 20,
     successfulRedemptions: 941,
     defaultedRedemptions: 0,
     totalTerminalRedemptions: 941,
-    averageSettlementSeconds: 128,
+    averageSettlementSeconds: 9,
     availability: "AVAILABLE",
-    availableLots: "880",
-    collateralRatioBips: "16000",
+    availableLots: "886",
+    collateralRatioBips: "102658",
     details: {
       name: "White-Knight",
       description: "Friendly liquidator for open beta",
@@ -152,20 +154,20 @@ export const HARNESS_AGENTS: readonly RankedAgent[] = [
   {
     ...baseAgent,
     agentVault: "0x5b89514d1f060adbea8b7294aff81ed8dbaa7fc5",
-    score: 48,
-    fulfillmentRate: 0.78,
-    fulfillmentScore: 35,
-    settlementTimeScore: 8,
-    defaultPenalty: 10,
-    availabilityScore: 10,
-    collateralScore: 5,
+    score: 98.12,
+    fulfillmentRate: 1,
+    fulfillmentScore: 45,
+    settlementTimeScore: 15,
+    defaultPenalty: 0,
+    availabilityScore: 20,
+    collateralScore: 18.12,
     successfulRedemptions: 1074,
-    defaultedRedemptions: 2,
-    totalTerminalRedemptions: 1076,
-    averageSettlementSeconds: 214,
-    availability: "UNAVAILABLE",
-    availableLots: "52",
-    collateralRatioBips: "14000",
+    defaultedRedemptions: 0,
+    totalTerminalRedemptions: 1074,
+    averageSettlementSeconds: 17,
+    availability: "AVAILABLE",
+    availableLots: "54",
+    collateralRatioBips: "19249",
     details: {
       name: "Oracle-Daemon 2",
       description: "Oracle Daemon auxiliary agent bot",
