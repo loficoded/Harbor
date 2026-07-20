@@ -71,6 +71,7 @@ The system drives one settlement lifecycle end to end:
 - [Getting started](#getting-started)
 - [Configuration](#configuration)
 - [Usage](#usage)
+- [Build on Harbor](#build-on-harbor)
 - [Implementation notes](#implementation-notes)
 - [Data model](#data-model)
 - [On-chain deployment](#on-chain-deployment)
@@ -199,6 +200,9 @@ Harbor disappears is that a redeemer submits the default themselves.
 - **Runs with zero configuration.** Every service flag and every `NEXT_PUBLIC_*`
   value has a safe local default, so the API and console boot in "mock mode"
   with no secrets.
+- **Build on Harbor.** A public, `GET`-only read API plus a drop-in embeddable
+  widget and React component, so wallets, explorers, and protocols can surface
+  agent reliability and settlement status with no contract calls and no custody.
 
 ## How Harbor works
 
@@ -770,6 +774,33 @@ availability, collateral, and a transparent heuristic score — to help you
 understand network behavior. It does **not** select, prefer, or influence which
 agent fulfills a redemption; that is always the protocol's FIFO assignment.
 
+## Build on Harbor
+
+Harbor's read API is public, `GET`-only, and non-custodial, so any wallet,
+explorer, or protocol can surface **agent reliability** and **settlement status**
+without integrating a contract, holding a key, or asking a user to sign anything.
+It is the same data the Harbor console renders, exposed for reuse:
+
+- `GET /agents?asset=FXRP` — the ranked, heuristic agent-reliability leaderboard
+  (official identity, fulfillment, settlement speed, availability, collateral).
+- `GET /redemptions/:id` — a single redemption's evidence-based status timeline.
+
+Live base URL: `https://api-production-6f3ec.up.railway.app`. Responses send
+permissive CORS headers, so a browser on any origin can read them. The data is
+informational only and never affects the protocol's FIFO agent assignment.
+
+### Drop-in integrations
+
+| Artifact | Use it for |
+| -------- | ---------- |
+| [`integration/INTEGRATION.md`](./integration/INTEGRATION.md) | Endpoint reference, field definitions, `curl`/`fetch` examples, and CORS notes. |
+| [`integration/harbor-widget.html`](./integration/harbor-widget.html) | A single, dependency-free embeddable widget that renders the FXRP reliability leaderboard. Copy the mount node + `<script>`, or `<iframe src>` it. |
+| [`integration/HarborAgentReliability.tsx`](./integration/HarborAgentReliability.tsx) | The same leaderboard as a zero-dependency React component. |
+
+Both the widget and the component are configurable (API base URL, asset, row
+limit) and read only public data, so either one drops into an existing product
+and shows live Coston2 agent reliability with no backend work.
+
 ## Implementation notes
 
 ### HarborRedeemer — the permissionless executor
@@ -1068,6 +1099,7 @@ Documented but intentionally out of scope for this testnet MVP:
 | Protocol constants | [`packages/protocol/src`](./packages/protocol/src) — chains, addresses, ABIs                                                    |
 | Backend modules    | [`services/api/src`](./services/api/src) — api · indexer · keeper · fdc · xrpl · scoring                                        |
 | Live e2e           | [`test/e2e/README.md`](./test/e2e/README.md) — standard + redeem-by-tag Coston2 runners                                         |
+| Build on Harbor    | [`integration/INTEGRATION.md`](./integration/INTEGRATION.md) — read-API guide · [`integration/harbor-widget.html`](./integration/harbor-widget.html) · [`integration/HarborAgentReliability.tsx`](./integration/HarborAgentReliability.tsx) |
 
 ## Contributing
 

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harbor — FXRP Agent Reliability (embeddable widget)</title>
+    <!--
+      Harbor Agent-Reliability widget — a single, dependency-free file.
+      Drop it into any page (or <iframe src="harbor-widget.html">) to show a live
+      FXRP agent-reliability leaderboard sourced from Harbor's public read API.
+
+      Configure with data-* attributes on the mount node (see #harbor-reliability):
+        data-api    Harbor API base URL   (default: the live Railway API)
+        data-asset  FAsset symbol         (default: FXRP)
+        data-limit  max agents to show    (default: all)
+
+      NOTE: because this fetches cross-origin from a browser, Harbor's API must
+      send `Access-Control-Allow-Origin`. Set HARBOR_API_CORS_ORIGINS=* on the
+      Railway service (the data is public and read-only) or add your exact origin.
+    -->
+    <style>
+      #harbor-reliability {
+        --hb-bg: #ffffff;
+        --hb-fg: #0f172a;
+        --hb-muted: #64748b;
+        --hb-border: #e2e8f0;
+        --hb-row: #f8fafc;
+        --hb-accent: #e62058; /* Flare/Harbor accent */
+        --hb-good: #059669;
+        --hb-warn: #d97706;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: var(--hb-fg);
+        background: var(--hb-bg);
+        border: 1px solid var(--hb-border);
+        border-radius: 14px;
+        padding: 18px 18px 12px;
+        max-width: 720px;
+        box-sizing: border-box;
+      }
+      @media (prefers-color-scheme: dark) {
+        #harbor-reliability {
+          --hb-bg: #0b1220;
+          --hb-fg: #e5e7eb;
+          --hb-muted: #94a3b8;
+          --hb-border: #1e293b;
+          --hb-row: #0f172a;
+        }
+      }
+      #harbor-reliability * { box-sizing: border-box; }
+      .hb-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+      .hb-title { font-size: 15px; font-weight: 700; margin: 0; }
+      .hb-by { font-size: 12px; color: var(--hb-muted); text-decoration: none; }
+      .hb-by b { color: var(--hb-accent); }
+      .hb-sub { font-size: 11px; color: var(--hb-muted); margin: 2px 0 12px; }
+      .hb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .hb-table th {
+        text-align: left;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--hb-muted);
+        font-weight: 600;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--hb-border);
+        white-space: nowrap;
+      }
+      .hb-table td {
+        padding: 9px 8px;
+        border-bottom: 1px solid var(--hb-border);
+        vertical-align: middle;
+      }
+      .hb-table tr:last-child td { border-bottom: 0; }
+      .hb-agent { display: flex; align-items: center; gap: 9px; min-width: 150px; }
+      .hb-agent img {
+        width: 26px; height: 26px; border-radius: 50%;
+        background: var(--hb-row); object-fit: cover; flex: none;
+      }
+      .hb-agent .hb-name { font-weight: 600; }
+      .hb-agent .hb-vault { font-size: 11px; color: var(--hb-muted); font-family: ui-monospace, monospace; }
+      .hb-score {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 40px; padding: 3px 8px; border-radius: 999px;
+        font-weight: 700; font-size: 12px;
+        color: #fff; background: var(--hb-good);
+      }
+      .hb-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .hb-def-0 { color: var(--hb-good); font-weight: 600; }
+      .hb-def-n { color: var(--hb-warn); font-weight: 600; }
+      .hb-foot { font-size: 10.5px; color: var(--hb-muted); margin-top: 10px; }
+      .hb-msg { padding: 22px 8px; text-align: center; color: var(--hb-muted); font-size: 13px; }
+      .hb-msg code { font-size: 11px; }
+      @media (max-width: 460px) {
+        .hb-hide-sm { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Mount node. Copy THIS element + the <script> below into your page. -->
+    <div
+      id="harbor-reliability"
+      data-api="https://api-production-6f3ec.up.railway.app"
+      data-asset="FXRP"
+    >
+      <div class="hb-msg">Loading agent reliability…</div>
+    </div>
+
+    <script>
+      (function () {
+        var el = document.getElementById("harbor-reliability");
+        if (!el) return;
+        var API = (el.getAttribute("data-api") || "").replace(/\/+$/, "");
+        var ASSET = el.getAttribute("data-asset") || "FXRP";
+        var LIMIT = parseInt(el.getAttribute("data-limit") || "0", 10);
+
+        function esc(s) {
+          return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+          });
+        }
+        function shortVault(v) {
+          return v ? v.slice(0, 6) + "…" + v.slice(-4) : "";
+        }
+        function secs(s) {
+          if (s == null) return "—";
+          if (s < 90) return s + "s";
+          return Math.round(s / 60) + "m";
+        }
+        function ratio(bips) {
+          var n = Number(bips);
+          return isFinite(n) ? (n / 100).toFixed(0) + "%" : "—";
+        }
+
+        function render(data) {
+          var agents = (data.agents || []).slice();
+          agents.sort(function (a, b) { return (b.score || 0) - (a.score || 0); });
+          if (LIMIT > 0) agents = agents.slice(0, LIMIT);
+
+          var rows = agents.map(function (a) {
+            var d = a.details || {};
+            var name = d.name || shortVault(a.agentVault);
+            var icon = d.iconUrl
+              ? '<img src="' + esc(d.iconUrl) + '" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+              : '<img alt=""/>';
+            var defCls = (a.defaultedRedemptions || 0) === 0 ? "hb-def-0" : "hb-def-n";
+            return (
+              "<tr>" +
+              '<td><div class="hb-agent">' + icon +
+                '<div><div class="hb-name">' + esc(name) + "</div>" +
+                (d.name ? '<div class="hb-vault">' + esc(shortVault(a.agentVault)) + "</div>" : "") +
+              "</div></div></td>" +
+              '<td><span class="hb-score">' + esc((a.score != null ? a.score : "—")) + "</span></td>" +
+              '<td class="hb-num">' + esc(a.successfulRedemptions != null ? a.successfulRedemptions : "—") + "</td>" +
+              '<td class="hb-num ' + defCls + '">' + esc(a.defaultedRedemptions != null ? a.defaultedRedemptions : "—") + "</td>" +
+              '<td class="hb-num hb-hide-sm">' + esc(secs(a.averageSettlementSeconds)) + "</td>" +
+              '<td class="hb-num hb-hide-sm">' + esc(a.availableLots != null ? a.availableLots : "—") + "</td>" +
+              '<td class="hb-num hb-hide-sm">' + esc(ratio(a.collateralRatioBips)) + "</td>" +
+              "</tr>"
+            );
+          }).join("");
+
+          var when = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "";
+          el.innerHTML =
+            '<div class="hb-head">' +
+              '<h3 class="hb-title">' + esc(ASSET) + " Agent Reliability</h3>" +
+              '<a class="hb-by" href="https://harbor-web-olive.vercel.app/agents" target="_blank" rel="noopener">powered by <b>Harbor</b></a>' +
+            "</div>" +
+            '<p class="hb-sub">Heuristic score (0–100) — informational only. FAssets assigns agents FIFO; this never selects an agent.</p>' +
+            '<table class="hb-table"><thead><tr>' +
+              "<th>Agent</th><th>Score</th><th>Settled</th><th>Defaults</th>" +
+              '<th class="hb-hide-sm">Avg&nbsp;time</th><th class="hb-hide-sm">Free&nbsp;lots</th><th class="hb-hide-sm">Collateral</th>' +
+            "</tr></thead><tbody>" + rows + "</tbody></table>" +
+            '<div class="hb-foot">Live from Coston2 · updated ' + esc(when) + "</div>";
+        }
+
+        fetch(API + "/agents?asset=" + encodeURIComponent(ASSET), { headers: { accept: "application/json" } })
+          .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+          .then(render)
+          .catch(function (err) {
+            el.innerHTML =
+              '<div class="hb-msg">Could not load Harbor data (' + esc(err.message) + ").<br/>" +
+              "If this is a CORS error, set <code>HARBOR_API_CORS_ORIGINS=*</code> on the Harbor API.</div>";
+          });
+      })();
+    </script>
+  </body>
+</html>
