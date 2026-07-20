@@ -2,6 +2,9 @@
 
 > **A guaranteed-settlement layer for FXRP redemptions on Flare — now with a destination-tag redemption lane.**
 
+> 🏆 **Built for the [Flare Summer Signal](https://dorahacks.io/hackathon/flaresummersignal) hackathon.**
+> Project submission (BUIDL): **[dorahacks.io/buidl/46944](https://dorahacks.io/buidl/46944)**.
+
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022-5FA04E?logo=node.js&logoColor=white)
