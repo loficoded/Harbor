@@ -24,13 +24,22 @@ const env = (name: string, dflt: string): string => {
   return v === undefined || v === "" ? dflt : v;
 };
 
+// Secrets have no bundled default: fail fast (with a clear message) when unset
+// rather than falling back to a committed key.
+const requireEnv = (name: string): string => {
+  const v = process.env[name];
+  if (v === undefined || v === "") {
+    throw new Error(
+      `${name} is required. Set it in your environment, e.g. export ${name}=0x<throwaway-key>`,
+    );
+  }
+  return v;
+};
+
 const CFG = {
   rpcUrl: env("RPC_URL", "https://coston2-api.flare.network/ext/C/rpc"),
   chainId: 114,
-  privateKey: env(
-    "PRIVATE_KEY",
-    "0x2f137cc77415e431c0bb5c5c1fc62597b986faa675c731eeed873762e60e836c",
-  ),
+  privateKey: requireEnv("PRIVATE_KEY"),
   addr: {
     assetManagerProxy: "0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA",
     fxrp: "0x0b6A3645c240605887a5532109323A3E12273dc7",

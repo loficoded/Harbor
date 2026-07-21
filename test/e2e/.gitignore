@@ -1,3 +1,8 @@
+# Never commit real secrets: local env overrides live outside version control.
+.env
+.env.*
+!.env.example
+
 node_modules/
 dist.cjs
 *.js

@@ -44,9 +44,14 @@ const require = createRequire(import.meta.url);
 const { ethers } = require("ethers");
 
 const RPC = process.env.RPC_URL || "http://127.0.0.1:8545";
-const PRIVATE_KEY =
-  process.env.PRIVATE_KEY ||
-  "0x2f137cc77415e431c0bb5c5c1fc62597b986faa675c731eeed873762e60e836c";
+// No bundled default: supply a throwaway key via the environment (never commit
+// one). Fail fast with a clear message when it is missing.
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+if (!PRIVATE_KEY) {
+  throw new Error(
+    "PRIVATE_KEY is required. Set it in your environment, e.g. export PRIVATE_KEY=0x<throwaway-key>",
+  );
+}
 const XRPL_ADDR = process.env.XRPL_REDEEMER_ADDRESS || "rDc7pHdFxCa9gVgXrfipWVU4HsXqtUNC8G";
 const EXECUTOR_FEE_WEI = BigInt(process.env.HARBOR_EXECUTOR_FEE_WEI || "100000000000000000"); // 0.1 C2FLR
 
