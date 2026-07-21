@@ -1,9 +1,10 @@
 import { RedemptionStatus } from "@/components/status";
 import { parseAdditionalRequestIds } from "@/lib/redemption-status";
 
+// Next 15 makes route `params`/`searchParams` async (Promises) for pages.
 type StatusPageProps = {
-  params: { id: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 function firstValue(value: string | string[] | undefined): string | undefined {
@@ -22,12 +23,17 @@ function firstValue(value: string | string[] | undefined): string | undefined {
  * agents FIFO, so the assigned agent is taken from indexed protocol data in the
  * redemption response rather than from the submission.
  */
-export default function StatusPage({ params, searchParams }: StatusPageProps) {
-  const requestId = decodeURIComponent(params.id).trim();
+export default async function StatusPage({
+  params,
+  searchParams,
+}: StatusPageProps) {
+  const { id } = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const requestId = decodeURIComponent(id).trim();
   const additionalRequestIds = parseAdditionalRequestIds(
-    firstValue(searchParams?.["more"]),
+    firstValue(resolvedSearchParams["more"]),
   );
-  const transactionHash = firstValue(searchParams?.["tx"]) ?? null;
+  const transactionHash = firstValue(resolvedSearchParams["tx"]) ?? null;
 
   return (
     <RedemptionStatus
