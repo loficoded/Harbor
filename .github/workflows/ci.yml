@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Format, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm check:format
+
+      # Build first: @harbor/api and @harbor/web import the compiled
+      # @harbor/shared and @harbor/protocol packages, so their dist output must
+      # exist before typecheck and tests can resolve them.
+      - name: Build
+        run: pnpm -r --if-present build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit + integration tests
+        run: pnpm -r --if-present test
+
+  contracts:
+    name: Foundry contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # foundry.toml remaps @openzeppelin and @flarenetwork to ../node_modules,
+      # so the workspace dependencies must be installed before compiling.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run forge tests
+        run: forge test --root contracts -vvv
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # No `cache: pnpm` here: this job doesn't run `pnpm install`, so there is
+      # no pnpm store for setup-node's cache step to save (which otherwise errors
+      # in its post-run with "Path Validation Error … no cache is being saved").
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Blocking gate: advisories are remediated (transitive overrides + Next 15
+      # + an audit-ignore for the unpatched, dead-code `elliptic` in the
+      # never-run hardhat-deploy). Retries only the flaky audit-endpoint 502s; a
+      # genuine high/critical advisory fails the build.
+      - name: Audit dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if out=$(pnpm audit --audit-level high 2>&1); then
+              echo "$out"; exit 0
+            fi
+            echo "$out"
+            if echo "$out" | grep -q "ERR_PNPM_AUDIT_BAD_RESPONSE"; then
+              echo "Transient audit-endpoint error; retry ${attempt}/3..."
+              sleep 5
+              continue
+            fi
+            echo "Dependency advisories found (see report above)."
+            exit 1
+          done
+          echo "::warning::pnpm audit endpoint unavailable after retries; not blocking."
+          exit 0
