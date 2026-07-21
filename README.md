@@ -15,17 +15,17 @@
 
 Harbor sits between an FXRP redeemer and the agent that owes them XRP, ensuring that missed payments automatically trigger FAssets default recovery. Because it never custodies funds, recovered collateral is always paid directly to you.
 
-|             |                                                                                            |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| Live demo   | [harbor-web-olive.vercel.app](https://harbor-web-olive.vercel.app)                         |
-| Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)         |
-| Walkthrough | ▶ [Watch the new demo video on YouTube](https://www.youtube.com/watch?v=TABAwMhMG20)       |
+|             |                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------ |
+| Live demo   | [harbor-web-olive.vercel.app](https://harbor-web-olive.vercel.app)                   |
+| Backend API | [api-production-6f3ec.up.railway.app](https://api-production-6f3ec.up.railway.app)   |
+| Walkthrough | ▶ [Watch the new demo video on YouTube](https://www.youtube.com/watch?v=TABAwMhMG20) |
 
 [![Harbor — FXRP redemption console on Flare Coston2](./assets/screenshots/redemption-console.png)](https://www.youtube.com/watch?v=TABAwMhMG20)
 
 <p align="center"><em>▶ <a href="https://www.youtube.com/watch?v=TABAwMhMG20">Watch the demo video</a> — redeem → watch XRPL → settle, or prove non-payment → execute default → recover collateral.</em></p>
 
-*Note: High-res video assets are also available in the repository at `assets/loom/video.mp4` (90-second walkthrough) and `assets/demo/harbor-demo.mp4` (2-minute product demo).*
+_Note: High-res video assets are also available in the repository at `assets/loom/video.mp4` (90-second walkthrough) and `assets/demo/harbor-demo.mp4` (2-minute product demo)._
 
 ## Features
 
@@ -155,6 +155,7 @@ stateDiagram-v2
 ## Agent Reliability Scoring
 
 Formula (`agent-reliability-mvp-v1`) clamped to `[0, 100]`:
+
 ```text
 fulfillment      (≤ 45)  = fulfillment_rate · 45 (22.5 if no history)
 settlement_time  (≤ 15)  = based on average settlement seconds (fast ≤ 1h, slow ≥ 24h)
@@ -162,15 +163,18 @@ availability     (≤ 20)  = from published availability + free lots
 collateral       (≤ 20)  = from agent's collateral ratio (floor 120% ... full 200%)
 default_penalty  (≤ 20)  = min(defaults · 5, 20) (subtracted)
 ```
+
 Scores are heuristic and **never** influence the protocol's FIFO agent assignment. Identity data (name, icon) is parsed directly from `AgentOwnerRegistry`.
 
 ## Build on Harbor
 
 Public, `GET`-only API providing read-only access to reliability and settlement status:
+
 - `GET /agents?asset=FXRP` — Heuristic agent leaderboard
 - `GET /redemptions/:id` — Evidence-based timeline
 
 **Drop-in Integrations:**
+
 - `integration/harbor-widget.html`: Zero-dependency embeddable leaderboard.
 - `integration/HarborAgentReliability.tsx`: Configurable React component.
 - See `integration/INTEGRATION.md` for full field definitions.
@@ -189,12 +193,15 @@ pnpm check                       # Format, typecheck, forge test
 ```
 
 ### Component Toggles (Backend)
+
 Configured via `.env` defaults:
+
 - `HARBOR_RUN_API` (on)
 - `HARBOR_RUN_MIGRATIONS` (on)
 - `HARBOR_RUN_INDEXER`, `HARBOR_RUN_XRPL_OBSERVER`, `HARBOR_RUN_AGENT_REFRESH`, `HARBOR_RUN_KEEPER` (off)
 
 ### Tests
+
 - **Foundry (Contracts):** `pnpm check:contracts` (3 suites)
 - **API (node:test):** `pnpm test` in `@harbor/api` (16 suites)
 - **Web (Vitest):** `pnpm test` in `@harbor/web` (19 suites)
@@ -213,9 +220,11 @@ pnpm protocol:generate-harbor-abi
 ```
 
 **Deployed Addresses:**
+
 - HarborRedeemer: `0x82f39361FFb1a438e4EBF8025efa06e4511b02b5`
 - FXRP AssetManager: `0xc1Ca88b937d0b528842F95d5731ffB586f4fbDFA`
 - FXRP Token (FTestXRP): `0x0b6A3645c240605887a5532109323A3E12273dc7`
 
 ## License
+
 Licensed under Apache 2.0.
