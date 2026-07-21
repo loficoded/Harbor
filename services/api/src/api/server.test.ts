@@ -37,7 +37,7 @@ import {
 } from "../repositories/index.js";
 import { resolveApiServerConfig, type ApiServerConfig } from "./config.js";
 import { createApiServer } from "./server.js";
-import { noopApiLogger } from "./logging.js";
+import { noopApiLogger, type ApiErrorLog, type ApiLogger } from "./logging.js";
 
 const assetManagerAddress = `0x${"11".repeat(20)}` as EvmAddress;
 const agentVaultA = `0x${"a1".repeat(20)}` as EvmAddress;
@@ -98,11 +98,12 @@ async function startTestServer(
   t: TestContext,
   database: SqliteDatabase,
   config: ApiServerConfig = testConfig(),
+  logger: ApiLogger = noopApiLogger,
 ): Promise<TestServer> {
   const server = createApiServer({
     database,
     config,
-    logger: noopApiLogger,
+    logger,
     generateRequestId: () => "test-request-id",
   });
 
@@ -809,5 +810,117 @@ describe("error responses", () => {
 
     assert.equal(response.status, 405);
     assert.equal(body.error.code, "METHOD_NOT_ALLOWED");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Malformed input handling (no 500 / no info leak)
+// ---------------------------------------------------------------------------
+
+describe("malformed redemption id", () => {
+  test("returns 404 (never 500) for a malformed percent-encoded id", async (t) => {
+    const database = createTestDatabase(t);
+    const { baseUrl } = await startTestServer(t, database);
+
+    // "%zz" is not a valid percent-encoding; the server must treat it as an
+    // unknown id (404), never surface a URIError as an internal 500.
+    const response = await fetch(`${baseUrl}/redemptions/%zz`);
+    const body = (await response.json()) as ApiErrorResponse;
+
+    assert.equal(response.status, 404);
+    assert.equal(body.error.code, "NOT_FOUND");
+  });
+});
+
+describe("internal error redaction", () => {
+  function capturingLogger(): { logger: ApiLogger; errors: ApiErrorLog[] } {
+    const errors: ApiErrorLog[] = [];
+    return {
+      logger: {
+        logRequest() {
+          // Not asserted here.
+        },
+        logError(entry) {
+          errors.push(entry);
+        },
+      },
+      errors,
+    };
+  }
+
+  test("redacts an unexpected 500 on the wire but logs the cause server-side", async (t) => {
+    const database = createTestDatabase(t);
+    const { logger, errors } = capturingLogger();
+    const { baseUrl } = await startTestServer(
+      t,
+      database,
+      testConfig(),
+      logger,
+    );
+
+    // Force an unexpected failure in a route with no internal catch.
+    database.close();
+
+    const { status, body } = await getJson(baseUrl, "/agents");
+    const response = body as ApiErrorResponse;
+
+    assert.equal(status, 500);
+    assert.equal(response.error.code, "INTERNAL");
+    // The client sees a generic message and no internal details.
+    assert.equal(response.error.message, "Internal server error");
+    assert.equal(response.error.details, null);
+    // The real cause is captured server-side for operators.
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0]?.statusCode, 500);
+    assert.equal(typeof errors[0]?.error, "string");
+    assert.notEqual(errors[0]?.error, "Internal server error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rate limiting
+// ---------------------------------------------------------------------------
+
+describe("rate limiting", () => {
+  function withRateLimit(limit: number, enabled = true): ApiServerConfig {
+    return {
+      ...testConfig(),
+      rateLimit: { enabled, limit, windowMs: 60_000, trustProxy: true },
+    };
+  }
+
+  test("returns 429 with Retry-After once a client exceeds the limit", async (t) => {
+    const database = createTestDatabase(t);
+    const { baseUrl } = await startTestServer(t, database, withRateLimit(2));
+
+    const first = await fetch(`${baseUrl}/health`);
+    await first.text();
+    const second = await fetch(`${baseUrl}/health`);
+    await second.text();
+    const third = await fetch(`${baseUrl}/health`);
+    const body = (await third.json()) as ApiErrorResponse;
+
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(third.status, 429);
+    assert.equal(body.error.code, "TOO_MANY_REQUESTS");
+    assert.equal(third.headers.get("ratelimit-limit"), "2");
+    assert.equal(third.headers.get("ratelimit-remaining"), "0");
+    assert.notEqual(third.headers.get("retry-after"), null);
+  });
+
+  test("does not rate limit when disabled", async (t) => {
+    const database = createTestDatabase(t);
+    const { baseUrl } = await startTestServer(
+      t,
+      database,
+      withRateLimit(1, false),
+    );
+
+    for (let index = 0; index < 3; index += 1) {
+      const response = await fetch(`${baseUrl}/health`);
+      await response.text();
+      assert.equal(response.status, 200);
+    }
   });
 });

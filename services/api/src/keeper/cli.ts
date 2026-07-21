@@ -43,12 +43,15 @@ function usage(): string {
     "  --database <path-or-file-url>          Defaults to INDEXER_DB_URL or ./data/harbor.sqlite",
     "  --rpc-url <url>                        Defaults to RPC_URL_COSTON2 or the pinned Coston2 RPC",
     "  --harbor-redeemer <address>            Defaults to HARBOR_REDEEMER_ADDRESS",
-    "  --keeper-private-key <0x...>           Defaults to KEEPER_PRIVATE_KEY",
     "  --fdc-da-layer-url <url>               Defaults to FDC_DA_LAYER_URL or the pinned Coston2 DA API",
-    "  --fdc-da-layer-api-key <key>           Defaults to FDC_DA_LAYER_API_KEY",
     "  --message-integrity-code <bytes32>     Defaults to HARBOR_FDC_MESSAGE_INTEGRITY_CODE or zero bytes32",
     "  --batch-size <count>                   Defaults to HARBOR_KEEPER_BATCH_SIZE or 25",
     "  --polling-interval-ms <milliseconds>   Defaults to HARBOR_KEEPER_POLL_INTERVAL_MS or 30000",
+    "",
+    "Secrets are read from the environment only (never CLI flags, which leak via",
+    "process listings and shell history):",
+    "  KEEPER_PRIVATE_KEY        Required. The keeper signer's 0x-prefixed key.",
+    "  FDC_DA_LAYER_API_KEY      Optional. DA-layer API key, if your endpoint needs one.",
   ].join("\n");
 }
 
@@ -143,9 +146,10 @@ async function main(): Promise<void> {
       "HARBOR_REDEEMER_ADDRESS",
     ),
   );
+  // Secrets are intentionally env-only: passing a key as a CLI flag leaks it via
+  // `ps`, /proc, and shell history. The env var is the single supported source.
   const keeperPrivateKey = requiredValue(
-    parseFlagValue(args, ["--keeper-private-key"]) ??
-      process.env.KEEPER_PRIVATE_KEY,
+    process.env.KEEPER_PRIVATE_KEY,
     "KEEPER_PRIVATE_KEY",
   ) as `0x${string}`;
   const messageIntegrityCode = normalizeBytes32(
@@ -156,9 +160,8 @@ async function main(): Promise<void> {
   const daLayerBaseUrl =
     parseFlagValue(args, ["--fdc-da-layer-url"]) ??
     process.env.FDC_DA_LAYER_URL;
-  const daLayerApiKey =
-    parseFlagValue(args, ["--fdc-da-layer-api-key"]) ??
-    process.env.FDC_DA_LAYER_API_KEY;
+  // Env-only (secret): never accepted as a CLI flag. See KEEPER_PRIVATE_KEY.
+  const daLayerApiKey = process.env.FDC_DA_LAYER_API_KEY;
   const batchSize = parsePositiveInteger(
     parseFlagValue(args, ["--batch-size"]) ??
       process.env.HARBOR_KEEPER_BATCH_SIZE,

@@ -6,6 +6,12 @@ import {
   type HealthBuildInfo,
 } from "@harbor/shared";
 
+import {
+  defaultRateLimit,
+  defaultRateLimitWindowMs,
+  type RateLimitConfig,
+} from "./rateLimit.js";
+
 export const harborApiServiceName = "@harbor/api";
 export const harborApiVersion = "0.1.0";
 export const defaultHarborApiPort = 3001;
@@ -33,6 +39,7 @@ export type ApiServerConfig = Readonly<{
   supportedAssets: readonly string[];
   defaultAsset: string;
   cors: CorsConfig;
+  rateLimit: RateLimitConfig;
   build: HealthBuildInfo;
 }>;
 
@@ -71,6 +78,74 @@ export function resolveCorsConfig(env: EnvInput = process.env): CorsConfig {
   };
 }
 
+const truthyFlagValues = new Set(["1", "true", "yes", "on"]);
+const falsyFlagValues = new Set(["0", "false", "no", "off"]);
+
+function parseBooleanFlag(
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean {
+  const raw = trimmed(value)?.toLowerCase();
+
+  if (raw === undefined) {
+    return defaultValue;
+  }
+
+  if (truthyFlagValues.has(raw)) {
+    return true;
+  }
+
+  if (falsyFlagValues.has(raw)) {
+    return false;
+  }
+
+  throw new Error(`Expected a boolean value (true/false), received "${value}"`);
+}
+
+function parsePositiveIntegerEnv(
+  value: string | undefined,
+  defaultValue: number,
+  name: string,
+): number {
+  const raw = trimmed(value);
+
+  if (raw === undefined) {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer, received "${raw}"`);
+  }
+
+  return parsed;
+}
+
+/**
+ * Resolve public-API rate limiting. Enabled by default as request-flood
+ * defense-in-depth; `trustProxy` defaults on so per-client limiting is correct
+ * behind the platform proxy (Railway). All knobs are overridable via env.
+ */
+export function resolveRateLimitConfig(
+  env: EnvInput = process.env,
+): RateLimitConfig {
+  return {
+    enabled: parseBooleanFlag(env["HARBOR_API_RATE_LIMIT_ENABLED"], true),
+    limit: parsePositiveIntegerEnv(
+      env["HARBOR_API_RATE_LIMIT"],
+      defaultRateLimit,
+      "HARBOR_API_RATE_LIMIT",
+    ),
+    windowMs: parsePositiveIntegerEnv(
+      env["HARBOR_API_RATE_LIMIT_WINDOW_MS"],
+      defaultRateLimitWindowMs,
+      "HARBOR_API_RATE_LIMIT_WINDOW_MS",
+    ),
+    trustProxy: parseBooleanFlag(env["HARBOR_API_TRUST_PROXY"], true),
+  };
+}
+
 export function resolveBuildInfo(env: EnvInput = process.env): HealthBuildInfo {
   return {
     service: harborApiServiceName,
@@ -98,6 +173,7 @@ export function resolveApiServerConfig(
     supportedAssets: [defaultAssetSymbol],
     defaultAsset: defaultAssetSymbol,
     cors: resolveCorsConfig(env),
+    rateLimit: resolveRateLimitConfig(env),
     build: resolveBuildInfo(env),
   };
 }

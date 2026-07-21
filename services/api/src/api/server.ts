@@ -12,6 +12,7 @@ import type { ApiServerConfig } from "./config.js";
 import { buildCorsHeaders } from "./cors.js";
 import { ApiError, toApiError, toApiErrorResponse } from "./errors.js";
 import { createJsonApiLogger, type ApiLogger } from "./logging.js";
+import { FixedWindowRateLimiter, resolveClientKey } from "./rateLimit.js";
 import {
   buildAgentsResponseData,
   buildHealthReport,
@@ -55,6 +56,12 @@ export function createApiServer(deps: ApiServerDependencies): Server {
   const logger = deps.logger ?? createJsonApiLogger();
   const generateRequestId = deps.generateRequestId ?? (() => randomUUID());
   const clock = deps.now;
+  const rateLimiter = config.rateLimit.enabled
+    ? new FixedWindowRateLimiter({
+        limit: config.rateLimit.limit,
+        windowMs: config.rateLimit.windowMs,
+      })
+    : null;
 
   function route(url: URL): RouteResult {
     const { pathname } = url;
@@ -95,7 +102,17 @@ export function createApiServer(deps: ApiServerDependencies): Server {
     const redemptionMatch = redemptionPathPattern.exec(pathname);
 
     if (redemptionMatch !== null) {
-      const rawId = decodeURIComponent(redemptionMatch[1] ?? "");
+      const rawEncodedId = redemptionMatch[1] ?? "";
+      let rawId: string;
+
+      try {
+        rawId = decodeURIComponent(rawEncodedId);
+      } catch {
+        // A malformed percent-encoding is never a valid request id: treat it as
+        // "not found" rather than letting the URIError surface as a 500.
+        throw ApiError.notFound(`Redemption "${rawEncodedId}" was not found`);
+      }
+
       let normalizedId: string;
 
       try {
@@ -148,6 +165,29 @@ export function createApiServer(deps: ApiServerDependencies): Server {
       logRequest(statusCode);
     };
 
+    // Per-client rate limiting (defense-in-depth against request floods). CORS
+    // and request-id headers are already set above, so a 429 still carries them.
+    if (rateLimiter !== null) {
+      const decision = rateLimiter.check(
+        resolveClientKey(request, config.rateLimit.trustProxy),
+      );
+
+      response.setHeader("ratelimit-limit", String(decision.limit));
+      response.setHeader("ratelimit-remaining", String(decision.remaining));
+
+      if (!decision.allowed) {
+        response.setHeader(
+          "retry-after",
+          String(Math.ceil(decision.retryAfterMs / 1000)),
+        );
+        const apiError = ApiError.tooManyRequests(
+          "Rate limit exceeded; slow down and retry shortly",
+        );
+        sendJson(apiError.statusCode, toApiErrorResponse(apiError, requestId));
+        return;
+      }
+    }
+
     try {
       // CORS preflight: answer with the negotiated headers and no body.
       if (method === "OPTIONS") {
@@ -167,6 +207,19 @@ export function createApiServer(deps: ApiServerDependencies): Server {
       sendJson(result.statusCode, result.body);
     } catch (error) {
       const apiError = toApiError(error);
+
+      // Unexpected (5xx) errors are logged in full server-side but redacted in
+      // the response body (see toApiErrorResponse), so internals never leak.
+      if (apiError.statusCode >= 500) {
+        logger.logError?.({
+          requestId,
+          method,
+          path: url.pathname,
+          statusCode: apiError.statusCode,
+          error: apiError.message,
+        });
+      }
+
       sendJson(apiError.statusCode, toApiErrorResponse(apiError, requestId));
     }
   });
